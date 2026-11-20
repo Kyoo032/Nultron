@@ -2,7 +2,7 @@
 
 Product: both · Instance: tester (`tester/chat-first`). Live voice is off unless `AGENTFORGE_VOICE` is on; to run it, start an isolated desk on its own port, never 3000 or 3200.
 
-Last verified: 2026-11-11 at 4fbbe0d2 (the tester code; this page's own commits sit on top). Driven live on 2026-11-10 to 11 on an isolated desk, through the real gateway and in Chromium with a fake microphone. The latency numbers are in the plan's [First live run](../voice-mode-plan.md#first-live-run-2026-11-10) section, not here. Not verified: the hosted server (server mode), Safari, a phone, a real microphone with echo on speakers. Tests run on 2026-11-11 pass (commands under "How to test it"). Plan: [`../voice-mode-plan.md`](../voice-mode-plan.md). Feature recipe: [`../../../.cursor/skills/verify-agentforge/features/voice.md`](../../../.cursor/skills/verify-agentforge/features/voice.md).
+Last verified: 2026-11-18 at 886ca55a plus the local browser mode fix. The browser voice tests cover that fix. The last live drive was on 2026-11-10 to 11 at 4fbbe0d2, through the real gateway and in Chromium with a fake microphone. The latency numbers are in the plan's [First live run](../voice-mode-plan.md#first-live-run-2026-11-10). Not verified: the hosted server, Safari, a phone, or a real microphone with echo on speakers. Plan: [`../voice-mode-plan.md`](../voice-mode-plan.md). Feature recipe: [`../../../.cursor/skills/verify-agentforge/features/voice.md`](../../../.cursor/skills/verify-agentforge/features/voice.md).
 
 ## Overview
 
@@ -110,7 +110,7 @@ _Bare line numbers in this section are in `packages/host/src/voice/relay.ts`; a 
    - The reply is released (`flush`, `:527-535`: state `thinking`, buffered events applied) once a text, audio or `ask` event has arrived and the silence has reached `endSilenceMs` (700 ms) (`canRelease`, `:408-410`).
    - If the person speaks again before the release, the speculative reply is dropped silently: its stream is aborted, its buffer and transcription are discarded (`abortEarly`, `:376-390`), and the longer utterance is sent when they stop. Nothing is sent to the browser.
    - The talker can say the sentence is unfinished with a `wait` event (the `keep_listening` tool, which ships off, see below). The relay also treats an `ask` whose question reads unfinished (`judgeTurnEnd`, `turns.ts:182-225`: ends on "yang", "and", a hesitation, "...") as a `wait` (`isUnfinished`, `relay.ts:503-510`). A `wait` aborts the reply, discards the buffer, goes back to `listening` and holds (`holdForWait`, `:512-525`). A held turn is answered only when silence reaches `maxSilenceMs` (2,500 ms), and then the talker is called with `mustAnswer` and may not wait again (`:397-399,522-524`).
-   - In **push-to-talk** the detector never ends a turn (`:393`): the browser sends frames only while the button is held and `commit` on release (`apps/web/lib/voice-client.ts:275-279,326-336`). `commit` is ignored if the detector never heard speech (`relay.ts:413`); otherwise it sets `mustAnswer`, starts the reply and releases it when events arrive (`onCommit`, `:412-418`).
+   - In **push-to-talk** the detector never ends a turn (`:393`): the browser sends frames only while the button is held and `commit` on release (`apps/web/lib/voice-client.ts:275-280,327-339`). `commit` is ignored if the detector never heard speech (`relay.ts:413`); otherwise it sets `mustAnswer`, starts the reply and releases it when events arrive (`onCommit`, `:412-418`).
 5. **The talker's events** (`apply`, `:538-572`): `audio` is forwarded to the browser in frames of at most 48,000 bytes (`forwardPcm`, `:663-690`; the first one moves the state to `speaking` and sets the latency number), `text` builds the assistant caption (at most one caption per 100 ms, `captionAssistant`, `:1028-1041`), `usage` is held for the ledger, `ask` diverts to the thinker (step 6), `done` ends the reply. A reply with no text, no audio and no ask goes back to `listening` without saving (`:473-479,560-563`).
 6. **`ask_nultron`** (`handleAsk`, `:574-613`): the relay sends the question as the person's final caption, plays the cached acknowledgement (below) with its caption `ack<n>`, calls the thinker (`voiceWiring().ask`, 20 s limit, see section 6), sends a `card` frame if it needs a tap, then calls the talker again with the thinker's text (`talkerSession.answer`, through `startReply(true)`, `:607-612`), and the talker speaks it. On an `ask` turn the saved words of the person are the question the talker passed on, and the transcriber is not started (`this.asked`, `:616`).
 7. **Words and caption of the person** (`maybeTranscribe` and `runTranscribe`, `:615-661`): the transcriber starts on the first audio or text event of the reply, buffered or not (`:491,541,546`), on the whole utterance, with up to 2 tries of 15 s each (`relay.ts:635`, `transcriber-gateway.ts:13`). When it answers, the relay sends the person's final caption (`:658`). It takes 3 to 5 s, so the words arrive after the agent has started to answer; the browser puts them above that turn's reply (see "What the two live-run fixes changed"). If it fails the turn is saved with `Voice message` / `Pesan suara` (`PLACEHOLDER`, `:37`).
@@ -154,7 +154,7 @@ _Bare line numbers in this section are in `packages/host/src/voice/ask.ts`; a ci
 
 _Bare line numbers in this section are in `packages/host/src/voice/relay.ts`; a cite of any other file names it._
 
-The browser ends voice with `{ type: "stop" }` (`voice-client.ts:358-367`) or H3. Both go to `voiceSessions().end` (`sessions.ts:158-180`), which calls the relay's `shutdown` (`relay.ts:202-229`): it aborts work, saves any released but unsaved turn (`persistPartial`, `:753-768`, waiting up to 20 s for the person's words), sends `ended { reason }`, closes the socket, closes the talker session and writes the session-seconds ledger row.
+The browser ends voice with `{ type: "stop" }` (`voice-client.ts:362-371`) or H3. Both go to `voiceSessions().end` (`sessions.ts:158-180`), which calls the relay's `shutdown` (`relay.ts:202-229`): it aborts work, saves any released but unsaved turn (`persistPartial`, `:753-768`, waiting up to 20 s for the person's words), sends `ended { reason }`, closes the socket, closes the talker session and writes the session-seconds ledger row.
 
 End reasons (`VOICE_END_REASONS`, `protocol.ts:58`): `user` (stop frame or H3); `max_length` (15 minutes, `sessions.ts:131-133`); `idle` (2 minutes with no speech and no control frame, `relay.ts:1099-1104`); `dropped` (no socket in 30 s, the socket closed or errored, audio too fast, or a listener 3 seconds behind: `sessions.ts:128-130`, `relay.ts:164-169,286-289,1109-1112`); `error` (three talker failures in a row, or a failed start, `relay.ts:197,1010`); `replaced` (a newer H1 from the same owner, `sessions.ts:104`).
 
@@ -272,11 +272,11 @@ Seconds rows go through `priceSecondsUsage` (`usage-record.ts:102-108`): with no
 - **Voice stands down for Chat.** A Chat reply that starts streaming closes voice (`use-voice-session.ts:188-192`); so does opening another session in the rail (`use-voice-session.ts:177-185`); Escape closes the view (`use-voice-session.ts:197-208`).
 - **Phone backgrounding.** `watchBackground` (`apps/web/lib/voice-browser-deps.ts:32-44`) stops voice on `pagehide` everywhere and on a hidden tab only when `isPhoneLike()` (`voice-browser-deps.ts:13-25`), so a desktop tab switch keeps the conversation going and locking a phone releases the microphone. A context that goes `suspended` or `interrupted` after it ran stops voice too (`voice-client.ts:282-291`).
 - **The packaged desktop app reports voice unsupported.** `browserVoiceDeps` sets `supported.webSocket` to `typeof WebSocket !== "undefined" && !isElectron()` (`voice-browser-deps.ts:52`): that app reaches the host over IPC from a `file:` page with no origin to open a socket on, so a tap shows `error.unsupported` (`voice-client.ts:101-103`).
-- **Mode:** the last choice of hands-free or push-to-talk is kept in `localStorage` (`apps/web/lib/voice-settings.ts:26-40`); a mode other than hands-free is sent as a `mode` frame after `ready` (`voice-client.ts:236-238`).
+- **Mode:** `localStorage` keeps the last choice of hands-free or push-to-talk (`apps/web/lib/voice-settings.ts:26-40`). The session POST carries the starting mode. If the choice changes before `ready`, the browser sends the latest mode before it starts sending microphone frames (`voice-client.ts:132-141,233-240`). In push-to-talk, a release flushes the final audio frame and sends one `commit`. A mode change or stop cancels the pending commit (`voice-client.ts:303-339,362-369`).
 
 ## How to test it
 
-All of these ran on 2026-11-11 against this tree and passed. The commands are run from inside the package, not from the repo root: `packages/host/vitest.config.ts` and `apps/web/vitest.config.ts` hold the setup each suite needs, and the repo root has no vitest config.
+The host, web, and eval suites ran again on 2026-11-18 for the browser mode fix. Run each command from its package. The repo root has no Vitest config.
 
 1. **Host voice suites** (no gateway call; `relay.test.ts` drives the relay and `attachVoiceUpgrade` on a real loopback socket, `relay.test.ts:335-336`): 13 files, 547 tests.
    ```bash
@@ -288,7 +288,7 @@ All of these ran on 2026-11-11 against this tree and passed. The commands are ru
    cd packages/core
    npx vitest run src/voice
    ```
-3. **Web voice suites:** 11 files, 296 tests.
+3. **Web voice suites:** 11 files, 300 tests.
    ```bash
    cd apps/web
    npx vitest run lib/voice-

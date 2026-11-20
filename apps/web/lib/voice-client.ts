@@ -77,7 +77,7 @@ export class VoiceClient {
   private barge: BargeCoordinator | null = null;
   private stopWatching: (() => void) | null = null;
   private ready = false;
-  private holding = false;
+  private hold: { releasing: boolean } | null = null;
   private everRan = false;
   /** Gives up on a socket that is still opening, so a stop during setup does not leave `connect` waiting. */
   private abortConnect: (() => void) | null = null;
@@ -129,7 +129,8 @@ export class VoiceClient {
     if (this.finished) {
       return;
     }
-    const opened = await this.deps.openSession(threadId, this.mode);
+    const requestedMode = this.mode;
+    const opened = await this.deps.openSession(threadId, requestedMode);
     if (this.finished) {
       return;
     }
@@ -137,13 +138,13 @@ export class VoiceClient {
       return this.fail(opened.code);
     }
     try {
-      await this.connect(audio, opened.session);
+      await this.connect(audio, opened.session, requestedMode);
     } catch {
       return this.fail("connect");
     }
   }
 
-  private async connect(audio: VoiceAudioLike, session: VoiceSessionCreated): Promise<void> {
+  private async connect(audio: VoiceAudioLike, session: VoiceSessionCreated, requestedMode: VoiceMode): Promise<void> {
     const socket = this.deps.createSocket(session.streamPath);
     socket.binaryType = "arraybuffer";
     this.socket = socket;
@@ -173,7 +174,7 @@ export class VoiceClient {
     if (this.finished) {
       return;
     }
-    socket.onmessage = (event) => this.onMessage(event.data);
+    socket.onmessage = (event) => this.onMessage(event.data, requestedMode);
     socket.onerror = () => undefined;
     socket.onclose = () => {
       if (!this.finished) {
@@ -213,14 +214,14 @@ export class VoiceClient {
   }
 
   /** The host's JSON frames and the agent's audio. */
-  private onMessage(data: unknown): void {
+  private onMessage(data: unknown, requestedMode: VoiceMode): void {
     if (this.finished) {
       return;
     }
     if (typeof data === "string") {
       const frame = parseVoiceHostFrame(data);
       if (frame) {
-        this.onFrame(frame);
+        this.onFrame(frame, requestedMode);
       }
       return;
     }
@@ -229,13 +230,13 @@ export class VoiceClient {
     }
   }
 
-  private onFrame(frame: VoiceHostFrame): void {
+  private onFrame(frame: VoiceHostFrame, requestedMode: VoiceMode): void {
     switch (frame.type) {
       case "ready":
-        this.ready = true;
-        if (this.mode !== "hands_free") {
+        if (this.mode !== requestedMode) {
           this.sendFrame({ type: "mode", value: this.mode });
         }
+        this.ready = true;
         this.options.emit({ type: "frame", frame });
         return;
       case "state":
@@ -272,7 +273,7 @@ export class VoiceClient {
         this.barge?.onLevel(level, VOICE_LEVEL_WINDOW_MS);
       }
     }
-    if (this.mode === "hands_free" || this.holding) {
+    if (this.mode === "hands_free" || this.hold) {
       for (const frame of frames) {
         this.sendBinary(frame);
       }
@@ -305,7 +306,7 @@ export class VoiceClient {
       return;
     }
     this.mode = mode;
-    this.holding = false;
+    this.hold = null;
     this.options.emit({ type: "mode", value: mode });
     if (this.ready) {
       this.sendFrame({ type: "mode", value: mode });
@@ -314,25 +315,28 @@ export class VoiceClient {
 
   /** Push-to-talk pressed: frames go to the host until `holdEnd`. */
   holdStart(): void {
-    if (this.finished || !this.ready || this.mode !== "push_to_talk" || this.holding) {
+    if (this.finished || !this.ready || this.mode !== "push_to_talk" || this.hold) {
       return;
     }
     this.audio?.resetCapture();
-    this.holding = true;
+    this.hold = { releasing: false };
     this.barge?.onHoldStart();
   }
 
   /** Push-to-talk released: what is still held in the last frame goes out, then `commit`. */
   async holdEnd(): Promise<void> {
-    if (this.finished || !this.holding) {
+    const hold = this.hold;
+    if (!hold || hold.releasing) {
       return;
     }
+    hold.releasing = true;
     await this.audio?.flushCapture();
-    // The flush was the last thing sent for this press: later frames are not part of it.
-    this.holding = false;
-    if (!this.finished) {
-      this.sendFrame({ type: "commit" });
+    // A mode change or stop can invalidate this press while the worklet flushes.
+    if (this.hold !== hold) {
+      return;
     }
+    this.hold = null;
+    this.sendFrame({ type: "commit" });
   }
 
   /** The person ended voice, or the view is going away. Tells the host, then lets everything go. */
@@ -360,7 +364,7 @@ export class VoiceClient {
       return;
     }
     this.finished = true;
-    this.holding = false;
+    this.hold = null;
     this.ready = false;
     if (tellHost) {
       this.sendFrame({ type: "stop" });

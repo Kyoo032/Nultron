@@ -13,6 +13,8 @@ class FakeAudio implements VoiceAudioLike {
   startError: unknown = null;
   /** Holds `start` open, like a permission prompt nobody has answered yet. */
   startGate: Promise<void> | null = null;
+  /** Holds `flushCapture` open until the worklet acknowledges the final frame. */
+  flushGate: Promise<void> | null = null;
   started = false;
   /** Everything a closed `AudioContext` and stopped tracks add up to: nothing left running. */
   closed = false;
@@ -54,6 +56,7 @@ class FakeAudio implements VoiceAudioLike {
   }
   async flushCapture() {
     this.flushes += 1;
+    if (this.flushGate) await this.flushGate;
     // What the worklet does: the padded remainder goes out through the capture path before it answers.
     this.onCapture?.([new ArrayBuffer(1920)], []);
   }
@@ -504,10 +507,32 @@ describe("the screen going away", () => {
 });
 
 describe("push-to-talk", () => {
-  it("tells the host the mode once the session is ready", async () => {
+  it.each<[VoiceMode, VoiceMode]>([
+    ["push_to_talk", "hands_free"],
+    ["hands_free", "push_to_talk"],
+  ])("switches from %s to %s on the host if the choice changes while connecting", async (initialMode, nextMode) => {
+    const { client, audio, socket, log, host, settle } = harness({ mode: initialMode });
+    const started = client.start();
+    await settle();
+    expect(log.sessionRequests).toEqual([{ threadId: "thread-1", mode: initialMode }]);
+    client.setMode(nextMode);
+    socket.open();
+    await started;
+    expect(socket.sent).toEqual([]);
+
+    host({ type: "ready", sessionId: SESSION.sessionId, threadId: SESSION.threadId, endsAt: 1 });
+    const pcm = new ArrayBuffer(1920);
+    audio.onCapture?.([pcm], []);
+
+    expect(socket.frames()).toEqual([{ type: "mode", value: nextMode }]);
+    expect(socket.binary()).toEqual(nextMode === "hands_free" ? [pcm] : []);
+    expect(socket.sent[0]).toBe(JSON.stringify({ type: "mode", value: nextMode }));
+  });
+
+  it("does not resend the starting mode if it has not changed", async () => {
     const { goLive, socket } = harness({ mode: "push_to_talk" });
     await goLive();
-    expect(socket.frames()).toEqual([{ type: "mode", value: "push_to_talk" }]);
+    expect(socket.frames()).toEqual([]);
   });
 
   it("sends no audio unless the button is held", async () => {
@@ -532,6 +557,35 @@ describe("push-to-talk", () => {
     // After release, nothing more goes out.
     audio.onCapture?.([new ArrayBuffer(1920)], []);
     expect(socket.binary()).toHaveLength(3);
+  });
+
+  it("sends just one commit if release is reported twice before the worklet answers", async () => {
+    const { client, goLive, audio, socket } = harness({ mode: "push_to_talk" });
+    await goLive();
+    const flush = Promise.withResolvers<void>();
+    audio.flushGate = flush.promise;
+    client.holdStart();
+    const firstRelease = client.holdEnd();
+    const secondRelease = client.holdEnd();
+    flush.resolve();
+    await Promise.all([firstRelease, secondRelease]);
+
+    expect(socket.binary()).toHaveLength(1);
+    expect(socket.frames()).toEqual([{ type: "commit" }]);
+  });
+
+  it("does not commit a push-to-talk turn after switching to hands-free during release", async () => {
+    const { client, goLive, audio, socket } = harness({ mode: "push_to_talk" });
+    await goLive();
+    const flush = Promise.withResolvers<void>();
+    audio.flushGate = flush.promise;
+    client.holdStart();
+    const released = client.holdEnd();
+    client.setMode("hands_free");
+    flush.resolve();
+    await released;
+
+    expect(socket.frames()).toEqual([{ type: "mode", value: "hands_free" }]);
   });
 
   it("commits on every release, not just the first", async () => {
@@ -579,7 +633,7 @@ describe("push-to-talk", () => {
     client.holdStart();
     await settle();
     expect(audio.pauses).toBe(1);
-    expect(socket.frames().map((frame) => frame.type)).toEqual(["mode", "barge_in", "played"]);
+    expect(socket.frames().map((frame) => frame.type)).toEqual(["barge_in", "played"]);
   });
 
   it("does not guess a cut-in from loudness: the button is the signal", async () => {

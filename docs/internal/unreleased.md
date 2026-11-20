@@ -60,6 +60,13 @@ Lanes: main, enterprise, tester
 
 Devin Review on #233's merged code found a Reasoning failover could land on `deepseek-v4-pro`, a text-only model, while the chat thread replays a picture it cannot read at all. The 2026-11-13 picture demotion covered only `modelMisreadsPictures` (the two Lunas); `tierLiveness` (`packages/host/src/tier-resolve.ts`) now demotes a candidate on the same `carriesPicture` flag when `modelImageInput(id) === "no"` either — still a demotion, never a drop, so it answers when nothing else of the tier is live. Effect today: on a Reasoning picture turn with `claude-opus-5-5` and `gpt-6-astra` down, the walk picks `qwen3.8-max` ahead of `deepseek-v4-pro`. The 2026-11-13 entry below says "Reasoning is unchanged"; this entry amends it. Corrects the recipe note in `features/model-tiers.md` the same way. Proof: `tier-resolve-picture.test.ts` (the Reasoning walk under a replayed picture and without), `tier-resolve.test.ts` (demoted = misreader or text-only), `pnpm ci:local` all required steps pass.
 
+## Live Voice keeps the selected turn mode, 2026-11-18
+
+Lanes: tester
+
+- If you switch between hands-free and push-to-talk while voice connects, the browser sends your latest choice before it sends microphone audio. Previously, switching to hands-free during connection could leave the host waiting for a push-to-talk release (`apps/web/lib/voice-client.ts:132-133,233-240`).
+- Push-to-talk release now sends at most one end-of-turn signal. If you switch modes or end voice while the last audio frame is still being flushed, the old release no longer sends a signal (`apps/web/lib/voice-client.ts:303-339,362-369`).
+- The browser client regression tests check both connection-time mode changes, duplicate releases, and a mode change during release (`apps/web/lib/voice-client.test.ts:510-530,562-589`). Not driven against the live gateway.
 ## Daily no longer sends a picture turn to the Luna models, which misread pictures, 2026-11-13 (branch `fix/daily-picture-model` from `main` at `365d4af6`; unit tests run, driven on `:3000`)
 
 Lanes: enterprise, tester
