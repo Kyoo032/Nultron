@@ -29,6 +29,8 @@ Scope: one run, one settle (a second is a no-op because `queueClosed` is already
 node scripts/formal/chat-run-settle.mjs
 ```
 
+Hermetic Nix CI runs both the default and `--hazard` checks via `nix build .#checks.x86_64-linux.ci-formal-chat-settle` (and inside `pnpm ci:nix:fast`). `nix develop` automatically supplies Java (`jre_headless`) and `TLA2TOOLS_JAR`.
+
 It needs Java 11 or later and TLC 1.7.4, pinned by sha256 in the script. The script looks for the jar at `~/.cache/nultron-formal/tla2tools-1.7.4.jar`, or at `TLA2TOOLS_JAR`. If it is missing, the script prints the one `curl` line that fetches it and exits 3. A run takes about two seconds.
 
 GitHub publishes no digest for that release asset, so the pinned hash is from the copy this check was built with. Its size matches the v1.7.4 release asset (2,274,532 bytes), and its banner reads `TLC2 Version 2.19 of 08 August 2024 (rev: 5a47802)`. If a fresh download hashes differently, stop and find out why before you change the pin.

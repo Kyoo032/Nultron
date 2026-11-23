@@ -29,12 +29,16 @@ let
   );
 
   callEach = dir: lib.mapAttrs (_: file: scope.callPackage file { }) (unitsIn dir);
+  checks = callEach ./checks;
+  basePackages = lib.filterAttrs (_: lib.isDerivation) (lib.getAttrs (lib.attrNames pkgUnits) scope);
+  fastCheckNames = builtins.filter (name: name != "images") (lib.attrNames checks);
+  ci-fast = pkgs.linkFarmFromDrvs "nultron-ci-fast" (lib.attrVals fastCheckNames checks);
 in
 {
   # Without makeScope's own `packages` function: it would answer `nix build .#packages.<system>.<name>` with
   # "not an attribute set" before Nix tries the flake's real packages output.
   scope = removeAttrs scope [ "packages" ];
-  packages = lib.filterAttrs (_: lib.isDerivation) (lib.getAttrs (lib.attrNames pkgUnits) scope);
-  checks = callEach ./checks;
+  packages = basePackages // { inherit ci-fast; };
+  inherit checks;
   devShells = callEach ./shells;
 }

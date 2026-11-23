@@ -98,6 +98,8 @@ describe("extractPdfText", () => {
   });
 
   it("runs the parse on a worker thread and releases it when done", async () => {
+    // Earlier tests in this file settle before `void worker.terminate()` finishes tearing down their thread.
+    await waitUntil(() => liveWorkers() === 0, 3_000);
     const baseline = liveWorkers();
     const pages = Array.from({ length: 300 }, (_, index) => `page ${index + 1} body text`);
     const pending = extractPdfText(buildTextPdf(pages));
