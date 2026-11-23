@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { delegateToolKeys } from "../agents/delegation";
-import { VIRTUAL_AGENTS } from "../agents/virtual-agents";
+import { FULL_CHAT_TOOLS, VIRTUAL_AGENTS } from "../agents/virtual-agents";
 import { MODE_HARNESS_SPECS } from "../harness/specs";
 import { defineTool } from "../tools/define-tool";
 import { invokeToolGuarded } from "./invoke-guarded";
@@ -221,11 +221,14 @@ describe("which tool sets can bind a paid tool", () => {
     ).toEqual(["chat"]);
   });
 
-  it("gives a delegated run neither paid tool, whichever agent it asks", () => {
+  it("gives a delegated run neither paid tool, whichever agent or team bot it asks", () => {
     for (const agent of VIRTUAL_AGENTS) {
       for (const tool of PAID_MEDIA_TOOLS) {
         expect(delegateToolKeys(agent), `${agent.id} delegated`).not.toContain(tool);
       }
+    }
+    for (const tool of PAID_MEDIA_TOOLS) {
+      expect(delegateToolKeys({ tools: FULL_CHAT_TOOLS }), "team bot delegated").not.toContain(tool);
     }
   });
 });
