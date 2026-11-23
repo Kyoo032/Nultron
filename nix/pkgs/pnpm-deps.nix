@@ -51,5 +51,5 @@ fetchPnpmDeps {
       export NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
     fi
   '';
-  hash = "sha256-/FR9X6opDjMIUIl2F5sIZoSc6ZaE4kgVP/haNjIjOUc=";
+  hash = "sha256-ipGFP5/daMKBkdYMzyJliFT0Ag7E6er/izpSqXYtrpo=";
 }

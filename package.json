@@ -12,6 +12,8 @@
     "test:e2e": "pnpm --filter @agentforge/web test:e2e",
     "ci:local": "node scripts/ci-local.mjs",
     "ci:nix": "nix flake check -L --keep-going",
+    "ci:nix:fast": "node scripts/nix-ci.mjs --fast",
+    "ci:nix:cache-warm": "node scripts/nix-ci.mjs --warm-cache",
     "db:push": "pnpm --filter @agentforge/db push",
     "db:seed": "pnpm --filter @agentforge/db seed",
     "db:studio": "pnpm --filter @agentforge/db studio",

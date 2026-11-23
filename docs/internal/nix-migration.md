@@ -223,26 +223,25 @@ answered 429 to anonymous pulls, so `postgres:16`, `caddy:2.11-alpine` and `axll
 `mirror.gcr.io` and were tagged with their usual names; and the repo's Playwright wanted another Chromium build,
 so `PLAYWRIGHT_BROWSERS_PATH` pointed at the installed one, with `*.localhost` added to `/etc/hosts` for Node.
 
-## Rung 5: flake checks and `ci:nix`
+## Rung 5: flake checks, `ci:nix:fast` and `ci:nix`
 
-`pnpm ci:nix` is `nix flake check -L --keep-going`, beside `pnpm ci:local`. The checks run
-`scripts/ci-local.mjs` itself, unchanged, inside the Nix sandbox, one check per step group, so a red check
-names the group and its log names the step:
+`pnpm ci:nix` runs `nix flake check -L --keep-going`; `pnpm ci:nix:fast` (`scripts/nix-ci.mjs`) builds `.#ci-fast` inside WSL `NixOS` (on Windows) or natively (on Linux), pinning GC roots in `.nix-ci-roots/` and optionally pushing/pulling a local `file://` binary cache (`--local-cache`). Per-package checks run through `nix/pkgs/ci-pkg-step.nix` using transitive source filesets (`nix/pkgs/workspace-filesets.nix`), while `node_modules/.pnpm` is symlinked directly from `nix/pkgs/workspace-deps.nix`:
 
 | Check | Runs | Extra the sandbox needs |
 |---|---|---|
 | `ci-lint` | `--only lint` | biome (glibc from npm) patched with `autoPatchelf` |
-| `ci-tsc` | `--only tsc`, 8 workspaces | |
-| `ci-test-<package>` (8) | `--only test:<package>` | the portal one starts a Postgres 16 and passes `PORTAL_TEST_DATABASE_URL`, the suite's own route; embedded-postgres is a glibc download |
-| `ci-node-test` | `--only node-test` | git: a throwaway repo of the copy, for tests that list tracked files; curl and openssl, which the backup and heartbeat scripts the tests run call |
-| `ci-sandbox` | `--only sandbox` | `web-build.nix`'s sandbox folder at `vendor/sandbox-runtime`, so `sandbox:integration` runs the real Pyodide and QuickJS |
+| `ci-tsc-<pkg>` (8) | `--only tsc:<pkg>` (`apps/{web,portal}`, `packages/{core,db,host,legal,marketing,university}`) | minimal transitive `tscSets` sources |
+| `ci-test-<pkg>` (7) | `--only test:<pkg>` (excluding `packages/host`) | `ci-test-apps-portal` starts Postgres 16 (`PORTAL_TEST_DATABASE_URL`) |
+| `ci-test-packages-host-{1..4}` | `vitest run --shard=i/4 --maxWorkers=2` via `nix/pkgs/ci-host-shard.nix` | `hostFileset` + `checkVitestLog` guard |
+| `ci-node-test` | `--only node-test` | throwaway git repo, `curl`, `openssl` |
+| `ci-sandbox` | `--only sandbox` | `web-build.nix` `vendor/sandbox-runtime` (Pyodide + QuickJS) |
+| `ci-formal-chat-settle` | `node scripts/formal/chat-run-settle.mjs` (`nix/pkgs/tla2tools.nix`) | headless OpenJDK 21 + pinned `tla2tools.jar` |
+| `ci-formal-paid-gate` | `node .cursor/skills/verify-paid-media-gate/scripts/check.mjs` | `codeTree` + `.cursor/skills/verify-paid-media-gate` |
 | `ci-docs` | `--only maps --only media` | advisory; never fails |
-| `images` | builds both images | |
-| `pins` | rung 1 | |
+| `images` | builds `web-image` and `portal-image` | excluded from `.#ci-fast` |
+| `pins` | rung 1 | included in `nix flake check` |
 
-They run on `workspace.nix`: the whole workspace installed offline, dev dependencies included, from the same
-pnpm store. Its install scripts run as on a developer's machine. keytar, whose prebuild download fails offline,
-compiles from source against libsecret and the pinned Node's headers. Two things had to be supplied:
+They build on `nix/pkgs/workspace-deps.nix` (and runtime/test closures derived from it): only manifests (`package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`) enter `workspace-deps`, so editing application TypeScript never reinstalls `node_modules`. Two things had to be supplied:
 `pnpm rebuild --pending` needs `--recursive` when no filter is given, and the hoisted node-gyp 9.4.1 imports
 `distutils`, so its Python carries setuptools (Debian bookworm's Python 3.11 still had it).
 
@@ -354,9 +353,16 @@ top rung (`62e9b5f5`): `checks.x86_64-linux.pins`, `web-prod`, `portal-tree`,
 `main` added `undici` as a direct dependency of `packages/core`, because the lockfile already held `undici@6.29.1`
 as a transitive one.
 
-Not run yet: `nix flake metadata` against GitHub, `nix develop` with `ci-local.mjs`, `pnpm ci:nix`, the
-compose and k8s rehearsals on the Nix images, and aarch64. [`nix-cutover.md`](nix-cutover.md), phase 1, lists
-them in order. Record each result here.
+Not run yet: `nix flake metadata` against GitHub, the compose and k8s rehearsals on the Nix images, and aarch64. [`nix-cutover.md`](nix-cutover.md), phase 1, lists them in order. Record each result here.
+
+Driven on 2026-11-23 on Rizky's PC in WSL `NixOS` (`feat/fast-nix-ci`, 12 vCPUs; after syncing `nix/pkgs/pnpm-deps.nix` hash to `sha256-ipGFP5/daMKBkdYMzyJliFT0Ag7E6er/izpSqXYtrpo=` to match `pnpm-lock.yaml` from `a26120e7`):
+- `nix build .#workspace-deps`: **34.0 s** (with `pnpm-deps` warm).
+- `nix build .#checks.x86_64-linux.ci-formal-chat-settle .#checks.x86_64-linux.ci-formal-paid-gate`: **34.1 s** (including OpenJDK headless + `tla2tools.jar` fetch).
+- `nix build .#ci-fast`: **2m 47.5 s** full rebuild across all 24 derivations (4 `host` shards capped at `--maxWorkers=2` finished in 1m 29s–1m 46s each); **3.3 s** warm no-op.
+- Incremental invalidation benchmark (appending a comment to `packages/legal/src/index.ts`): **2m 22.0 s**, rebuilding 16 of 24 derivations while `workspace-deps`, `pnpm-deps`, `ci-formal-chat-settle`, and all `packages/core`, `packages/db`, `packages/marketing`, `packages/university`, and `apps/portal` TSC and Vitest derivations stayed cached.
+- `nix flake check -L --keep-going` (with `ci-fast` cached): **1m 9.8 s** (`all checks passed!`, covering `pins`, `images`, `web-prod`, `portal-tree`, `web-image`, `portal-image`, `k8s-manifests`).
+- `nix develop -c node scripts/formal/chat-run-settle.mjs`: passed cleanly.
+- `node scripts/nix-ci.mjs --fast --local-cache /tmp/nultron-nix-cache`: passed and populated a 48 MB local file binary cache in **58.5 s** (**1m 1.7 s** total); `pnpm ci:nix:fast` from Windows against cached `5248a07b` finished in **13.0 s**.
 
 ## Still owed
 

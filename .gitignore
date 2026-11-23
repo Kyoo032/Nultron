@@ -64,6 +64,9 @@ review.env
 # Local CI logs (scripts/ci-local.mjs). Per-run step logs and summary.md; never committed.
 .ci-local/
 
+# Local Nix GC-root pins written by scripts/nix-ci.mjs; never committed.
+.nix-ci-roots/
+
 # tools/nultron-3d is outside the pnpm workspace: its own npm install, the render output, and scratch (previews, logs, look renders).
 tools/nultron-3d/node_modules/
 tools/nultron-3d/out/

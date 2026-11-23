@@ -1,6 +1,8 @@
-# scripts/ci-local.mjs --only lint (Biome), inside the sandbox. See nix/pkgs/ci-step.nix.
-{ ci-step }:
-ci-step {
+# scripts/ci-local.mjs --only lint (Biome), inside the sandbox with zero-copy workspace-deps.
+{ ci-pkg-step, workspace-filesets }:
+ci-pkg-step {
   name = "lint";
+  src = workspace-filesets.fullSource;
   only = [ "lint" ];
+  needsGit = true;
 }

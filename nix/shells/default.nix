@@ -30,6 +30,8 @@
   kind,
   kubeconform,
   openssl,
+  jre_headless,
+  tla2tools,
 }:
 mkShell {
   packages = [
@@ -46,6 +48,7 @@ mkShell {
     kind
     kubeconform
     openssl
+    jre_headless
   ];
 
   # ci-local.mjs runs pnpm as `node <pnpm.cjs>` and looks for that file in CI_LOCAL_PNPM before falling back to
@@ -53,4 +56,6 @@ mkShell {
   CI_LOCAL_PNPM = "${pnpm}/libexec/pnpm/bin/pnpm.cjs";
   # node-gyp builds against this Node's own headers instead of downloading a tarball for the version.
   npm_config_nodedir = "${nodejs}";
+  # Hermetic pinned TLA+ / TLC jar for `pnpm formal:settle`.
+  TLA2TOOLS_JAR = "${tla2tools}";
 }

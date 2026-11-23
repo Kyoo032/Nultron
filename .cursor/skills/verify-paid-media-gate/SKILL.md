@@ -28,6 +28,8 @@ One command from the repo root (about 20 s). It needs `pnpm install` done, nothi
 pnpm verify:paid-gate
 ```
 
+Hermetic Nix CI runs the same check via `nix build .#checks.x86_64-linux.ci-formal-paid-gate` (and inside `pnpm ci:nix:fast`).
+
 That is `node .cursor/skills/verify-paid-media-gate/scripts/check.mjs`. It runs two vitest groups, which `ci:local` also runs with core and host:
 
 | Group | Files | Proves |
