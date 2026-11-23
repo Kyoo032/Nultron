@@ -129,7 +129,7 @@ touched.
   the portal from the app image, does not work**, and this is a finding, not a preference: the app
   image is installed with `pnpm install --filter "@agentforge/web..."`, the portal is not one of the web
   app's dependencies, so the image carries `apps/portal`'s source (SR-49) but not its `node_modules`.
-  `tsx src/main.ts` there fails with `ERR_MODULE_NOT_FOUND: Cannot find package 'nodemailer' imported
+  Running the portal there fails with `ERR_MODULE_NOT_FOUND: Cannot find package 'nodemailer' imported
   from /app/apps/portal/src/mail/smtp.ts`. The portal image installs `--filter "@agentforge/portal..."`
   and nothing else.
 

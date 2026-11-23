@@ -145,13 +145,13 @@ both. Nothing is built on the server. One of each service: do not scale any of t
 4. Start the portal first, because the app will not boot without the client secret it prints:
    \`docker compose pull && docker compose up -d portal\` (this starts its database and migrations too).
 5. Seed the first tenant and user. The secret is shown once:
-   \`docker compose exec -T portal sh /app/webapp-deploy/portal-entry.sh ./node_modules/.bin/tsx scripts/seed.ts --email <you> --redirect https://<NULTRON_DOMAIN>/auth/callback\`
+   \`docker compose exec -T portal sh /app/webapp-deploy/portal-entry.sh node dist/scripts/seed.mjs --email <you> --redirect https://<NULTRON_DOMAIN>/auth/callback\`
    Put the client secret it prints in \`.env\` as \`AGENTFORGE_PORTAL_CLIENT_SECRET\`.
 6. \`docker compose up -d\`, then \`docker compose ps\` until \`app\` and \`portal\` are \`healthy\`.
 7. Create the first owner account, **before anyone can sign in**. This bundle signs people in with a username and a
    password (\`PORTAL_SIGNIN_MODE=password\` in \`portal.env\`), and the seed made the owner without one. Give that person
    a password with the portal's account command, using the same address you gave the seed:
-   \`docker compose exec -T portal sh /app/webapp-deploy/portal-entry.sh ./node_modules/.bin/tsx scripts/account.ts create --username <name> --email <you> --role owner\`
+   \`docker compose exec -T portal sh /app/webapp-deploy/portal-entry.sh node dist/scripts/account.mjs create --username <name> --email <you> --role owner\`
    It prints a generated initial password **once**: hand it to the person, who must choose their own at first
    sign-in. Add everyone else the same way (\`--role admin\` or \`member\`, up to the seat cap); \`account.ts\` also has
    \`list\`, \`reset-password\`, \`disable\`, \`enable\` and \`set-role\`. There is no self-sign-up, no self-service

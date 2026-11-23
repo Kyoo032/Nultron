@@ -614,13 +614,13 @@ test("portal.env.example sets the sign-in mode to password, says code is still s
 test("DEPLOY.md tells the operator to create the first owner account, that no mail sender is needed, and how to go back to code", () => {
   const doc = deployDoc(TAG);
   assert.match(doc, /PORTAL_SIGNIN_MODE=password/);
-  assert.match(doc, /scripts\/account\.ts create .*--role owner/, "names the portal account command");
+  assert.match(doc, /dist\/scripts\/account\.mjs create .*--role owner/, "names the portal account command");
   assert.match(doc, /before anyone can sign in/i, "no one signs in until the owner account exists");
   assert.match(doc, /no mail sender|no e-mail is sent|needs no mail/i, "says no mail sender is needed");
   assert.match(doc, /PORTAL_SIGNIN_MODE=code/, "says how to switch back to the e-mailed code");
   assert.match(doc, /SR-165/, "points at the residual risks");
   // The seed step must come before the account step, and neither may be told to put the one-time code in a mailbox.
-  assert.ok(doc.indexOf("scripts/seed.ts") < doc.indexOf("scripts/account.ts"));
+  assert.ok(doc.indexOf("dist/scripts/seed.mjs") < doc.indexOf("dist/scripts/account.mjs"));
   assert.doesNotMatch(doc, /receive the code on a real inbox/i);
 });
 

@@ -2,7 +2,7 @@
 # The portal image's entrypoint wrapper: build the portal's two Postgres DSNs from the two passwords
 # in the environment, then run whatever command it was given.
 #
-#   sh /app/webapp-deploy/portal-entry.sh ./node_modules/.bin/tsx src/main.ts
+#   sh /app/webapp-deploy/portal-entry.sh node dist/main.mjs
 #
 # Why it exists. The portal wants two DSNs (SR-56): the schema owner's, for migrations only, and
 # `portal_app_login`'s, which the server runs as. They differ only in the role and the password, and

@@ -23,15 +23,14 @@
  * fingerprint. Today it is one file on a service the operator restarts by hand.
  */
 import { readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { PORTAL_ROOT } from "../paths";
 import type { PortalRoute } from "../server";
 import { LOGO_PATH } from "../views/layout";
 
 export { LOGO_PATH };
 
-/** `apps/portal` -- this file is at `apps/portal/src/routes/assets.ts`. */
-const ASSETS_DIR = join(resolve(dirname(fileURLToPath(import.meta.url)), "..", ".."), "assets");
+const ASSETS_DIR = join(PORTAL_ROOT, "assets");
 
 /**
  * Read once, at module load, and held. It is 110 KB and it never changes while the process runs, so

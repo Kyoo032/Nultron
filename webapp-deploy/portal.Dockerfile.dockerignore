@@ -29,8 +29,9 @@
 !webapp-deploy/portal-entry.sh
 !webapp-deploy/k8s/base/scripts/prepare-db.mjs
 
-# Never, even inside the folders above: dependencies and local state.
+# Never, even inside the folders above: dependencies, build output, and local state.
 **/node_modules
+**/dist
 **/.env
 **/.env.*
 **/*.enc

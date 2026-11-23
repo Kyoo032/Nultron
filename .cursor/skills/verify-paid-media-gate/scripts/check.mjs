@@ -47,8 +47,8 @@ const BREAKS = [
     id: "key-ignores-model",
     proves: "a Run on a cheap model lets the same prompt run on a dearer one",
     file: "packages/core/src/runtime/media-permission.ts",
-    find: "  const lines = Object.keys(picked)\n",
-    replace: '  const lines = Object.keys(picked).filter((field) => field !== "model")\n',
+    find: "  const pairs = Object.keys(picked)\n",
+    replace: '  const pairs = Object.keys(picked).filter((field) => field !== "model")\n',
     catchers: ["gate"],
   },
   {

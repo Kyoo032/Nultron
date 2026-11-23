@@ -1,9 +1,10 @@
-# The portal image's /app: its allowlisted context (portal.Dockerfile.dockerignore) and
-# `pnpm install --frozen-lockfile --filter "@agentforge/portal..."`, dev dependencies included, because
-# `tsx` is a devDependency of apps/portal and is its entrypoint. The Dockerfile runs no check on this tree;
-# the image's boot test does (portal-image.nix).
+# The portal image's /app: its allowlisted context (portal.Dockerfile.dockerignore), bundled with
+# esbuild into apps/portal/dist/*.mjs so the production tree runs on plain Node with `--prod`
+# dependencies only (no `tsx`, `vitest`, `typescript`, or `embedded-postgres`). The image's boot
+# test checks the resulting runtime (portal-image.nix).
 {
   stdenv,
+  nodejs,
   removeReferencesTo,
   docker-context,
   pnpm-offline-install,
@@ -14,6 +15,7 @@ stdenv.mkDerivation {
   src = docker-context.sourceOf "webapp-deploy/portal.Dockerfile.dockerignore";
 
   nativeBuildInputs = [
+    nodejs
     pnpm-offline-install
     removeReferencesTo
   ];
@@ -22,15 +24,18 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    # Docker: pnpm install --frozen-lockfile --filter "@agentforge/portal..."
     pnpmOfflineInstall --filter=@agentforge/portal...
+    node apps/portal/scripts/build-server.mjs
+    rm -rf node_modules apps/*/node_modules packages/*/node_modules
+    rm -rf apps/portal/src apps/portal/scripts
+    pnpmOfflineInstall --filter=@agentforge/portal... --prod
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
     # Docker installs at /app; see web-prod.nix.
-    grep -rlF --null "$PWD" node_modules apps/*/node_modules packages/*/node_modules 2>/dev/null \
+    (grep -rlF --null "$PWD" node_modules apps/*/node_modules packages/*/node_modules 2>/dev/null || true) \
       | xargs -0 --no-run-if-empty sed -i "s|$PWD|/app|g"
     mkdir -p "$out"
     cp -a . "$out/"

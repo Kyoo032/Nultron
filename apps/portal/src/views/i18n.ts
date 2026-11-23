@@ -12,15 +12,14 @@
  * two consumers -- the alternative is two copies that drift.
  */
 import { readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { PORTAL_ROOT } from "../paths";
 
 export const PORTAL_LOCALES = ["en", "id"] as const;
 export type PortalLocale = (typeof PORTAL_LOCALES)[number];
 export const DEFAULT_PORTAL_LOCALE: PortalLocale = "en";
 
-/** `apps/portal` -- this file is at `apps/portal/src/views/i18n.ts`. */
-const LOCALES_DIR = join(resolve(dirname(fileURLToPath(import.meta.url)), "..", ".."), "locales");
+const LOCALES_DIR = join(PORTAL_ROOT, "locales");
 
 type Catalog = Readonly<Record<string, unknown>>;
 

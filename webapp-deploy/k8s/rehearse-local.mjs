@@ -148,7 +148,7 @@ export function parseSeedSecret(output) {
 function seedPortal(email, rotate) {
   const args = [
     "-n", NAMESPACE, "exec", "deploy/nultron-portal", "-c", "portal", "--",
-    "./node_modules/.bin/tsx", "scripts/seed.ts",
+    "node", "dist/scripts/seed.mjs",
     "--email", email,
     "--tenant", "nultron", "--tenant-name", "Nultron", "--org", "Kyo", "--seat-cap", "5",
     "--redirect", `${APP_ORIGIN}/auth/callback`,

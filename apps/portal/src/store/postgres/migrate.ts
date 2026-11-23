@@ -18,14 +18,10 @@
  */
 import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import type { PoolClient } from "pg";
+import { PORTAL_ROOT, REPO_ROOT } from "../../paths";
 import type { MigrationResult } from "../types";
-
-/** `apps/portal` — this file is at `apps/portal/src/store/postgres/migrate.ts`. */
-const PORTAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-const REPO_ROOT = resolve(PORTAL_ROOT, "..", "..");
 
 export const SHARED_MIGRATIONS_DIR = join(REPO_ROOT, "docs", "internal", "portal", "migrations");
 export const PORTAL_MIGRATIONS_DIR = join(PORTAL_ROOT, "migrations");

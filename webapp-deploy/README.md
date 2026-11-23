@@ -364,8 +364,8 @@ sh scripts/portal.sh account create --username <name> --email you@example.com --
 ```
 
 (In the released bundle there is no `scripts/` folder; the seed is
-`docker compose exec -T portal sh /app/webapp-deploy/portal-entry.sh ./node_modules/.bin/tsx scripts/seed.ts ...`,
-which is what `portal.sh` runs.) `sh scripts/portal.sh <name> ...` runs `apps/portal/scripts/<name>.ts`
+`docker compose exec -T portal sh /app/webapp-deploy/portal-entry.sh node dist/scripts/seed.mjs ...`,
+which is what `portal.sh` runs.) `sh scripts/portal.sh <name> ...` runs `apps/portal/scripts/<name>.ts` (compiled as `dist/scripts/<name>.mjs` inside the portal image)
 inside the running portal with the same two database DSNs the portal itself uses, so no password is typed
 on the host. In `code` mode testers are added with the portal's invite script when it lands (`sh scripts/portal.sh invite
 ...`, see `apps/portal/README.md`); until then each tester is another `seed --email` for the same tenant, up
