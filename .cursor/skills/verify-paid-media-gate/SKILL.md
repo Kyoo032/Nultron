@@ -118,14 +118,10 @@ Previous full runs:
 | `packages/host/src/workers/video-generate-tool.ts` | `chatVideoGenerateTool` wrapper (`keepRunAlive` around `videoGenerateTool`, gated under `"video_generate"`) |
 | `packages/core/src/tools/platform/register.ts` | registers `imageGenerateTool` and `videoGenerateTool` |
 
-**Sync commit: `8871ffdf`** (`main`, 2026-11-23). The check was confirmed to describe the files above at that commit. To see whether covered files moved since: `pnpm formal:sync-check` (or `git log --oneline 8871ffdf..HEAD -- <files above>`). After you confirm the tests still describe the code, write the new commit here.
+**Sync commit: `8af77b99`** (`feat/security-phase1-hardening`, 2026-11-23). The check was confirmed to describe the files above at that commit. To see whether covered files moved since: `pnpm formal:sync-check` (or `git log --oneline 8af77b99..HEAD -- <files above>`). After you confirm the tests still describe the code, write the new commit here.
 
-Since the previous sync (`365d4af6`), these changes touched covered code, and none breaks the promise:
-- `1896261b` added team bots (`tb-` delegation in `run-delegation.ts` using `delegateToolKeys({ tools: FULL_CHAT_TOOLS })` and `team-propose.ts` with `bindings: []`). `media-permission.property.test.ts` now also checks `delegateToolKeys({ tools: FULL_CHAT_TOOLS })`, and `team-propose.ts` is listed in `RUN_ENTRIES`.
-- `5f690f6c` added `packages/host/src/voice/ask.ts`, already listed in `RUN_ENTRIES` as gated (uses `prepareChatRun` with `grants: []` and `voiceBindings` which excludes `image_generate` and `video_generate`).
-- `128fdab6` wrapped `videoGenerateTool` in `packages/host/src/workers/video-generate-tool.ts` (`keepRunAlive`) and registered it under `"video_generate"` in `register-tools.ts`, listed in `TOOL_OBJECT_USERS` because `invokeToolGuarded` gates by `tool.key` before calling `execute`.
-- `a0c1bdd2` / `0a2774bf` updated `media-permission.ts` (`defaultModelFor` uses `imageModelForReference` when `image_url` is set; `defaultModel` is display-only and not part of `mediaRequestKey` or grants).
-- `40d7b321` / `9f34c771` refactored `runs.ts` (`prepareChatRun`, `chatHistoryFromRows`) and `ai-sdk-runtime.ts` (`usageDrainTimer`, `stopWhen`, `finished`); `createMediaPermission` remains called once directly in `AiSdkRuntime.stream`, and `runs.ts` still passes `mediaPermission` to `runtime.execute`.
+Since the previous sync (`8871ffdf`), one change touched covered code, and the check changed with it:
+- `8af77b99` (SR-195) deleted `fingerprint` and made `mediaRequestKey` return the canonical `JSON.stringify([tool, pairs])` text. Both `F1` cases in `media-permission.property.test.ts` are plain `it` now, and the `key-ignores-model` break in `scripts/check.mjs` finds the `pairs` line.
 
 ## Why not TLA+
 
