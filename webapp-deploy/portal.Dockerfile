@@ -11,7 +11,7 @@
 # `pnpm install --filter "@agentforge/web..."`, and the portal is not a dependency of the web app by
 # design (apps/portal/README.md: nothing in the product imports it). So the app image carries
 # apps/portal's TypeScript source (SR-49) but not its node_modules: `pg` and `nodemailer` are absent
-# and `tsx src/main.ts` cannot start. Running the portal from the app image does not work
+# and it cannot start. Running the portal from the app image does not work
 # (ERR_MODULE_NOT_FOUND: nodemailer, proven by the Kubernetes rehearsal, 2026-10-01).
 #
 # WHAT ENTERS THE IMAGE is decided by portal.Dockerfile.dockerignore, an ALLOWLIST next to this file
@@ -38,10 +38,15 @@ RUN corepack enable \
 FROM base AS build
 WORKDIR /app
 COPY . .
-# The portal and the workspace packages it names. tsx is a devDependency of apps/portal and is the
-# entrypoint, so this image still ships its dev dependencies. The app image no longer does (SR-113: its
-# `prod` stage installs --prod); this image is not part of that gate or of scripts/audit-deployed.mjs.
-RUN pnpm install --frozen-lockfile --filter "@agentforge/portal..."
+RUN pnpm install --frozen-lockfile --filter "@agentforge/portal..." \
+ && pnpm --filter @agentforge/portal build
+
+FROM base AS prod
+WORKDIR /app
+COPY . .
+COPY --from=build /app/apps/portal/dist /app/apps/portal/dist
+RUN rm -rf /app/apps/portal/src /app/apps/portal/scripts \
+ && pnpm install --frozen-lockfile --prod --filter "@agentforge/portal..."
 
 FROM base AS runtime
 ENV NODE_ENV=production \
@@ -50,7 +55,7 @@ ENV NODE_ENV=production \
     PORTAL_DATA_DIR=/portal-data \
     TMPDIR=/tmp
 WORKDIR /app
-COPY --from=build --chown=node:node /app /app
+COPY --from=prod --chown=node:node /app /app
 RUN mkdir -p /portal-data && chown node:node /portal-data
 USER node
 WORKDIR /app/apps/portal
@@ -58,4 +63,4 @@ EXPOSE 4000
 # `GET /healthz` is the portal's own liveness route (apps/portal/src/server.ts HEALTH_PATH).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORTAL_PORT||4000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["./node_modules/.bin/tsx", "src/main.ts"]
+CMD ["node", "dist/main.mjs"]

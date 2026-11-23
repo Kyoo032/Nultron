@@ -2,8 +2,8 @@
 # Recreate: its rate-limit windows live in memory (SR-29), so a second process would double them.
 #
 # It runs from its OWN image. The app image does not contain the portal's node_modules (the app is
-# installed with --filter @agentforge/web..., and the portal is not one of its dependencies), so
-# `tsx src/main.ts` cannot start there. webapp-deploy/portal.Dockerfile builds it.
+# installed with --filter @agentforge/web..., and the portal is not one of its dependencies), and the
+# portal image runs compiled JS under plain Node without tsx. webapp-deploy/portal.Dockerfile builds it.
 #
 # NODE_ENV=production is on purpose, so the production refusals are exercised: a real signing key, a
 # non-sandbox SMTP host over STARTTLS, an https public URL, two database roles, no manual OTP.

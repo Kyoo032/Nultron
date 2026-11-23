@@ -64,25 +64,9 @@ Within these bounds, and no further:
 - **A real gateway.** Nothing here makes a picture. No paid media has been made by this check, and the live Run press that SR-167 still owes is not replaced by it.
 - **Why a call fails to match.** Whether `12` and `"12"` are one request, or `Square` and `square`, is whatever `mediaRequestArgs` says; the tests pass numbers as numbers and strings as strings.
 
-## Open finding
+## Closed finding (F1 / SR-195)
 
-**F1 (SR-195, Low): two different requests can share a key, so a grant for one lets the other start.** The identity of a request is `fingerprint(...)` in `media-permission.ts`, two 32-bit passes with a comment that says "Not a security hash". Counterexample, in the code's words:
-
-1. The person presses Run on a 12-second clip on `veo-3.1-lite` whose prompt ends in `癋戕紥萐两`. The body's grant reaches `readMediaPermission`, then `createMediaPermission`, which files it under `mediaRequestKey` = `a64e1d812a3b147e`.
-2. The model calls `video_generate` for 12 seconds on `veo_3_1`, prompt `a calm lake at dawn, very soft light 妰蟖纐倨之`. `mediaRequestKey` returns `a64e1d812a3b147e` again, `beforeCall` finds one unspent grant and returns null, and `argsToRun` hands the tool the dear request's own fields.
-3. The tool starts the dearer model for 12 seconds: 8x the card's list price per second ($4.80 against $0.60), or a different picture than the card showed at the same price.
-
-Needs someone who controls what the model writes (text in a page or file) and a pair computed ahead (about five minutes on four cores, `scripts/find-collision.mjs`). The two prompts are the same length up to a five-character tail, and the tails are the only odd part of either prompt. The list prices come from `media-pricing.ts`: `veo-3.1-lite` at 0.05 USD per second and `veo_3_1` at 0.40 USD per second at 720p. The pair is pinned in `media-permission.property.test.ts` as two `it.fails` tests (the `CHEAP` and `DEAR` constants). The code is unchanged, as this check never edits product code. The fix is one function: make the key the canonical text itself (`${tool}\n${lines}`; values are already single-spaced strings, so it is unambiguous) and delete `fingerprint`. When that lands, the two `it.fails` turn red; change them to `it` and the finding is closed.
-
-### Finding a new colliding pair
-
-Only needed if the pinned pair ever has to be replaced. The script needs only Node and makes no network calls.
-
-1. Run `node .cursor/skills/verify-paid-media-gate/scripts/find-collision.mjs <seed>` with seeds 1 to 4 at once, one per core.
-2. Each run prints `RESULT {"tailLite":..,"tailFull":..}` after about five to eight minutes, when it finds a pair that crosses the two prefixes. Otherwise it keeps going.
-3. Append each tail to its prompt and put the pair in `CHEAP` and `DEAR`.
-
-How it works: `fingerprint` in `packages/core/src/runtime/media-permission.ts` keeps a 64-bit state (two 32-bit passes) that moves to a new state one character at a time. Two requests whose texts are the same length up to a tail, and differ before it (here the model id and a few words of the prompt), collide when their states agree after the tail. The search is Floyd's cycle finding on a function from 64 bits to the state after the tail, on the cheap prefix or the dear prefix: one bit picks the branch and 63 bits spell the five-character tail. It takes about 2^32 steps. The tail uses the 16,384 CJK characters from U+4E00, none of which is whitespace; the first four characters carry 14 bits each and the fifth carries 7. The script copies `fingerprint` from the source on purpose, so the test checks the pinned pair against the real `mediaRequestKey`.
+**F1 (SR-195, Low): resolved in `feat/security-phase1-hardening` (2026-11-23).** Previously, the identity of a request used `fingerprint(...)` in `media-permission.ts` (two 32-bit FNV passes with a comment "Not a security hash"), which allowed a precomputed collision pair (`a64e1d812a3b147e`, `veo-3.1-lite` vs `veo_3_1`) to share a grant key. `fingerprint` was removed and `mediaRequestKey` now returns lossless canonical `JSON.stringify([tool, pairs])`; both `F1` tests in `media-permission.property.test.ts` now run as ordinary `it` assertions rather than `it.fails`.
 
 ## When it goes red
 
@@ -117,7 +101,7 @@ Previous full runs:
 
 | Code | What the check reads |
 |---|---|
-| `packages/core/src/runtime/media-permission.ts` | `createMediaPermission`, `mediaRequestArgs`, `mediaRequestKey`, `fingerprint`, `defaultModelFor`, `REQUEST_FIELDS` |
+| `packages/core/src/runtime/media-permission.ts` | `createMediaPermission`, `mediaRequestArgs`, `mediaRequestKey`, `defaultModelFor`, `REQUEST_FIELDS` |
 | `packages/core/src/runtime/invoke-guarded.ts` | `invokeToolGuarded`, the `permission` lines |
 | `packages/core/src/runtime/ai-sdk-runtime.ts` | `AiSdkRuntime.stream`, where the gate is built |
 | `packages/core/src/agents/delegation.ts` | `DELEGATE_EXCLUDED_TOOLS`, `delegateToolKeys` |
@@ -134,14 +118,10 @@ Previous full runs:
 | `packages/host/src/workers/video-generate-tool.ts` | `chatVideoGenerateTool` wrapper (`keepRunAlive` around `videoGenerateTool`, gated under `"video_generate"`) |
 | `packages/core/src/tools/platform/register.ts` | registers `imageGenerateTool` and `videoGenerateTool` |
 
-**Sync commit: `8871ffdf`** (`main`, 2026-11-23). The check was confirmed to describe the files above at that commit. To see whether covered files moved since: `pnpm formal:sync-check` (or `git log --oneline 8871ffdf..HEAD -- <files above>`). After you confirm the tests still describe the code, write the new commit here.
+**Sync commit: `8af77b99`** (`feat/security-phase1-hardening`, 2026-11-23). The check was confirmed to describe the files above at that commit. To see whether covered files moved since: `pnpm formal:sync-check` (or `git log --oneline 8af77b99..HEAD -- <files above>`). After you confirm the tests still describe the code, write the new commit here.
 
-Since the previous sync (`365d4af6`), these changes touched covered code, and none breaks the promise:
-- `1896261b` added team bots (`tb-` delegation in `run-delegation.ts` using `delegateToolKeys({ tools: FULL_CHAT_TOOLS })` and `team-propose.ts` with `bindings: []`). `media-permission.property.test.ts` now also checks `delegateToolKeys({ tools: FULL_CHAT_TOOLS })`, and `team-propose.ts` is listed in `RUN_ENTRIES`.
-- `5f690f6c` added `packages/host/src/voice/ask.ts`, already listed in `RUN_ENTRIES` as gated (uses `prepareChatRun` with `grants: []` and `voiceBindings` which excludes `image_generate` and `video_generate`).
-- `128fdab6` wrapped `videoGenerateTool` in `packages/host/src/workers/video-generate-tool.ts` (`keepRunAlive`) and registered it under `"video_generate"` in `register-tools.ts`, listed in `TOOL_OBJECT_USERS` because `invokeToolGuarded` gates by `tool.key` before calling `execute`.
-- `a0c1bdd2` / `0a2774bf` updated `media-permission.ts` (`defaultModelFor` uses `imageModelForReference` when `image_url` is set; `defaultModel` is display-only and not part of `mediaRequestKey` or grants).
-- `40d7b321` / `9f34c771` refactored `runs.ts` (`prepareChatRun`, `chatHistoryFromRows`) and `ai-sdk-runtime.ts` (`usageDrainTimer`, `stopWhen`, `finished`); `createMediaPermission` remains called once directly in `AiSdkRuntime.stream`, and `runs.ts` still passes `mediaPermission` to `runtime.execute`.
+Since the previous sync (`8871ffdf`), one change touched covered code, and the check changed with it:
+- `8af77b99` (SR-195) deleted `fingerprint` and made `mediaRequestKey` return the canonical `JSON.stringify([tool, pairs])` text. Both `F1` cases in `media-permission.property.test.ts` are plain `it` now, and the `key-ignores-model` break in `scripts/check.mjs` finds the `pairs` line.
 
 ## Why not TLA+
 

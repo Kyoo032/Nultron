@@ -9,6 +9,8 @@
     "./store": "./src/store/types.ts"
   },
   "scripts": {
+    "build": "node scripts/build-server.mjs",
+    "start": "node dist/main.mjs",
     "dev": "tsx src/main.ts",
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts",

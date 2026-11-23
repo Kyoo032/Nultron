@@ -41,4 +41,4 @@ if [ -z "$(dc ps -q portal)" ]; then
 fi
 
 # -T: no TTY, so output can be redirected and this works from a script.
-dc exec -T portal sh /app/webapp-deploy/portal-entry.sh ./node_modules/.bin/tsx "scripts/$NAME.ts" "$@"
+dc exec -T portal sh /app/webapp-deploy/portal-entry.sh node "dist/scripts/$NAME.mjs" "$@"

@@ -229,7 +229,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-192](#sr-192) | Medium | WhatsApp delivers at least once and in no fixed order, so a redelivered, replayed or late event could double a customer's message or undo a "read" tick | Built in tree (2026-11-02): unique partial index on `(conversation_id, direction, external_id)` with `INSERT OR IGNORE`, delivery words move forward only; unit-tested and mutation-checked on the index and the ordering; not driven with Meta | Phase 3 live drive |
 | [SR-193](#sr-193) | Medium | Customers' phone numbers, profile names and message text are personal data kept in the desk's database in the clear, readable by every member of the company, kept with no time limit, so an owner must be able to erase one customer | Retention decided by Rizky 2026-11-03: **no time limit, kept so agents can pull up older threads, deleted when the customer asks.** Built in tree: owner-only "Erase this customer" (the conversation and every message, hard delete), no expiry, no trim; logs carry counts only; a desk's delete purges all three tables. Driven in Chromium against the sandbox; not on a hosted server | Before a real customer's number is connected on a hosted desk |
 | [SR-194](#sr-194) | Low | Meta's rules and API move under the feature: the 24-hour window, per-message pricing, the ban on general-purpose AI bots (from 2026-01-15) and the Graph version | Recorded (2026-11-02): the Graph version is one constant, the window one function, and Phase 1 sends only what the owner writes | Re-read Meta's terms and changelog before Phase 2 (an agent that answers) and before the live number |
-| [SR-195](#sr-195) | Low | Two different paid media requests can share a grant key (`fingerprint` is a 64-bit non-security hash), so a Run press for a cheap clip can start a dear one | Open (2026-11-03): pinned as two `it.fails` tests, fix not applied | Next release that carries the chat-first shell |
+| [SR-195](#sr-195) | Low | Two different paid media requests could share a grant key (`fingerprint` was a 64-bit non-security hash), so a Run press for a cheap clip could start a dear one | Fixed in tree (2026-11-23, `feat/security-phase1-hardening`): replaced `fingerprint` with canonical `JSON.stringify` tuple keying in `media-permission.ts` and turned both `it.fails` cases in `media-permission.property.test.ts` into passing `it` guards under `verify-paid-media-gate --teeth` | None |
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual bounded 2026-11-06 (`fix/request-array-caps`): a posted body is charged by cost (an object or list 6, any other value 1) against 60,000, or 250,000 for a Market briefing, before a schema reads it, and error text built from `zod` issues is cut to 20; the worst failing body measured gives about 56,000 issues and 60 MB on the default profile and about 102,000 issues and 71 MB on the briefing profile | None |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
@@ -6664,26 +6664,19 @@ WhatsApp changes: the 24-hour customer service window, per-message pricing (sinc
 Gate: re-read Meta's terms and changelog before Phase 2 (an agent that answers) and before the live number.
 ### SR-195 {#sr-195}
 
-**Two different paid media requests can share a grant key, so a Run press for one lets the other start.**
-Raised 2026-11-03 by the formal check of the paid media gate (finding F1). Low. Open. SR-195 because SR-191 to
-SR-194 are taken by the WhatsApp branch (PR #198).
+**Two different paid media requests could share a grant key, so a Run press for one could let the other start.**
+Raised 2026-11-03 by the formal check of the paid media gate (finding F1). Low. Fixed in tree (2026-11-23, `feat/security-phase1-hardening`). SR-195 because SR-191 to SR-194 were taken by the WhatsApp branch (PR #198).
 
-Evidence: a grant is filed under `mediaRequestKey`, which is `fingerprint(...)` of the canonical request text
-(`packages/core/src/runtime/media-permission.ts:121`, `:133-138` at `b79a527`). `fingerprint` is two 32-bit
-passes, and its own note says it is not a security hash. `.cursor/skills/verify-paid-media-gate/scripts/find-collision.mjs`
+Evidence: a grant was filed under `mediaRequestKey`, which previously ran `fingerprint(...)` over the request text
+(`packages/core/src/runtime/media-permission.ts:121`, `:133-138` at `b79a527`). `fingerprint` was two 32-bit
+passes, and its own note said it was not a security hash. `.cursor/skills/verify-paid-media-gate/scripts/find-collision.mjs`
 found a pair of 12-second clips with the same key `a64e1d812a3b147e`: one on `veo-3.1-lite`, one on `veo_3_1`,
 with different prompt tails. The second model lists at 8x the price per second (`media-pricing.ts`: 0.05 against
-0.40 USD/s at 720p). A grant for the cheap clip lets the dear clip start, and `argsToRun` runs the dear request's
-own fields: $4.80 billed where the card showed $0.60. Pinned as two `it.fails` tests in
-`packages/core/src/runtime/media-permission.property.test.ts`.
+0.40 USD/s at 720p).
 
-What it takes: someone who controls what the model writes (text in a page or a file) and a pair computed ahead of
-time, about five minutes on four cores. The person must still press Run on the cheap card.
+Fix: deleted `fingerprint` and replaced `mediaRequestKey` with lossless canonical JSON tuple keying (`JSON.stringify([tool, pairs])` over sorted fields from `mediaRequestArgs`), then changed both `F1` tests in `packages/core/src/runtime/media-permission.property.test.ts` from `it.fails` to passing `it` assertions under `node .cursor/skills/verify-paid-media-gate/scripts/check.mjs --teeth`.
 
-Fix: key grants by the canonical text itself (`${tool}\n${lines}`, already unambiguous) and delete `fingerprint`.
-Then change the two `it.fails` tests to `it`. Not applied: the check that found it does not edit product code.
-
-Gate: the same as [SR-167](#sr-167), the next release that carries the chat-first shell.
+Gate: none.
 ### SR-196 {#sr-196}
 
 **Two HIGH advisories reach the hosted image: `zod` and `body-parser`.**

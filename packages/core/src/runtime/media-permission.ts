@@ -118,25 +118,13 @@ export function mediaRequestArgs(tool: PaidMediaTool, args: unknown): MediaReque
   return picked;
 }
 
-/** Two 32-bit FNV-style passes: enough to tell requests of one turn apart. Not a security hash. */
-function fingerprint(text: string): string {
-  let first = 0x811c9dc5;
-  let second = 0x9747b28c;
-  for (let index = 0; index < text.length; index += 1) {
-    const code = text.charCodeAt(index);
-    first = Math.imul(first ^ code, 0x01000193) >>> 0;
-    second = Math.imul(second ^ (code + index), 0x85ebca6b) >>> 0;
-  }
-  return first.toString(16).padStart(8, "0") + second.toString(16).padStart(8, "0");
-}
-
 /** The identity of a request: the tool and its request fields, whatever order the model wrote them in. */
 export function mediaRequestKey(tool: PaidMediaTool, args: unknown): string {
   const picked = mediaRequestArgs(tool, args);
-  const lines = Object.keys(picked)
+  const pairs = Object.keys(picked)
     .sort()
-    .map((field) => `${field}=${picked[field]}`);
-  return fingerprint(`${tool}\n${lines.join("\n")}`);
+    .map((field) => [field, picked[field]]);
+  return JSON.stringify([tool, pairs]);
 }
 
 const REFUSAL_COPY: Readonly<Record<PaidMediaTool, string>> = {

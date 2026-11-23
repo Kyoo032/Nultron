@@ -212,8 +212,8 @@ services:
       - sh
       - /app/webapp-deploy/portal-entry.sh
     command:
-      - ./node_modules/.bin/tsx
-      - src/main.ts
+      - node
+      - dist/main.mjs
     depends_on:
       portal-prepare:
         condition: service_completed_successfully

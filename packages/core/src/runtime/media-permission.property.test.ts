@@ -271,11 +271,11 @@ describe("findings (pinned counterexamples; each flips to a plain `it` when its 
     expect(mediaRequestArgs(CHEAP.tool, CHEAP.args).model).toBe("veo-3.1-lite");
   });
 
-  it.fails("F1: two different requests never share a key", () => {
+  it("F1: two different requests never share a key", () => {
     expect(mediaRequestKey(CHEAP.tool, CHEAP.args)).not.toBe(mediaRequestKey(DEAR.tool, DEAR.args));
   });
 
-  it.fails("F1: a grant for the cheap clip never lets the dear clip start", () => {
+  it("F1: a grant for the cheap clip never lets the dear clip start", () => {
     const gate = realGate([CHEAP]);
     expect(gate.beforeCall(DEAR.tool, DEAR.args)).not.toBeNull();
   });

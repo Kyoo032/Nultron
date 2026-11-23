@@ -61,7 +61,7 @@ async function connectWhenReady(Client, url) {
 }
 
 function migrate() {
-  const result = spawnSync("./node_modules/.bin/tsx", ["scripts/migrate.ts"], { cwd: PORTAL_DIR, stdio: "inherit" });
+  const result = spawnSync("node", ["dist/scripts/migrate.mjs"], { cwd: PORTAL_DIR, stdio: "inherit" });
   if (result.error) throw new Error(`could not start the migration: ${result.error.message}`);
   if (result.status !== 0) throw new Error(`migration exited ${result.status}`);
 }

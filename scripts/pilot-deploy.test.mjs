@@ -499,7 +499,7 @@ test("portal.sh refuses otp (SR-10), runs scripts only through the DSN wrapper, 
   const script = read("webapp-deploy", "scripts", "portal.sh");
   assert.match(script, /^otp\)$/m);
   assert.match(script, /\*\[!a-z0-9-\]\*\)/, "the script name is validated");
-  assert.match(script, /dc exec -T portal sh \/app\/webapp-deploy\/portal-entry\.sh \.\/node_modules\/\.bin\/tsx "scripts\/\$NAME\.ts" "\$@"/);
+  assert.match(script, /dc exec -T portal sh \/app\/webapp-deploy\/portal-entry\.sh node "dist\/scripts\/\$NAME\.mjs" "\$@"/);
   assert.doesNotMatch(
     script
       .split("\n")
