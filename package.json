@@ -22,6 +22,8 @@
     "portal:account": "pnpm --filter @agentforge/portal exec tsx scripts/account.ts",
     "maps:check": "node scripts/map-rot.mjs",
     "verify:paid-gate": "node .cursor/skills/verify-paid-media-gate/scripts/check.mjs",
+    "formal:settle": "node scripts/formal/chat-run-settle.mjs",
+    "formal:sync-check": "node scripts/formal-sync-check.mjs",
     "lane-guard": "node scripts/lane-guard.mjs",
     "where": "node scripts/where-am-i.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",

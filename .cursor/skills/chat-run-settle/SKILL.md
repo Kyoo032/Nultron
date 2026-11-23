@@ -56,22 +56,22 @@ Line numbers are as of the sync commit below.
 
 | Model | Code |
 | --- | --- |
-| `Settle` (watchdog or closed connection) | `onStall` at `packages/host/src/runs.ts:273` and `onClientAbort` at `:294`, both calling `settleRun` at `:259`. The abort that landed before the listener existed is `:308`, the `Settle` from `"start"`. Neither settles while `finishing` is set: `onStall` takes its finishing branch (`:277-286`), which returns without `settleRun`, and `onClientAbort` returns (`:295`). That is the `~(CancelYieldsToClaim /\ finishing)` conjunct. |
-| `StandDown` | The finishing branch of `onStall` (`:277-286`): the watchdog fires while the claim is held. It closes the queue (`:284`) and returns. It never calls `settleRun`, `finishRun` or `modelAbort.abort()`, so the row, the meter and `settled` are left to the run's own path. While the answer is not saved (`if (!persisted)`, `:278`) it sends `run.failed` with `chatTurnCopy(locale).saveTimeout`, unless the model already sent one (`failedMessage`), and then `run.completed`. The `outcome = "fail"` branch of `seen'` is that `failedMessage` check. |
-| `hangAt` | One database `await` the run never resumes from, chosen once per run, and only when `DbYields` is true. `Work` stays disabled at that `pc`. The waits are those of `DbWaits`: the two writes before the model call, `finishRun` after `insertRun`, the assistant `insertMessage` (`:383`) from each of its three callers, `finishRun(..., "completed")` (`:694`), the `getThread` in the knowledge tail (`:720`) and the catch path's `finishRun` (`:748`). |
+| `Settle` (watchdog or closed connection) | `onStall` at `packages/host/src/runs.ts:426` and `onClientAbort` at `:447`, both calling `settleRun` at `:412`. The abort that landed before the listener existed is `:461`, the `Settle` from `"start"`. Neither settles while `finishing` is set: `onStall` takes its finishing branch (`:430-439`), which returns without `settleRun`, and `onClientAbort` returns (`:449`). That is the `~(CancelYieldsToClaim /\ finishing)` conjunct. |
+| `StandDown` | The finishing branch of `onStall` (`:430-439`): the watchdog fires while the claim is held. It closes the queue (`:437`) and returns (`:438`). It never calls `settleRun`, `finishRun` or `modelAbort.abort()`, so the row, the meter and `settled` are left to the run's own path. While the answer is not saved (`if (!persisted)`, `:431`) it sends `run.failed` with `chatTurnCopy(locale).saveTimeout`, unless the model already sent one (`failedMessage`), and then `run.completed`. The `outcome = "fail"` branch of `seen'` is that `failedMessage` check. |
+| `hangAt` | One database `await` the run never resumes from, chosen once per run, and only when `DbYields` is true. `Work` stays disabled at that `pc`. The waits are those of `DbWaits`: the two writes before the model call, `finishRun` after `insertRun`, the assistant `insertMessage` (`:536`) from each of its three callers, `finishRun(..., "completed")` (`:847`), the `getThread` in the knowledge tail (`:873`) and the catch path's `finishRun` (`:901`). |
 | `settled`, `queueClosed` | The flags set by `settleRun` and `closeQueue` in `runs.ts` |
-| `persisted` | Set right after the assistant `insertMessage` returns (`:384`). It lives beside `finishing` (`:254`) so `onStall` can read it. |
-| `finishing`, `Claim` | `finishing = true`, the first statement of `persistAssistant` (`:342`). Each call of `persistAssistant` follows an `if (settled)` check with no `await` between them, so the claim is taken in the same step as that check: the not-settled branch of `ModelAnswers`, `AfterAttempt` and `Catch`. |
+| `persisted` | Set right after the assistant `insertMessage` returns (`:537`). It lives beside `finishing` (`:406-407`) so `onStall` can read it. |
+| `finishing`, `Claim` | `finishing = true`, the first statement of `persistAssistant` (`:495`). Each call of `persistAssistant` follows an `if (settled)` check with no `await` between them, so the claim is taken in the same step as that check: the not-settled branch of `ModelAnswers`, `AfterAttempt` and `Catch`. |
 | `CancelFinish` | The fire-and-forget `finishRun(..., "failed")` inside `settleRun`. It is its own step only when `DbYields` is true. |
-| `StoreUser`, `InsertRun` | `insertMessage(..., "user", ...)` at `:394` and `insertRun` at `:402`, then the `if (settled)` at `:404` |
-| `FinishAfterInsert` | `finishRun(..., "failed")` at `:406` |
-| `"model"` with `ModelAnswers`, `ModelFails`, `ModelAborted` | `runtime.execute` inside `attempt()`, awaited at `:670`, and its `run.completed` and `run.failed` events. `ModelAborted` is `modelAbort.abort()` making the call reject. The runtime emits `run.completed` as its last act (`packages/core/src/runtime/ai-sdk-runtime.ts:670`), so a claim taken in that handler leaves no network wait unguarded, and no model call is left for `StandDown` to abort. |
-| `ModelAnswers` when settled | The `if (settled)` in the `run.completed` handler at `:597`, which meters and drops the answer |
-| `PersistEv` | `await persistAssistant()` and `send(event)` in the same handler (`:603-604`) |
-| `AfterAttempt` | The `if (settled)` between the last `await attempt()` (`:686`) and `finishRun(..., "completed")` (`:694`) |
-| `PersistFinal`, `FinishCompleted`, `AfterFinish` | `persistAssistant()`, `finishRun(..., "completed")` at `:694` with `recordChatRunUsage`, then the knowledge tail before the `finally` at `:774` |
-| `Catch`, `CatchFinish` | The `catch` at `:739` with its `if (settled)`, then `persistAssistant()` at `:745` and `finishRun` with `status` |
-| `MeterOk` | `meterSettledRun` at `:334` and its `settledRunMetered` flag |
+| `StoreUser`, `InsertRun` | `insertMessage(..., "user", ...)` at `:547` and `insertRun` at `:555`, then the `if (settled)` at `:557` |
+| `FinishAfterInsert` | `finishRun(..., "failed")` at `:559` |
+| `"model"` with `ModelAnswers`, `ModelFails`, `ModelAborted` | `runtime.execute` inside `attempt()`, awaited at `:823` (and `:839` on fallback), and its `run.completed` and `run.failed` events. `ModelAborted` is `modelAbort.abort()` making the call reject. The runtime emits `run.completed` as its last act (`packages/core/src/runtime/ai-sdk-runtime.ts:664`), so a claim taken in that handler leaves no network wait unguarded, and no model call is left for `StandDown` to abort. |
+| `ModelAnswers` when settled | The `if (settled)` in the `run.completed` handler at `:750`, which meters and drops the answer |
+| `PersistEv` | `await persistAssistant()` and `send(event)` in the same handler (`:756-757`) |
+| `AfterAttempt` | The `if (settled)` between the last `await attempt()` (`:839`) and `finishRun(..., "completed")` (`:847`) |
+| `PersistFinal`, `FinishCompleted`, `AfterFinish` | `persistAssistant()`, `finishRun(..., "completed")` at `:847` with `recordChatRunUsage`, then the knowledge tail before the `finally` at `:927` |
+| `Catch`, `CatchFinish` | The `catch` at `:892` with its `if (settled)` (`:893`), then `persistAssistant()` at `:898` and `finishRun` with `status` (`:901`) |
+| `MeterOk` | `meterSettledRun` at `:487` and its `settledRunMetered` flag |
 | `Applies`, `FinishTo` | `finishRun` at `packages/host/src/threads.ts:312`, which updates only a `streaming` row (`:327`) |
 | `metered` | `recordChatRunUsage` at `packages/host/src/usage-record.ts:259`, which writes only when `finished` |
 
@@ -88,15 +88,15 @@ The switches the script reads, and where:
 | `SettleFinishes` | `settleRun` calls `finishRun(options.tenant, runId, "failed"` |
 | `FinishOnlyFromStreaming` | `finishRun` filters on `eq(runs.status, "streaming")` |
 | `MeterOnce` | `meterSettledRun` checks and sets `settledRunMetered` |
-| `MeterOnFinish` | `recordChatRunUsage(options.tenant, run.id, finished, runUsage)` follows `finishRun(..., "completed")` (`:698`) |
-| `MeterOnSettledCompletion` | The settled branch of the `run.completed` handler calls `meterSettledRun();` (`:600`) |
-| `MeterAfterAttempt` | The `if (settled)` after the model call calls `meterSettledRun();` (`:690`) |
-| `ClaimOnPersist` | `finishing = true;` is the first statement of `persistAssistant`, and no `await` sits between each `if (settled) {` and its `persistAssistant()` call: the `run.completed` handler (`:597`→`:603`), after the model call (`:688`→`:693`) and the catch path (`:740`→`:745`). The script prints which part made it false. |
+| `MeterOnFinish` | `recordChatRunUsage(options.tenant, run.id, finished, runUsage)` follows `finishRun(..., "completed")` (`:851`) |
+| `MeterOnSettledCompletion` | The settled branch of the `run.completed` handler calls `meterSettledRun();` (`:753`) |
+| `MeterAfterAttempt` | The `if (settled)` after the model call calls `meterSettledRun();` (`:843`) |
+| `ClaimOnPersist` | `finishing = true;` is the first statement of `persistAssistant`, and no `await` sits between each `if (settled) {` and its `persistAssistant()` call: the `run.completed` handler (`:750`→`:756`), after the model call (`:841`→`:846`) and the catch path (`:893`→`:898`). The script prints which part made it false. |
 | `CancelYieldsToClaim` | `onClientAbort` starts with `if (queueClosed \|\| finishing) {` and a `return;`, and `onStall` either does the same or has an `if (finishing) {` branch before `settleRun(message)` that ends in `return;` and calls neither `settleRun` nor `finishRun`. One handler alone is not enough, so the switch is false unless both do. |
-| `StreamBound` | The finishing branch of `onStall` calls `closeQueue();` (`:284`) |
-| `QuietOnceSaved` | Every `send(` in the finishing branch of `onStall` sits inside its `if (!persisted) {` (`:278`) |
+| `StreamBound` | The finishing branch of `onStall` calls `closeQueue();` (`:437`) |
+| `QuietOnceSaved` | Every `send(` in the finishing branch of `onStall` sits inside its `if (!persisted) {` (`:431`) |
 
-`:600` and `:690` back each other up. Removing either one alone still passes, and removing both breaks `BilledIsMetered`.
+`:753` and `:843` back each other up. Removing either one alone still passes, and removing both breaks `BilledIsMetered`.
 
 Each property fails when the code it guards is broken:
 
@@ -126,11 +126,13 @@ The claim had a cost, found on 2026-11-09 (Notion Dev Findings card 62). Once th
 
 A closed connection during the claim still does nothing. It does not need to. `onClientAbort` leaves the watchdog armed, because only the `finally` calls `stall.close()`, so the watchdog still ends an abandoned run's stream one stall window later. In the model, a closed connection during the claim changes no variable, and `StreamEnds` holds with only `StandDown` ending the stream. Closing the stream at the abort would free the hosted run slot one window sooner. No property tells the two apart, and the person who left sees neither.
 
-A write that rejects after the claim is not modeled. The catch path calls `persistAssistant` again. The retry does not send the closing sentence twice, because `assistantText` already holds it and `settleChatTurn` appends a note only when the text lacks it (`withClosingNote`, `packages/core/src/agents/chat-turn.ts:256`). One rejection is enough when it is the catch path's own save (`runs.ts:745`, after a model failed mid-answer with partial text) or a `finishRun` (`:694`, then again at `:748`). If that retry also rejects, the run leaves the catch with no `finishRun`, so the row stays `streaming` and the person gets no terminal frame. That was already true before the claim on `better-sqlite3`, where the same write throws.
+A write that rejects after the claim is not modeled. The catch path calls `persistAssistant` again. The retry does not send the closing sentence twice, because `assistantText` already holds it and `settleChatTurn` appends a note only when the text lacks it (`withClosingNote`, `packages/core/src/agents/chat-turn.ts:256`). One rejection is enough when it is the catch path's own save (`runs.ts:898`, after a model failed mid-answer with partial text) or a `finishRun` (`:847`, then again at `:901`). If that retry also rejects, the run leaves the catch with no `finishRun`, so the row stays `streaming` and the person gets no terminal frame. That was already true before the claim on `better-sqlite3`, where the same write throws.
 
 ## What it does not cover
 
-- The fallback retry on a second model (`heldNext`, `:676`) is folded into the one `"model"` wait.
+- The fallback retry on a second model (`heldNext`, `:829`) and tier fallback (`fallbackFor`, `:595`) are folded into the one `"model"` wait.
+- `workerChannel.alive` (`runs.ts:668-673`, used by `keepRunAlive` for long `video_generate` polls) resets the stall watchdog only while `!queueClosed && !settled` inside `"model"`, before any claim or settle.
+- `AiSdkRuntime.consume`'s `usageDrainTimer` (`USAGE_DRAIN_MS = 5000`, `ai-sdk-runtime.ts:803`) and `finished` / `stopWhen` checks (`:748`, `:786`, `:829`) happen inside `"model"` before `run.completed` or failure.
 - A write that never returns ends the person's stream, but the run itself never finishes. `work` stays pending on the `await`, and the row stays `streaming`. `EndsSettled` and `BilledIsMetered` hold only vacuously there, because the run never reaches `"done"`. Nothing closes such a row later: no code sweeps `streaming` rows at boot (`threads.ts` writes `streaming` only in `insertRun`, `:301`, and reads it only in `finishRun`, `:327`). A move off SQLite (open decision 1, K-D9 in `AGENTS.md`) still owes a timeout on each write, or such a sweep. The hosted run slot is freed when the stream ends (`guardRunStream`, `packages/host/src/run-limits.ts:210`, wrapped around the run at `packages/host/src/handlers/runs.ts:53`), while that write may still be pending. The gateway is not affected (the model call has returned by the claim), but on a yielding driver the SR-138 run cap then stops limiting database work in flight, so a stalled database can pile up hung writes or pool connections; the per-write timeout above closes that too.
 - The person can be told that saving took too long and later find the answer saved and billed, when a slow save lands after the watchdog. The sentence says to reload the chat for that reason.
 - The watchdog's timing is not modeled. `StandDown` has weak fairness, which stands for the real timer: `armRunStallGuard` fires once, one idle window after the last runtime event, and nothing touches it after the claim (`packages/host/src/run-stall.ts`).
@@ -141,24 +143,26 @@ A write that rejects after the claim is not modeled. The catch path calls `persi
 - Tool calls, media mirroring, tool invocation rows, knowledge ingestion and retrieval counts are left out.
 - Frames are reduced to `failed`, the success end `ok`, and the closing `end`. Deltas and thinking frames are not modeled.
 - A run that broke after saving partial text and ends `completed` is modeled for the `answer` outcome only.
-- `ModelAnswers` assumes a `run.completed` from the runtime carries something to save. The runtime keeps that true with its empty-reply check (`shouldFailEmptyAssistant` with `hasVisibleText`, `packages/core/src/runtime/ai-sdk-runtime.ts:656`), which turns an empty stream into `run.failed`, the `fail` outcome. That check is not modeled. Before `771e9d90`, a stream of whitespace-only reasoning passed it, so the person got `run.completed` and then `run.failed` for one turn, the harm `NoFailureAfterSuccess` names, on a path outside the model.
+- `ModelAnswers` assumes a `run.completed` from the runtime carries something to save. The runtime keeps that true with its empty-reply check (`shouldFailEmptyAssistant` with `hasVisibleText`, `packages/core/src/runtime/ai-sdk-runtime.ts:650`), which turns an empty stream into `run.failed`, the `fail` outcome. That check is not modeled. Before `771e9d90`, a stream of whitespace-only reasoning passed it, so the person got `run.completed` and then `run.failed` for one turn, the harm `NoFailureAfterSuccess` names, on a path outside the model.
 - `FinishOnlyFromStreaming` is mirrored, but no property fails when only it is removed, in either database mode. Its job is defense in depth.
-- The meter calls on the catch path (`:741` and `:751`) are not modeled. No modeled path reaches the catch with a billed call, because a billed call ends in `run.completed`.
+- The meter calls on the catch path (`:894` and `:904`) are not modeled. No modeled path reaches the catch with a billed call, because a billed call ends in `run.completed`.
 - The hosted run cap (`packages/host/src/run-limits.ts`) and the desktop IPC transport are out of scope, though both reach this same code.
 
 ## Keep it in step with the code
 
-Coverage: `startModalityRun` in `packages/host/src/runs.ts`, `finishRun` in `packages/host/src/threads.ts`, `recordChatRunUsage` in `packages/host/src/usage-record.ts`, and the driver import in `packages/db/src/client.ts`.
+Coverage: `packages/host/src/runs.ts` (`startModalityRun`), `packages/host/src/threads.ts` (`finishRun`), `packages/host/src/usage-record.ts` (`recordChatRunUsage`), `packages/db/src/client.ts` (driver import), and `packages/core/src/runtime/ai-sdk-runtime.ts` (stream completion and usage drain).
 
-Sync commit: `365d4af6` (`main`, 2026-11-13). At this commit the model was confirmed to describe the covered code. `runs.ts` last changed at `9b80459b`, which gave `onStall` its finishing branch, and `threads.ts`, `usage-record.ts` and `client.ts` have not changed since. Since the previous sync (`9b80459b`), only `ai-sdk-runtime.ts` changed: `771e9d90` sends whitespace-only reasoning with no text down the failure path (the `fail` outcome), and `3bff8ec1` stops retrying an attempt that streamed readable reasoning (retries are inside the one `"model"` wait). Neither changes the model. They moved `run.completed` from `:668` to `:670`. Default, `--hazard`, and seven `--break` runs (`GuardOnCompleted`, `MeterOnce`, `StallGuard`, `SettleFinishes`, and under `--hazard` `StreamBound`, `ClaimOnPersist`, `QuietOnceSaved`) each gave the result in the table above.
+Sync commit: `8871ffdf` (`main`, 2026-11-23). At this commit the model was confirmed to describe the covered code. Since the previous sync (`365d4af6`), `runs.ts` extracted `prepareChatRun` and `chatHistoryFromRows` (`40d7b321`), added tier fallback (`5653a2ed`, `b46e8983`), and added `workerChannel.alive` (`128fdab6`), while `ai-sdk-runtime.ts` replaced `settleWithin` with `usageDrainTimer` (`4ecf3bc9`) and added `stopWhen` / `finished` stream termination checks (`98e29d08`, `4c04e87c`). None changes the settlement state machine or the sixteen switches. `threads.ts`, `usage-record.ts` and `client.ts` did not change. Default (44 distinct states), `--hazard`, and all seven `--break` runs (`GuardOnCompleted`, `MeterOnce`, `StallGuard`, `SettleFinishes`, and under `--hazard` `StreamBound`, `ClaimOnPersist`, `QuietOnceSaved`) each gave the result in the table above.
 
 To check whether the verification needs another look:
 
 ```bash
-git log --oneline 365d4af6..HEAD -- packages/host/src/runs.ts packages/host/src/threads.ts packages/host/src/usage-record.ts packages/db/src/client.ts packages/core/src/runtime/ai-sdk-runtime.ts
+pnpm formal:sync-check
+# or manually:
+git log --oneline 8871ffdf..HEAD -- packages/host/src/runs.ts packages/host/src/threads.ts packages/host/src/usage-record.ts packages/db/src/client.ts packages/core/src/runtime/ai-sdk-runtime.ts
 ```
 
-`ai-sdk-runtime.ts` is not covered code, but the table cites it for where `run.completed` is sent, so a change there can move that reference or change the model's outcomes.
+`ai-sdk-runtime.ts` is included in `Coverage` so line references for `run.completed` (`:664`) and model stream outcomes stay current.
 
 When a change to covered code is intended:
 

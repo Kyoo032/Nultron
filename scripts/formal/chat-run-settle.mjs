@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SPEC = join(ROOT, "formal", "chat-run-settle", "ChatRunSettle.tla");
@@ -266,6 +266,11 @@ function writeConfig(dir, values, invariants, properties) {
   writeFileSync(join(dir, "ChatRunSettle.cfg"), `${lines.join("\n")}\n`);
 }
 
+export function formatJavaSpawnError(error) {
+  const code = error && typeof error === "object" && "code" in error && error.code ? error.code : error?.message;
+  return `Java 11+ is required to run TLC (spawn java failed: ${code || "unknown"}). Run inside \`nix develop\` / WSL NixOS or install Java 11+.`;
+}
+
 function check(jar, values, invariants, properties) {
   const work = mkdtempSync(join(tmpdir(), "chat-run-settle-"));
   try {
@@ -289,6 +294,10 @@ function check(jar, values, invariants, properties) {
       ],
       { cwd: work, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
     );
+    if (result.error) {
+      console.error(formatJavaSpawnError(result.error));
+      process.exit(3);
+    }
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     const violations = [...output.matchAll(/Invariant (\S+) is violated/g)].map((m) => m[1].replace(/\.$/, ""));
     if (output.includes("Temporal properties were violated")) {
@@ -359,4 +368,6 @@ function main() {
   process.exit(1);
 }
 
-main();
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
+  main();
+}

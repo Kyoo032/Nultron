@@ -336,6 +336,8 @@ function buildSteps(ctx) {
 
   // Doc and media checks. Never in the old CI; advisory because the media they check is gitignored.
   add("maps", "maps:check", false, [node(["scripts/map-rot.mjs"])]);
+  // Formal verification drift check. Advisory here so unrelated PRs see a reminder when covered code moved.
+  add("formal", "formal:sync-check", false, [node(["scripts/formal-sync-check.mjs"])]);
   // Change guard (lanes.json). Required: a path that never reaches main, a protected file without a `Lanes:` line, a new
   // brand literal in shared code. Those exit 1 without `--strict`. It skips itself when lanes.json or docs/internal is
   // absent or the range origin/main...HEAD cannot be resolved.
