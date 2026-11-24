@@ -14,6 +14,7 @@ import { EditRecipesPanel } from "@/components/edit-recipes-panel";
 import { EditPreview } from "@/components/edit-preview";
 import { EditTimeline } from "@/components/edit-timeline";
 import { apiFetch, isElectron } from "@/lib/api-client";
+import { useCatalogVersion } from "@/lib/catalog-version";
 import { editInterruptedNote } from "@/lib/edit-agent-note";
 import { filenameFromDisposition } from "@/lib/download-name";
 import { pickMedia } from "@/lib/desktop-bridge";
@@ -194,9 +195,18 @@ export function EditStudio() {
         setDoctor(report);
       }
     });
+  }, [loadList]);
+
+  const catalogVersion = useCatalogVersion();
+  useEffect(() => {
+    void catalogVersion;
+    let cancelled = false;
     void apiFetch("/api/v1/settings")
       .then((res) => res.json())
       .then((payload) => {
+        if (cancelled) {
+          return;
+        }
         setHasKey(Boolean(payload.hasOpenai));
         if (typeof payload.editTurnCapUsd === "number") {
           setSpendCap(Math.min(50, Math.max(0.5, payload.editTurnCapUsd)));
@@ -206,6 +216,9 @@ export function EditStudio() {
     void apiFetch("/api/v1/videos")
       .then((res) => res.json())
       .then((payload) => {
+        if (cancelled) {
+          return;
+        }
         if (Array.isArray(payload.models)) {
           setModels(payload.models);
         }
@@ -217,12 +230,18 @@ export function EditStudio() {
     void apiFetch("/api/v1/images")
       .then((res) => res.json())
       .then((payload) => {
+        if (cancelled) {
+          return;
+        }
         if (Array.isArray(payload.models)) {
           setImageModels(payload.models);
         }
       })
       .catch(() => undefined);
-  }, [loadList]);
+    return () => {
+      cancelled = true;
+    };
+  }, [catalogVersion]);
 
   useEffect(() => {
     eventsAbort.current?.abort();

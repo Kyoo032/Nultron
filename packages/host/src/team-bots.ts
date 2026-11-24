@@ -1,6 +1,8 @@
 import { db, DrizzleAgentRepository } from "@agentforge/db";
 import {
   ApiError,
+  canAdminister,
+  canBuild,
   DEFAULT_CHAT_TOOLS,
   isDelegableAgent,
   isTeamBotSlug,
@@ -129,6 +131,9 @@ export async function createTeamBot(tenant: TenantContext, proposal: TeamBotProp
  * its threads and its runs all stay. True when a live bot was released.
  */
 export async function releaseTeamBot(tenant: TenantContext, slugOrName: string): Promise<boolean> {
+  if (!canBuild(tenant.role)) {
+    throw new ApiError("forbidden", "Builder role required", 403);
+  }
   const wanted = slugOrName.trim().toLowerCase();
   const bots = await teamBotRows(tenant);
   const found = bots.find(
@@ -136,6 +141,9 @@ export async function releaseTeamBot(tenant: TenantContext, slugOrName: string):
   );
   if (!found) {
     return false;
+  }
+  if (found.row.createdByUserId !== tenant.userId && !canAdminister(tenant.role)) {
+    throw new ApiError("forbidden", "Only the creator can edit this agent", 403);
   }
   await repo.updateVersion(tenant.organizationId, found.version.id, {
     config: { ...found.version.config, [TEAM_BOT_CONFIG_KEY]: false },

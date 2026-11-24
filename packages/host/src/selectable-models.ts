@@ -45,7 +45,7 @@ import {
   type ModelCacheScope,
 } from "./model-cache";
 import { log } from "./log";
-import { dropRefusedModels, forgetLessons, withKeyId } from "./model-availability";
+import { dropRefusedModels, forgetLessons, resetAvailabilityMemo, withKeyId } from "./model-availability";
 import { loadSettings } from "./settings-store";
 import { loadModelsDevRegistry, modelsDevCacheStamp, refreshModelsDevRegistry } from "./models-dev-cache";
 
@@ -528,7 +528,10 @@ export async function refreshModelCache(
   if (options.onlyIfMissing && modelCacheStamp(scope) !== "missing") {
     return loadModelCache(scope);
   }
-  return saveModelCache(finished, scope);
+  const saved = saveModelCache(finished, scope);
+  catalogMemo.delete(modelCacheSlot(scope));
+  resetAvailabilityMemo();
+  return saved;
 }
 
 // ---------------------------------------------------------------------------- hosted cache warm-up

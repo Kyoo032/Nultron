@@ -10,10 +10,12 @@ import {
   type TeamProposal,
 } from "@agentforge/core";
 import { DEFAULT_MODEL_TIER } from "@agentforge/core/tiers";
+import { requireGatewayAllowed } from "./gateway-gate";
 import { loadSettings } from "./settings-store";
 import { listSelectableModels, toolMediaModels } from "./selectable-models";
 import { chooseTierRun } from "./tier-resolve";
 import { localeForRun } from "./run-context";
+import { recordChatRunUsage } from "./usage-record";
 
 /**
  * `POST /api/v1/team/propose`: one model call that reads the owner's brief and answers which
@@ -105,10 +107,14 @@ function proposalVersion(tenant: TenantContext, model: string, prompt: string): 
 }
 
 /**
- * The model-drafted proposal, or the deterministic one. `chooseTierRun` throws when the Daily tier
- * has no live candidate, which lands in the same fallback as a failed call.
+ * The model-drafted proposal, or the deterministic one. The gateway gate and plan entitlement run
+ * first and propagate refusals (`403 gateway_blocked`, plan blocks) rather than swallowing them into
+ * the deterministic fallback; `chooseTierRun` throwing or a model failure / unparseable reply still
+ * falls back.
  */
 export async function proposeTeam(tenant: TenantContext, brief: string): Promise<TeamProposal> {
+  const settings = loadSettings(tenant);
+  requireGatewayAllowed(settings, { tenant });
   const fallback = () => proposeTeamDeterministic(brief);
   try {
     const catalog = listSelectableModels(tenant);
@@ -116,10 +122,12 @@ export async function proposeTeam(tenant: TenantContext, brief: string): Promise
     if (!tier) {
       return fallback();
     }
+    const runId = `team-propose-${crypto.randomUUID()}`;
     let text = "";
-    await createRuntime(loadSettings(tenant), toolMediaModels(tenant)).execute({
+    let usageRecorded = false;
+    await createRuntime(settings, toolMediaModels(tenant)).execute({
       tenant,
-      runId: `team-propose-${crypto.randomUUID()}`,
+      runId,
       modality: "text",
       version: proposalVersion(tenant, tier.model, TEAM_PROPOSE_PROMPT),
       bindings: [],
@@ -131,6 +139,13 @@ export async function proposeTeam(tenant: TenantContext, brief: string): Promise
       onEvent: (event) => {
         if (event.type === "assistant.delta") {
           text += event.text;
+        } else if (event.type === "run.completed" && !usageRecorded) {
+          usageRecorded = true;
+          try {
+            recordChatRunUsage(tenant, runId, true, (event.usage as Record<string, unknown> | undefined) ?? null);
+          } catch {
+            // The ledger never fails a proposal; `recordUsage` logs its own failure.
+          }
         }
       },
     });
