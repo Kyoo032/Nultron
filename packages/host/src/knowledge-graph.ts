@@ -105,10 +105,10 @@ function sourceLabels(workspaceId: string, ids: readonly string[]): Map<string, 
   }
   const rows = sql
     .prepare(
-      `SELECT id, name FROM knowledge_sources WHERE workspace_id = ? AND id IN (${ids.map(() => "?").join(", ")})`,
+      `SELECT id, name, origin_kind FROM knowledge_sources WHERE workspace_id = ? AND id IN (${ids.map(() => "?").join(", ")})`,
     )
-    .all(workspaceId, ...ids) as Array<{ id: string; name: string }>;
-  return new Map(rows.map((row) => [row.id, row.name]));
+    .all(workspaceId, ...ids) as Array<{ id: string; name: string; origin_kind: string | null }>;
+  return new Map(rows.map((row) => [row.id, row.origin_kind === "thread" ? openThreadTitle(row.name) : row.name]));
 }
 
 function threadLabels(workspaceId: string, ids: readonly string[]): Map<string, string> {

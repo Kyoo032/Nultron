@@ -32,8 +32,18 @@ vi.mock("./safe-fetch", async (importOriginal) => {
 
 const { checkpointWalTruncate, sql } = await import("@agentforge/db");
 const { sqliteFilePath } = await import("@agentforge/db/vault-key");
-const { addFileSource, addPastedSource, addUrlSource, deleteSource, findSourceByOrigin, getKnowledgeModels, retrieveChunks } =
-  await import("./knowledge");
+const {
+  addFileSource,
+  addPastedSource,
+  addUrlSource,
+  deleteSource,
+  findSourceByOrigin,
+  getKnowledgeModels,
+  listSources,
+  retrieveChunks,
+} = await import("./knowledge");
+const { handleGetKnowledge } = await import("./handlers/knowledge");
+const { upsertWorkSource } = await import("./knowledge-ingest");
 const { embedTextsWithModel, reembedWorkspaceChunks, resetEmbedCircuit, searchVectors, STUB_EMBED_MODEL } = await import(
   "./knowledge-embed"
 );
@@ -53,7 +63,9 @@ const {
   setThreadTitleFromParts,
 } = await import("./threads");
 const { startModalityRun } = await import("./runs");
-const { stubEmbed } = await import("@agentforge/core");
+const { chatWorkCard } = await import("./work-cards");
+const { invokeToolGuarded, stubEmbed } = await import("@agentforge/core");
+const { knowledgeSearchTool } = await import("./knowledge-search-tool");
 
 const RAW_EMAIL = "alex.rivera@example.com";
 const RAW_NIK = "3273011505900001";
@@ -609,6 +621,15 @@ describe("Thread titles at-rest encryption and end-to-end Chat-turn raw-DB accep
     expect(rawThread.title).not.toContain(turnNik);
     expect(rawThread.title).not.toContain(turnNpwp);
 
+    const rawSource = sql
+      .prepare("SELECT name FROM knowledge_sources WHERE workspace_id = ? AND origin_kind = 'thread' AND origin_id = ?")
+      .get(tenant.workspaceId, thread.id) as { name: string };
+    expect(isSealedThreadTitle(rawSource.name)).toBe(true);
+    expect(rawSource.name).not.toContain(marker);
+    expect(rawSource.name).not.toContain(turnEmail);
+    expect(rawSource.name).not.toContain(turnNik);
+    expect(rawSource.name).not.toContain(turnNpwp);
+
     // 2. messages.content rows are AES-256-GCM sealed at rest.
     const rawMessages = sql
       .prepare("SELECT content FROM messages WHERE thread_id = ?")
@@ -659,5 +680,97 @@ describe("Thread titles at-rest encryption and end-to-end Chat-turn raw-DB accep
       expect(afterDelete.db.includes(Buffer.from(token, "utf8"))).toBe(false);
       expect(afterDelete.wal.includes(Buffer.from(token, "utf8"))).toBe(false);
     }
+  });
+
+  it("seals knowledge_sources.name for origin_kind='thread' at rest while keeping sources APIs readable and thread delete removing the row", async () => {
+    const tenant = await getTenant();
+    const ready = await agentService.ensureDefaultChat(tenant);
+    const plantedTitle = "Confidential Thread Work Card 4821";
+    const bodyToken = "sapphirebeacon4821";
+    const thread = await createThread(tenant, ready.agent.id, plantedTitle);
+
+    const upserted = await upsertWorkSource(
+      tenant,
+      chatWorkCard({
+        threadId: thread.id,
+        title: plantedTitle,
+        userText: `Analyze ${bodyToken}`,
+        assistantText: `Summary for ${bodyToken} completed.`,
+      }),
+    );
+    expect(upserted.status).toBe("indexed");
+    if (upserted.status === "skipped") {
+      throw new Error("unexpected skip");
+    }
+    expect(upserted.source.name).toBe(plantedTitle);
+
+    const rawRow = sql
+      .prepare("SELECT name FROM knowledge_sources WHERE workspace_id = ? AND origin_kind = 'thread' AND origin_id = ?")
+      .get(tenant.workspaceId, thread.id) as { name: string } | undefined;
+    expect(rawRow).toBeDefined();
+    expect(isSealedThreadTitle(rawRow?.name ?? "")).toBe(true);
+    expect(rawRow?.name).not.toContain(plantedTitle);
+    expect(rawRow?.name).not.toContain("4821");
+
+    expect(listSources(tenant).find((item) => item.id === upserted.source.id)?.name).toBe(plantedTitle);
+    expect(findSourceByOrigin(tenant, { kind: "thread", id: thread.id })?.name).toBe(plantedTitle);
+
+    const apiResponse = await handleGetKnowledge({
+      method: "GET",
+      path: "/api/v1/knowledge",
+      query: {},
+      params: {},
+      headers: {},
+      body: undefined,
+    });
+    expect(apiResponse.status).toBe(200);
+    if (!("body" in apiResponse)) {
+      throw new Error("Expected JSON response body");
+    }
+    const apiBody = apiResponse.body as { sources: Array<{ id: string; name: string }> };
+    expect(apiBody.sources.find((item) => item.id === upserted.source.id)?.name).toBe(plantedTitle);
+
+    const retrieved = await retrieveChunks(tenant, bodyToken, 4);
+    expect(retrieved.chunks[0]?.sourceName).toBe(plantedTitle);
+
+    const searchResult = (await invokeToolGuarded(knowledgeSearchTool, { query: bodyToken }, tenant)) as {
+      results: Array<{ title: string; source_id: string }>;
+    };
+    expect(searchResult.results[0]?.title).toBe(plantedTitle);
+
+    const reindexed = await reindexSource(tenant, upserted.source.id);
+    expect(reindexed).toMatchObject({ status: "reindexed", sourceId: upserted.source.id, name: plantedTitle });
+    const rawAfterReindex = sql
+      .prepare("SELECT name FROM knowledge_sources WHERE workspace_id = ? AND id = ?")
+      .get(tenant.workspaceId, upserted.source.id) as { name: string };
+    expect(isSealedThreadTitle(rawAfterReindex.name)).toBe(true);
+    expect(rawAfterReindex.name).not.toContain(plantedTitle);
+
+    const legacyThreadId = `legacy-thread-${crypto.randomUUID()}`;
+    const legacySourceId = crypto.randomUUID();
+    const legacyName = "Legacy Plaintext Chat Card 9012";
+    sql
+      .prepare(
+        `INSERT INTO threads (id, organization_id, workspace_id, agent_id, user_id, title, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(legacyThreadId, tenant.organizationId, tenant.workspaceId, ready.agent.id, tenant.userId, legacyName, Date.now());
+    sql
+      .prepare(
+        `INSERT INTO knowledge_sources (id, workspace_id, name, type, status, chunks, error, created_at, origin_kind, origin_id)
+         VALUES (?, ?, ?, 'Chat', 'Indexed', 0, NULL, ?, 'thread', ?)`,
+      )
+      .run(legacySourceId, tenant.workspaceId, legacyName, Date.now(), legacyThreadId);
+    expect(listSources(tenant).find((item) => item.id === legacySourceId)?.name).toBe(legacyName);
+    expect(findSourceByOrigin(tenant, { kind: "thread", id: legacyThreadId })?.name).toBe(legacyName);
+
+    expect(await deleteThread(tenant, thread.id)).toBe(true);
+    const remaining = sql
+      .prepare("SELECT count(*) AS n FROM knowledge_sources WHERE workspace_id = ? AND origin_kind = 'thread' AND origin_id = ?")
+      .get(tenant.workspaceId, thread.id) as { n: number };
+    expect(remaining.n).toBe(0);
+    expect(findSourceByOrigin(tenant, { kind: "thread", id: thread.id })).toBeNull();
+
+    await deleteThread(tenant, legacyThreadId);
   });
 });

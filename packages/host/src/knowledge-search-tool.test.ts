@@ -2,7 +2,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { invokeTool, type TenantContext } from "@agentforge/core";
+import { invokeTool, invokeToolGuarded, type TenantContext } from "@agentforge/core";
+import { sql } from "@agentforge/db";
 import { addPastedSource } from "./knowledge";
 import { upsertWorkSource } from "./knowledge-ingest";
 import {
@@ -191,6 +192,32 @@ describe("knowledge_search", () => {
 
     expect(outside.results).toHaveLength(2);
     expect(inside.results.map((hit) => hit.title)).toEqual(["Vendor risk thread-b"]);
+  });
+
+  it("masks PII in knowledge_search output through invokeToolGuarded while keeping source_id and readable title", async () => {
+    const ctx = desk("guarded-pii");
+    const sourceId = "b73b2194-8471-4712-9012-123456789012";
+    sql
+      .prepare(
+        `INSERT INTO knowledge_sources (id, workspace_id, name, type, status, chunks, error, created_at)
+         VALUES (?, ?, 'Harbor contact memo', 'Paste', 'Indexed', 1, NULL, ?)`,
+      )
+      .run(sourceId, ctx.workspaceId, Date.now());
+    sql
+      .prepare("INSERT INTO knowledge_chunks (source_id, workspace_id, body) VALUES (?, ?, ?)")
+      .run(sourceId, ctx.workspaceId, "zanzibarite-contact: Kirim ke Rina Wijaya di rina@contoh.id (081234567890)");
+
+    const guarded = (await invokeToolGuarded(
+      knowledgeSearchTool,
+      { query: "zanzibarite-contact" },
+      ctx,
+    )) as { results: Array<{ title: string; source_id: string; snippet: string }> };
+    expect(guarded.results).toHaveLength(1);
+    expect(guarded.results[0]).toMatchObject({
+      title: "Harbor contact memo",
+      source_id: sourceId,
+      snippet: "zanzibarite-contact: Kirim ke [name] di [email] ([phone])",
+    });
   });
 
   it("refuses with `unavailable` instead of throwing when the gateway gate is closed", async () => {

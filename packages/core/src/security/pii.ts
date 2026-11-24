@@ -416,6 +416,7 @@ const SKIP_JSON_MASK_KEYS: ReadonlySet<string> = new Set([
   "artifactId",
   "toolKey",
   "sourceId",
+  "source_id",
 ]);
 
 const STANDALONE_LINK_RE = /^(?:https?:\/\/|\/api\/|data:)\S+$/i;
