@@ -4,6 +4,7 @@ import type { KnowledgeMap, TenantContext } from "@agentforge/core";
 import { sanitizeSourceName } from "./knowledge-text";
 import { sweepOrphanGraph } from "./knowledge-graph-prune";
 import { visibleGraphNodes } from "./knowledge-visibility";
+import { openThreadTitle } from "./thread-title-seal";
 import { log } from "./log";
 
 /**
@@ -118,7 +119,7 @@ function threadLabels(workspaceId: string, ids: readonly string[]): Map<string, 
     const rows = sql
       .prepare(`SELECT id, title FROM threads WHERE workspace_id = ? AND id IN (${ids.map(() => "?").join(", ")})`)
       .all(workspaceId, ...ids) as Array<{ id: string; title: string }>;
-    return new Map(rows.map((row) => [row.id, row.title]));
+    return new Map(rows.map((row) => [row.id, openThreadTitle(row.title)]));
   } catch {
     // A thread title is a nicety; the id is always a usable label.
     return new Map();

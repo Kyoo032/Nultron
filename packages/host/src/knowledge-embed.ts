@@ -2,6 +2,7 @@ import {
   DEFAULT_OPENAI_BASE_URL,
   cosineSimilarity,
   hasLiveProvider,
+  maskPii,
   parseEmbeddingResponse,
   resolveProviderKeys,
   resolveRuntimeMode,
@@ -12,6 +13,7 @@ import {
 import { sql } from "@agentforge/db";
 import { loadSettings, type SettingsScope } from "./settings-store";
 import { andVisibleSource } from "./knowledge-visibility";
+import { openVectorBody, sealVectorBody } from "./knowledge-vector-seal";
 import { log } from "./log";
 
 const EMBED_BATCH = 16;
@@ -94,13 +96,14 @@ async function liveEmbedBatch(texts: string[], model: string, scope?: SettingsSc
   // Pinned endpoint only: the gateway key rides this request, so a stored `openaiBaseUrl` must
   // never decide where it goes. `resolveProviderKeys` is the single source of that URL.
   const base = (resolveProviderKeys(settings).openaiBaseUrl || DEFAULT_OPENAI_BASE_URL).replace(/\/+$/, "");
+  const maskedTexts = texts.map((text) => maskPii(text));
   const res = await fetch(`${base}/embeddings`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ model, input: texts }),
+    body: JSON.stringify({ model, input: maskedTexts }),
     // Same rule as every other key-bearing call: never follow a redirect with the bearer token
     // attached (docs/internal/security-owasp-2026-09.md, A10-4). A 3xx is not ok, so it throws.
     redirect: "manual",
@@ -241,10 +244,20 @@ export async function indexSourceVectors(
       sql.prepare("DELETE FROM knowledge_vectors WHERE workspace_id = ? AND source_id = ?").run(ws, sourceId);
       for (let i = 0; i < chunks.length; i += 1) {
         const embedding = embeddings[i];
-        if (!embedding) {
+        const chunk = chunks[i];
+        if (!embedding || chunk === undefined) {
           continue;
         }
-        insert.run(crypto.randomUUID(), ws, sourceId, i, chunks[i], JSON.stringify(embedding), storedModel, createdAt);
+        insert.run(
+          crypto.randomUUID(),
+          ws,
+          sourceId,
+          i,
+          sealVectorBody(chunk),
+          JSON.stringify(embedding),
+          storedModel,
+          createdAt,
+        );
       }
     });
     // BEGIN IMMEDIATE: this transaction reads then writes. A deferred transaction would take the
@@ -413,7 +426,7 @@ export async function searchVectors(
         embedding = [];
       }
       return {
-        body: row.body,
+        body: openVectorBody(row.body),
         sourceId: row.source_id,
         chunkIndex: row.chunk_index,
         score: cosineSimilarity(queryVec, embedding),

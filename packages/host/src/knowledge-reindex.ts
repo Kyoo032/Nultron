@@ -281,6 +281,33 @@ function recordFailure(tenant: TenantContext, row: ReindexRow, reason: string): 
   return { status: "failed", sourceId: row.id, name: row.name, type: row.type, reason };
 }
 
+const WORK_CARD_HOST_HEADER_LINE = /^(?:Mode|Model|Pointer|File):\s/;
+
+/**
+ * Mask PII in a reconstructed source body before re-chunking, storing, and embedding.
+ * For work cards (`origin_kind !== null`), host-generated header lines (`Mode:`, `Model:`,
+ * `Pointer:`, `File:`) stay untouched so UUIDs in `Pointer: artifact:<uuid>` are never rewritten
+ * as `[phone]`, matching `upsertWorkSource` in `knowledge-ingest.ts`.
+ */
+function maskReindexedBody(body: string, isWorkCard: boolean): string {
+  if (!isWorkCard) {
+    return maskPii(body);
+  }
+  const split = body.indexOf("\n\n");
+  if (split === -1) {
+    return body
+      .split("\n")
+      .map((line) => (WORK_CARD_HOST_HEADER_LINE.test(line) ? line : maskPii(line)))
+      .join("\n");
+  }
+  const header = body
+    .slice(0, split)
+    .split("\n")
+    .map((line) => (WORK_CARD_HOST_HEADER_LINE.test(line) ? line : maskPii(line)))
+    .join("\n");
+  return `${header}\n\n${maskPii(body.slice(split + 2))}`;
+}
+
 /**
  * Re-index one source. Idempotent: run it twice and the second run rewrites the same chunks and
  * vectors it wrote the first time (content-identical; the row's version stamp moves, which is what
@@ -301,7 +328,9 @@ export async function reindexSource(tenant: TenantContext, sourceId: string): Pr
     }
     body = upload.text === null ? null : maskPii(upload.text);
   }
-  body ??= reconstructSourceBody(storedChunks(tenant, sourceId));
+  if (body === null) {
+    body = maskReindexedBody(reconstructSourceBody(storedChunks(tenant, sourceId)), row.origin_kind !== null);
+  }
 
   const chunks = chunkKnowledgeText(body);
   if (chunks.length === 0) {

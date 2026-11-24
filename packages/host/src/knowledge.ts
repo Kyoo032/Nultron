@@ -1,7 +1,7 @@
 import { readdirSync, rmSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { sql } from "@agentforge/db";
+import { checkpointWalTruncate, sql } from "@agentforge/db";
 import {
   ApiError,
   assertAllowedEndpointUrl,
@@ -204,7 +204,12 @@ export function addMemory(tenant: TenantContext, text: string, pinned = false): 
 }
 
 export function deleteMemory(tenant: TenantContext, id: string): void {
-  sql.prepare("DELETE FROM knowledge_memories WHERE workspace_id = ? AND id = ?").run(workspaceId(tenant), id);
+  const changes = sql
+    .prepare("DELETE FROM knowledge_memories WHERE workspace_id = ? AND id = ?")
+    .run(workspaceId(tenant), id).changes;
+  if (changes > 0) {
+    checkpointWalTruncate();
+  }
 }
 
 /**
@@ -707,6 +712,8 @@ export function deleteSource(tenant: TenantContext, id: string): boolean {
     removeStoredUpload(tenant, id);
     // The saved map is a coverage claim. The id has to leave it in the same delete.
     forgetSourcesOnMap(tenant, [id]);
+    // Truncate WAL frames so deleted chunk / source text does not linger on disk.
+    checkpointWalTruncate();
   }
   return removed;
 }
@@ -784,6 +791,9 @@ export function sweepOrphanSources(tenant: TenantContext): number {
   // or a retrieval. The owner's desk carried 18 graph nodes against one live source; this is the
   // repair pass that makes the loop chart describe the knowledge base that actually exists.
   sweepOrphanGraph(tenant);
+  if (removed.length > 0) {
+    checkpointWalTruncate();
+  }
   return removed.length;
 }
 

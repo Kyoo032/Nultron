@@ -54,6 +54,15 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## At-rest sealing and FTS5 secure-delete hardening (DFIND-143..147), 2026-11-24 (branch `fix/dfind-143-147-knowledge-at-rest` from `main` at `5118c795`; unit tests run, not driven live)
+
+Lanes: enterprise
+
+- **FTS5 `secure-delete` and WAL truncation (Key 143).** `ensureSchema` enables FTS5 `secure-delete` on `knowledge_chunks` and `market_news_fts` (`packages/db/src/ensure-schema.ts`), `client.ts` sets `PRAGMA journal_size_limit = 16777216` and exports best-effort `checkpointWalTruncate()`, and `deleteSource`, `deleteMemory`, `sweepOrphanSources`, and `deleteThread` invoke it so deleted B-tree rows and FTS5 inverted-index tokens do not linger in `.sqlite` or `.sqlite-wal`.
+- **Map re-embedding keeps vectors sealed and masks outbound embeddings (Key 144).** `packages/host/src/knowledge-embed.ts` seals `knowledge_vectors.body` with `sealVectorBody` in `indexSourceVectors`, opens it with `openVectorBody` in `searchVectors`, and masks outbound `/embeddings` batch texts with `maskPii` in `liveEmbedBatch`.
+- **Re-indexing masks legacy non-File sources too (Key 145).** `packages/host/src/knowledge-reindex.ts` runs `maskPii` on reconstructed paste, URL, work-card, and file-fallback bodies before chunking, storing, and embedding, while keeping work-card host header lines (`Mode:`, `Model:`, `Pointer:`, `File:`) intact so artifact UUIDs are not rewritten.
+- **Thread titles sealed at rest and `ent-readme.md:39` verified end to end (Keys 146–147).** `packages/host/src/threads.ts` seals `threads.title` with AES-256-GCM via `thread-title-seal.ts` (backward-compatible with legacy plaintext titles) and `packages/host/src/knowledge-graph.ts` opens titles when projecting thread node labels. `docs/public/ent-readme.md` now matches every implemented protection verbatim, backed by an end-to-end Chat-turn raw-DB and WAL byte-scan test in `packages/host/src/knowledge-pii.test.ts` and `packages/db/src/client.test.ts`.
+
 ## Live voice delegates to the desk's agents itself, 2026-11-20
 
 Lanes: tester
