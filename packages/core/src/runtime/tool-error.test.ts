@@ -109,6 +109,19 @@ describe("toolErrorResult", () => {
   it("tells the model what to do next", () => {
     expect(toolErrorResult(new Error("nope"), "web_fetch").message).toMatch(/try|another|tell/i);
   });
+
+  it("masks PII inside tool error messages before returning to the model", () => {
+    const result = toolErrorResult(
+      new Error("Failed sending to alex.rivera@example.com for Kirim ke Rina Wijaya (081234567890)"),
+      "email_send",
+    );
+    expect(result.message).not.toContain("alex.rivera@example.com");
+    expect(result.message).not.toContain("Rina Wijaya");
+    expect(result.message).not.toContain("081234567890");
+    expect(result.message).toContain("[email]");
+    expect(result.message).toContain("[name]");
+    expect(result.message).toContain("[phone]");
+  });
 });
 
 describe("isRunAbort", () => {

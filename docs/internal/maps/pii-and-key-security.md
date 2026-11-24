@@ -2,6 +2,8 @@
 
 Product: both · Instance: main :3000
 
+Last verified: 2026-11-24 on `fix/dfind-130-131-132-134-148` (DFIND-130/131/132/148): `scanPii` now includes cue-led free-text personal names (`kind: "name"` -> `[name]`), `scanIndonesianIds` covers bank-named/transfer-cued/grouped/IBAN accounts while preserving money exclusions, `invokeToolGuarded` masks `thin` with `maskPiiInJson` and `toolErrorResult` runs `maskPii`, and `knowledge_sources.name` for `origin_kind = 'thread'` is sealed via `sealThreadTitle` on write and opened via `openThreadTitle` on read. Verified by targeted `@agentforge/core` and `@agentforge/host` unit suites; not driven on a live host.
+
 Last verified: 2026-11-06 on `fix/redactor-gaps` (before merge, after the review round) for § 11 (the credential redactor) and its row in Where things live only. Read against `redact.ts`, `redact-deep.ts` and their five test files, which are green (153 tests); the line anchors are re-read after the docblocks were deleted; not driven on a live host. Nothing else on the page was re-read.
 
 Last verified: 2026-11-09 at 6080cbba plus the working tree of `fix/desk-key-warn`, for the desk wrap-key warning in section 6, the Failure modes row and the bare-SHA-256 note only (SR-203). Before that: 2026-11-06 at f6c9acc1 for the desk wrap-key floor and its boot check in section 6, the bare-SHA-256 note, the `settings.enc` rows of Failure modes, and the `main.cjs`, `vault-key.ts`, `settings-store.ts` and `openJson` citations in those places (SR-203). Before that: 2026-11-06 at 39cd5f0c plus the working tree of `fix/sec-005-guard-bypass-not-persisted` (SR-202), for the switch paragraph of § 4 only; nothing else on the page was re-read. Before that: 2026-10-29 at 464b00c5 for `attachmentCountOf` in `packages/core/src/security/injection-guard.ts`. Before that: 2026-10-13 at 433778dc (branch `fix/safe-web-search`, before merge, with the review fixes) for the outbound-guard row of Failure modes and the search-query sentence of the first Gotchas bullet only.
@@ -38,14 +40,14 @@ The four original patterns (`:23`, `:26`, `:29`, `:32`) are deliberately loose, 
 | phone | `:26` | 10–15 extracted digits **and** `hasPhoneFormatting` — leading `+`/`00` or an internal `[\s().-]` (`:73-75`) — and not `looksLikeAmount` (`:116-119`), and not `slicedFromNumber` (`:131-137`), and no overlap with an earlier finding (`:178-195`) |
 | card | `:29` | must pass Luhn (`passesLuhn`, `:39-57`), and an **unseparated** run must also satisfy `bareRunLooksLikeCard` (`:151-156`); a run already claimed by an Indonesian finding is skipped (`:206-209`). Checked at `:197-211` |
 | id | `:32` | ≥ 9 digits, not already Luhn-valid at card length, no overlap, and must contain `[-\s]` (`:213-235`) |
-| nik / npwp / account / phone (`08xx`) | `packages/core/src/security/pii-id.ts` | `scanIndonesianIds`, run **first** inside `scanPii` (`:167-169`) so a NIK that happens to pass Luhn reads as `[nik]` and not `[card]`. Detector-by-detector rules are in "Finance privacy guard" below |
-| name | — | **never produced by `scanPii`.** The token exists in `PII_MASK`; only the Finance column scanner classifies a name column, and even there the cell becomes a pseudonym (`Karyawan N`), not the literal `[name]` (`packages/core/src/finance/pii-scan.ts:90-98`) |
+| nik / npwp / account / phone (`08xx`) | `packages/core/src/security/pii-id.ts` | `scanIndonesianIds`, run **first** inside `scanPii` so a NIK that happens to pass Luhn reads as `[nik]` and not `[card]`; also matches bank-named (`Rekening BCA ...`), transfer-cued (`Transfer ke ...`), bank-grouped, and IBAN accounts while keeping money figures unmasked. |
+| name | `packages/core/src/security/pii.ts` | Cue-led free-text person names (`NAME_CUE_ONLY_RE` + `TITLE_NAME_SPAN_RE`, filtered by `NAME_STOPLIST`) emit `kind: "name"` -> `[name]`, alongside Finance table pseudonymisation (`Karyawan N`, `packages/core/src/finance/pii-scan.ts`). |
 
 Both of the "must have a separator" rules exist for one reason, stated in the comments at `:72` and `:229-230`: **bare digit runs are quantities, not identities.** A market cap or a share volume in a Finance or Market prompt is 13 digits long and would otherwise come out as `[id]` or `[card]`. `packages/core/src/market/briefing-prompt.test.ts:172-183` pins that behaviour against real briefing text.
 
 **The Indonesian detectors are not Finance-only.** `scanIndonesianIds` was spliced into `scanPii` itself, not gated behind a Finance flag, so every caller of `maskPii` / `maskOutboundRunInput` — Chat, knowledge cards, studio prompts, research and market queries — now masks NIK, NPWP, labelled bank accounts and `08xx` phones too.
 
-`maskPii` (`:253-275`) applies the surviving findings; `maskPiiInParts` (`:277-284`) maps `type: "text"` and `type: "thinking"` parts and leaves `image_url` alone; `maskOutboundRunInput` (`:286-297`) masks `input.version.systemPrompt` and every `history[].parts`, spreading rather than mutating. `KIND_LABEL` (`:241-250`) carries a human sentence for all eight kinds.
+`maskPii` applies the surviving findings; `maskPiiInJson` recursively masks string values while keeping technical keys (`id`, `sourceId`, `source_id`, `path`, `url`, `href`, `mediaId`, `artifactId`, `toolKey`) and standalone links intact (`invokeToolGuarded` runs it on `thin` after `thinToolOutput`, leaving `full` on the ALS sink untouched, and `toolErrorResult` masks thrown tool error text); `maskPiiInParts` maps `type: "text"` and `type: "thinking"` parts and leaves `image_url` alone; `maskOutboundRunInput` masks `input.version.systemPrompt` and every `history[].parts`, spreading rather than mutating. `KIND_LABEL` carries a human sentence for all eight kinds.
 
 ### 2. The masking point — inside what `createRuntime` returns
 
@@ -104,6 +106,8 @@ Sealed today:
 | `agent_versions.system_prompt` | `packages/db/src/repos/drizzle-agent-repository.ts:87` (`sealText`, `:16-18`) | `:57` (`openText`, `:20-33`) |
 | `settings.enc` (whole file) | `packages/host/src/settings-store.ts:221-227` | `:237-252` |
 | `auth_sessions.refresh_sealed` — the portal refresh token behind each hosted session (hosted only, since 2026-09-23, migration 0021) | `sealRefresh`, `packages/host/src/auth/session-secrets.ts:57-65` | `openRefresh`, `:82-102` |
+| `threads.title` | `sealThreadTitle` (`packages/host/src/thread-title-seal.ts`) in `packages/host/src/threads.ts` | `openThreadTitle` |
+| `knowledge_sources.name` (`origin_kind = 'thread'`) | `sealThreadTitle` in `packages/host/src/knowledge.ts` (`replaceSourceRows`) and `knowledge-reindex.ts` | `openThreadTitle` in `knowledge.ts`, `knowledge/backends/builtin.ts`, `knowledge-expand.ts`, `knowledge-graph.ts`, `knowledge-last-turn.ts`, `knowledge-reindex.ts` |
 
 The refresh token is the one sealed value that does **not** use the wrap key directly: its key is
 HKDF-SHA256 over the wrap key with info `auth-session-refresh-v1` (`refreshSealingKey`,

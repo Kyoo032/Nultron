@@ -10,6 +10,7 @@ import { CHUNK_OVERLAP, chunkKnowledgeText, ftsSourceFilter } from "./knowledge-
 import { andVisibleSource } from "./knowledge-visibility";
 import { tenantMediaRoot } from "./media-root";
 import { tenantDataDir } from "./tenant-paths";
+import { openThreadTitle, sealThreadTitle } from "./thread-title-seal";
 import { log } from "./log";
 
 /**
@@ -93,7 +94,13 @@ function sourceRow(tenant: TenantContext, sourceId: string): ReindexRow | null {
          FROM knowledge_sources WHERE workspace_id = ? AND id = ?${visible.sql}`,
       )
       .get(tenant.workspaceId, sourceId, ...visible.params) as ReindexRow | undefined;
-    return row ?? null;
+    if (!row) {
+      return null;
+    }
+    return {
+      ...row,
+      name: row.origin_kind === "thread" ? openThreadTitle(row.name) : row.name,
+    };
   } catch (error) {
     warn(`${sourceId} could not be read`, error);
     return null;
@@ -217,11 +224,12 @@ async function uploadText(
  * immediate transaction. The embedding is computed before the transaction opens (it may be a
  * network call); everything after that either lands whole or not at all.
  */
-async function replaceSourceRows(tenant: TenantContext, sourceId: string, chunks: string[]): Promise<void> {
+async function replaceSourceRows(tenant: TenantContext, row: ReindexRow, chunks: string[]): Promise<void> {
   const models = getKnowledgeModels(tenant);
   const { vectors, model: storedModel } = await embedTextsWithModel(chunks, models.embeddingModel, tenant);
   const createdAt = nextCreatedAt();
   const ws = tenant.workspaceId;
+  const storedName = row.origin_kind === "thread" ? sealThreadTitle(row.name) : row.name;
   const insertChunk = sql.prepare("INSERT INTO knowledge_chunks (source_id, workspace_id, body) VALUES (?, ?, ?)");
   const insertVector = sql.prepare(
     `INSERT INTO knowledge_vectors (id, workspace_id, source_id, chunk_index, body, embedding, model, created_at)
@@ -230,24 +238,24 @@ async function replaceSourceRows(tenant: TenantContext, sourceId: string, chunks
   const tx = sql.transaction(() => {
     const updated = sql
       .prepare(
-        `UPDATE knowledge_sources SET status = 'Indexed', chunks = ?, error = NULL, created_at = ?
+        `UPDATE knowledge_sources SET name = ?, status = 'Indexed', chunks = ?, error = NULL, created_at = ?
          WHERE workspace_id = ? AND id = ?`,
       )
-      .run(chunks.length, createdAt, ws, sourceId).changes;
+      .run(storedName, chunks.length, createdAt, ws, row.id).changes;
     if (updated === 0) {
       // Deleted while this call was embedding: writing the rows now would orphan them (the vector
       // search serves rows by source id and a missing row's chunks would still match FTS queries).
       throw new MissingSourceError();
     }
-    sql.prepare("DELETE FROM knowledge_vectors WHERE workspace_id = ? AND source_id = ?").run(ws, sourceId);
-    sql.prepare("DELETE FROM knowledge_chunks WHERE workspace_id = ? AND source_id = ?").run(ws, sourceId);
+    sql.prepare("DELETE FROM knowledge_vectors WHERE workspace_id = ? AND source_id = ?").run(ws, row.id);
+    sql.prepare("DELETE FROM knowledge_chunks WHERE workspace_id = ? AND source_id = ?").run(ws, row.id);
     for (let i = 0; i < chunks.length; i += 1) {
       const chunk = chunks[i] ?? "";
-      insertChunk.run(sourceId, ws, chunk);
+      insertChunk.run(row.id, ws, chunk);
       insertVector.run(
         crypto.randomUUID(),
         ws,
-        sourceId,
+        row.id,
         i,
         sealVectorBody(chunk),
         JSON.stringify(vectors[i] ?? []),
@@ -338,7 +346,7 @@ export async function reindexSource(tenant: TenantContext, sourceId: string): Pr
   }
 
   try {
-    await replaceSourceRows(tenant, sourceId, chunks);
+    await replaceSourceRows(tenant, row, chunks);
   } catch (error) {
     if (error instanceof MissingSourceError) {
       return { status: "missing", sourceId };

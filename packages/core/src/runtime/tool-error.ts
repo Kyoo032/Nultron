@@ -1,5 +1,6 @@
 import { homedir, tmpdir } from "node:os";
 import { scanInjection } from "../security/injection-guard";
+import { maskPii } from "../security/pii";
 import { redactSecrets } from "../security/redact";
 
 /** What the model reads when a tool it called threw. Same shape as the budget and egress refusals. */
@@ -76,7 +77,7 @@ export function toolErrorResult(
   toolKey: string,
   options: { scanForInstructions?: boolean } = {},
 ): ToolErrorResult {
-  const cleaned = scrubHost(redactSecrets(detailOf(error)))
+  const cleaned = maskPii(scrubHost(redactSecrets(detailOf(error))))
     .replace(/\s+/g, " ")
     .trim();
   const withheld = options.scanForInstructions !== false && scanInjection(cleaned) !== null;

@@ -30,6 +30,7 @@ import { defaultSoul, isLegacyDefaultSoul, type KnowledgeSoul } from "./knowledg
 import { modeDefaultsFor } from "./selectable-models";
 import { loadSettings } from "./settings-store";
 import { escapeLikePattern, LIKE_ESCAPE } from "./sql-guard";
+import { openThreadTitle, sealThreadTitle } from "./thread-title-seal";
 
 export { chunkKnowledgeText, knowledgeFtsQuery, sanitizeSourceName } from "./knowledge-text";
 export type { RetrievedChunk, RetrieveResult } from "./knowledge/backend";
@@ -73,10 +74,14 @@ type SourceRow = {
 
 const SOURCE_COLUMNS = "id, name, type, status, chunks, error, created_at, origin_kind, origin_id";
 
+function openSourceName(name: string, originKind: string | null): string {
+  return originKind === "thread" ? openThreadTitle(name) : name;
+}
+
 function sourceFromRow(row: SourceRow): KnowledgeSource {
   return {
     id: row.id,
-    name: row.name,
+    name: openSourceName(row.name, row.origin_kind),
     type: row.type,
     status: row.status,
     chunks: row.chunks,
@@ -344,12 +349,13 @@ function replaceSourceRows(
     }
     sql.prepare("DELETE FROM knowledge_chunks WHERE workspace_id = ? AND source_id = ?").run(ws, input.id);
     sql.prepare("DELETE FROM knowledge_sources WHERE workspace_id = ? AND id = ?").run(ws, input.id);
+    const storedName = input.origin?.kind === "thread" ? sealThreadTitle(input.name) : input.name;
     sql
       .prepare(INSERT_SOURCE)
       .run(
         input.id,
         ws,
-        input.name,
+        storedName,
         input.type,
         status,
         chunks.length,

@@ -223,4 +223,103 @@ describe("safe web search in a live run", () => {
 
     expect(seen.tavily).toEqual(["PSAK 72 revenue recognition contact [email]"]);
   });
+
+  it("masks PII in mid-run tool results before the next model request", async () => {
+    registerTool(
+      defineTool({
+        key: "contact_lookup",
+        name: "Contact lookup",
+        description: "Lookup a contact note.",
+        trust: "user_content",
+        schema: z.object({ id: z.string() }),
+        execute: async () => ({
+          success: true,
+          id: "c-1",
+          url: "https://example.com/alex.rivera@example.com",
+          snippet: "Contact alex.rivera@example.com or Kirim ke Rina Wijaya di 081234567890",
+        }),
+      }),
+    );
+    const seen = network((request) =>
+      request === 1
+        ? callStream("contact_lookup", { id: "c-1" }, 1)
+        : textStream("done"),
+    );
+
+    const events: RuntimeEvent[] = [];
+    const guard = createOutboundGuard({ userText: ["Look up contact c-1"], privateText: [], locale: "en" });
+    await runOutboundGuarded(guard, () =>
+      new AiSdkRuntime({ openai: "sk-test", openaiBaseUrl: "https://gateway.test/v1" }).execute({
+        tenant,
+        runId: "run-midrun-pii",
+        modality: "text",
+        version,
+        bindings: [binding("contact_lookup")],
+        history: [{ role: "user", parts: [{ type: "text", text: "Look up contact c-1" }] }],
+        thinking: false,
+        reasoningEffort: "none",
+        reasoningEffortExplicit: true,
+        onEvent: (event) => {
+          events.push(event);
+        },
+      }),
+    );
+
+    expect(toolMessages(seen.model[1] as Captured)).toEqual([
+      {
+        success: true,
+        id: "c-1",
+        url: "https://example.com/alex.rivera@example.com",
+        snippet: "Contact [email] or Kirim ke [name] di [phone]",
+      },
+    ]);
+    expect(toolOutputs(events)[0]).toEqual({
+      success: true,
+      id: "c-1",
+      url: "https://example.com/alex.rivera@example.com",
+      snippet: "Contact [email] or Kirim ke [name] di [phone]",
+    });
+  });
+
+  it("masks PII in thrown tool errors before the next model request", async () => {
+    registerTool(
+      defineTool({
+        key: "broken_lookup",
+        name: "Broken lookup",
+        description: "Fails with PII.",
+        trust: "user_content",
+        schema: z.object({ id: z.string() }),
+        execute: async () => {
+          throw new Error("Could not deliver to alex.rivera@example.com for Kirim ke Rina Wijaya");
+        },
+      }),
+    );
+    const seen = network((request) =>
+      request === 1
+        ? callStream("broken_lookup", { id: "c-1" }, 1)
+        : textStream("done"),
+    );
+
+    const guard = createOutboundGuard({ userText: ["Look up c-1"], privateText: [], locale: "en" });
+    await runOutboundGuarded(guard, () =>
+      new AiSdkRuntime({ openai: "sk-test", openaiBaseUrl: "https://gateway.test/v1" }).execute({
+        tenant,
+        runId: "run-midrun-error-pii",
+        modality: "text",
+        version,
+        bindings: [binding("broken_lookup")],
+        history: [{ role: "user", parts: [{ type: "text", text: "Look up c-1" }] }],
+        thinking: false,
+        reasoningEffort: "none",
+        reasoningEffortExplicit: true,
+        onEvent: () => undefined,
+      }),
+    );
+
+    const serialized = JSON.stringify(toolMessages(seen.model[1] as Captured));
+    expect(serialized).not.toContain("alex.rivera@example.com");
+    expect(serialized).not.toContain("Rina Wijaya");
+    expect(serialized).toContain("[email]");
+    expect(serialized).toContain("[name]");
+  });
 });

@@ -197,7 +197,15 @@ export type { HostCapabilities } from "./capabilities";
 export { redactSecrets, redactCredentials } from "./security/redact";
 export { redactSecretsDeep } from "./security/redact-deep";
 export { keyFingerprint, keyFingerprintOrNull } from "./security/fingerprint";
-export { scanPii, maskPii, maskPiiInParts, maskOutboundRunInput, piiWarning, PII_MASK } from "./security/pii";
+export {
+  scanPii,
+  maskPii,
+  maskPiiInJson,
+  maskPiiInParts,
+  maskOutboundRunInput,
+  piiWarning,
+  PII_MASK,
+} from "./security/pii";
 export type { PiiKind, PiiFinding } from "./security/pii";
 export { ID_PROVINCE_CODES, isNikDigits, isNpwpDigits, scanIndonesianIds } from "./security/pii-id";
 export type { IdPiiKind, IdPiiMatch } from "./security/pii-id";

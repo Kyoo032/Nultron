@@ -339,6 +339,62 @@ describe("createOmniHttpTalker answer", () => {
     expect(error).toMatchObject({ code: "failed" });
     expect(chatCalls(calls)).toHaveLength(0);
   });
+
+  it("masks PII in prior history turns before sending reply requests to the gateway", async () => {
+    const { calls, fetchImpl } = install(() => sse([chunk({ content: "Noted." }), chunk({}, "stop", USAGE)]));
+    const open = talker(fetchImpl).open({
+      locale: "id",
+      history: [
+        { role: "user", text: "Kirim ringkasan ke Rina Wijaya di rina@contoh.id" },
+        { role: "assistant", text: "Baik, dikirim ke Rekening BCA 1234567890" },
+      ],
+    });
+    await collect(open.reply(PCM, { signal: new AbortController().signal }));
+    const first = chatCalls(calls)[0];
+    const serialized = JSON.stringify(first?.json?.messages);
+    expect(serialized).not.toContain("Rina Wijaya");
+    expect(serialized).not.toContain("rina@contoh.id");
+    expect(serialized).not.toContain("1234567890");
+    expect(serialized).toContain("[name]");
+    expect(serialized).toContain("[email]");
+    expect(serialized).toContain("[account]");
+  });
+
+  it("masks PII in answer text, pending question, and arguments before sending to the gateway", async () => {
+    const { calls, fetchImpl } = install((call) => {
+      const messages = call.json?.messages;
+      if (chatCalls([call]).length === 1 && Array.isArray(messages) && messages.length === 2) {
+        return sse([
+          chunk({
+            tool_calls: [
+              {
+                index: 0,
+                id: "call_pii",
+                function: {
+                  name: "ask_nultron",
+                  arguments: '{"question":"Email rina@example.com for Kirim ke Rina Wijaya"}',
+                },
+              },
+            ],
+          }),
+          chunk({}, "tool_calls"),
+        ]);
+      }
+      return sse([chunk({ content: "Done." }), chunk({}, "stop", USAGE)]);
+    });
+    const open = session(fetchImpl);
+    const signal = new AbortController().signal;
+    await collect(open.reply(PCM, { signal }));
+    await collect(open.answer("call_pii", "Send to rina@example.com or 081234567890", { signal }));
+    const second = chatCalls(calls)[1];
+    const serialized = JSON.stringify(second?.json);
+    expect(serialized).not.toContain("rina@example.com");
+    expect(serialized).not.toContain("Rina Wijaya");
+    expect(serialized).not.toContain("081234567890");
+    expect(serialized).toContain("[email]");
+    expect(serialized).toContain("[name]");
+    expect(serialized).toContain("[phone]");
+  });
 });
 
 describe("createOmniHttpTalker remember", () => {

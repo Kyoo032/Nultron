@@ -7,6 +7,7 @@
  * The base URL and the key are passed in. This file does not read the environment or the
  * settings store. Logs are counts and timings only.
  */
+import { maskPii } from "@agentforge/core";
 import { log } from "../log";
 import { createSseParser } from "./talker-sse";
 import {
@@ -287,7 +288,7 @@ function sameWords(heard: string, sentence: string): boolean {
 function historyMessages(history: readonly TalkerTurn[]): { role: TalkerTurn["role"]; content: string }[] {
   return history
     .filter((turn) => turn.text.trim().length > 0)
-    .map((turn) => ({ role: turn.role, content: turn.text }));
+    .map((turn) => ({ role: turn.role, content: maskPii(turn.text) }));
 }
 
 async function* readStream(input: {
@@ -617,7 +618,7 @@ export function createOmniHttpTalker(options: OmniHttpTalkerOptions): Talker {
               fetchImpl,
               url,
               apiKey,
-              body: answerBody({ model, voice, locale, history, pending: match, text }),
+              body: answerBody({ model, voice, locale, history, pending: match, text: maskPii(text) }),
               caller: replyOptions.signal,
               session: sessionCtrl.signal,
               limits,
@@ -758,7 +759,7 @@ function answerBody(input: {
   ];
   if (input.pending) {
     messages.push(
-      { role: "user", content: input.pending.question },
+      { role: "user", content: maskPii(input.pending.question) },
       {
         role: "assistant",
         content: null,
@@ -766,11 +767,11 @@ function answerBody(input: {
           {
             id: input.pending.callId,
             type: "function",
-            function: { name: input.pending.name, arguments: input.pending.arguments },
+            function: { name: input.pending.name, arguments: maskPii(input.pending.arguments) },
           },
         ],
       },
-      { role: "tool", tool_call_id: input.pending.callId, content: input.text },
+      { role: "tool", tool_call_id: input.pending.callId, content: maskPii(input.text) },
     );
   }
   return {
