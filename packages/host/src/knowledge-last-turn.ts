@@ -2,6 +2,7 @@ import { sql } from "@agentforge/db";
 import type { TenantContext } from "@agentforge/core";
 import type { KnowledgeBackendId, RetrievedChunk, RetrieveResult } from "./knowledge/backend";
 import { knowledgeInjection, sourcesPart, type KnowledgeInjection } from "./knowledge";
+import { openVectorBody } from "./knowledge-vector-seal";
 import { andVisibleSource } from "./knowledge-visibility";
 import { log } from "./log";
 
@@ -60,7 +61,7 @@ function chunkBodies(workspaceId: string, sourceIds: string[]): Map<string, stri
   for (const row of rows) {
     const key = `${row.source_id}#${row.chunk_index}`;
     if (!out.has(key)) {
-      out.set(key, row.body);
+      out.set(key, openVectorBody(row.body));
     }
   }
   return out;

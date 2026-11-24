@@ -52,6 +52,8 @@ if (process.env.NODE_ENV !== "production") {
 
 sql.pragma("journal_mode = WAL");
 sql.pragma("foreign_keys = ON");
+// Overwrite deleted pages with zeros so removed rows do not linger in free pages on disk.
+sql.pragma("secure_delete = ON");
 // WAL gives concurrent readers with one writer, but without this a second writer gets
 // SQLITE_BUSY immediately instead of waiting. 5 s is the Phase 3 database-engine change
 // (docs/internal/web-phase3-tenancy-spec.md §3b); a SQLITE_BUSY still reaching a client

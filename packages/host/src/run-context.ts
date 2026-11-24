@@ -7,6 +7,8 @@ export type RunContext = {
   threadId: string;
   agentId: string;
   locale: AppLocale;
+  /** True when the run started from voice mode (`askNultron`), so delegated sub-runs stay read-only. */
+  voice?: boolean;
 };
 
 const storage = new AsyncLocalStorage<RunContext>();

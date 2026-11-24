@@ -1,10 +1,11 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import { ApiError, type TenantContext } from "@agentforge/core";
+import { ApiError, maskPii, type TenantContext } from "@agentforge/core";
 import { sql } from "@agentforge/db";
 import { extractText } from "./knowledge-extract";
 import { getKnowledgeModels, markSourceFailed, nextCreatedAt, type SourceOriginKind } from "./knowledge";
 import { embedTextsWithModel } from "./knowledge-embed";
+import { sealVectorBody } from "./knowledge-vector-seal";
 import { CHUNK_OVERLAP, chunkKnowledgeText, ftsSourceFilter } from "./knowledge-text";
 import { andVisibleSource } from "./knowledge-visibility";
 import { tenantMediaRoot } from "./media-root";
@@ -241,13 +242,14 @@ async function replaceSourceRows(tenant: TenantContext, sourceId: string, chunks
     sql.prepare("DELETE FROM knowledge_vectors WHERE workspace_id = ? AND source_id = ?").run(ws, sourceId);
     sql.prepare("DELETE FROM knowledge_chunks WHERE workspace_id = ? AND source_id = ?").run(ws, sourceId);
     for (let i = 0; i < chunks.length; i += 1) {
-      insertChunk.run(sourceId, ws, chunks[i]);
+      const chunk = chunks[i] ?? "";
+      insertChunk.run(sourceId, ws, chunk);
       insertVector.run(
         crypto.randomUUID(),
         ws,
         sourceId,
         i,
-        chunks[i],
+        sealVectorBody(chunk),
         JSON.stringify(vectors[i] ?? []),
         storedModel,
         createdAt,
@@ -297,7 +299,7 @@ export async function reindexSource(tenant: TenantContext, sourceId: string): Pr
     if (upload.failure) {
       return recordFailure(tenant, row, upload.failure);
     }
-    body = upload.text;
+    body = upload.text === null ? null : maskPii(upload.text);
   }
   body ??= reconstructSourceBody(storedChunks(tenant, sourceId));
 

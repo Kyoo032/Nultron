@@ -289,15 +289,17 @@ describe("Retrieval: search, vectors, Chat injection and the knowledge_search to
     const c = await company("retrieve-vec");
     const { sql } = await import("@agentforge/db");
     const { retrieveChunks } = await import("./knowledge");
-    const body = (
+    const { openVectorBody } = await import("./knowledge-vector-seal");
+    hosted(true);
+    const rawBody = (
       sql
         .prepare("SELECT body FROM knowledge_vectors WHERE workspace_id = ? AND source_id = ? LIMIT 1")
         .get(c.tenants.alice.workspaceId, c.cardIds.alice) as { body: string }
     ).body;
+    const body = openVectorBody(rawBody);
     sql
       .prepare("DELETE FROM knowledge_chunks WHERE workspace_id = ? AND source_id = ?")
       .run(c.tenants.alice.workspaceId, c.cardIds.alice);
-    hosted(true);
 
     const asAlice = await retrieveChunks(c.tenants.alice, body, 8);
     expect(asAlice.chunks.map((chunk) => chunk.sourceId)).toContain(c.cardIds.alice);

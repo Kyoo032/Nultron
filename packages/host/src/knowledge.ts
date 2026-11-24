@@ -8,6 +8,7 @@ import {
   htmlToText,
   isHtmlContent,
   knowledgeMissBlock,
+  maskPii,
   plainToText,
   scanInjection,
   type KnowledgeModels,
@@ -489,7 +490,7 @@ function indexSource(
   if (rule) {
     return Promise.resolve(markSourceFailed(tenant, { id, name, type }, `injection_blocked (rule: ${rule})`));
   }
-  return indexKnowledgeSource(tenant, { id, name, type, text });
+  return indexKnowledgeSource(tenant, { id, name, type, text: maskPii(text) });
 }
 
 /**
@@ -598,7 +599,7 @@ export async function addFileSource(
   const full = path.join(uploadDir(tenant), `${id}-${file.filename.replace(/[^\w.-]+/g, "_")}`);
   await mkdir(path.dirname(full), { recursive: true });
   await writeFile(full, Buffer.from(file.bytes));
-  return indexKnowledgeSource(tenant, { id, name: file.filename, type: "File", text });
+  return indexKnowledgeSource(tenant, { id, name: file.filename, type: "File", text: maskPii(text) });
 }
 
 /** Whole page for indexing; the 1.5 MB fetch cap already bounds it. Shared with paste and file text. */
