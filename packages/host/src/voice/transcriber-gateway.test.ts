@@ -111,4 +111,22 @@ describe("createGatewayTranscriber", () => {
     ).resolves.toBeNull();
     expect(Date.now() - started).toBeLessThan(1_000);
   });
+
+  it("masks PII in transcribed text before returning it", async () => {
+    const { fetchImpl } = install(
+      () =>
+        new Response(
+          JSON.stringify({ text: "Email saya rina@example.com dan nomor HP 081234567890" }),
+          { status: 200 },
+        ),
+    );
+    const result = await transcriber(fetchImpl).transcribe(PCM, {
+      locale: "id",
+      signal: new AbortController().signal,
+    });
+    expect(result?.text).not.toContain("rina@example.com");
+    expect(result?.text).not.toContain("081234567890");
+    expect(result?.text).toContain("[email]");
+    expect(result?.text).toContain("[phone]");
+  });
 });

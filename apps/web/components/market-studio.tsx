@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
-import { usePathname, useSearchParams } from "@/lib/nav";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { MARKET_SPECIALISTS } from "@agentforge/core/market";
 import { ArtifactActions } from "@/components/artifact-actions";
 import { Confetti } from "@/components/confetti";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
@@ -10,15 +11,19 @@ import type { JobRegenSubmit } from "@/components/job-regen-panel";
 import { MarketBoard } from "@/components/market-board";
 import { MarketBriefingView } from "@/components/market-briefing-view";
 import { MarketWatchlistInput } from "@/components/market-watchlist-input";
-import { ModeHeader } from "@/components/mode-header";
 import { MascotSlot } from "@/components/mascot-slot";
+import { ModeIcon } from "@/components/mode-icons";
 import { ModeIllustration } from "@/components/mode-illustration";
 import { ModelSelect } from "@/components/model-select";
+import { SettingsLinkHint } from "@/components/settings-link-hint";
+import { UiSelect } from "@/components/ui-select";
 import { WorkingStatus } from "@/components/working-status";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { getLocale, t } from "@/lib/i18n";
 import {
-  DEFAULT_MAX_CHARS,
   DEFAULT_MARKET_DEPTH,
   DEFAULT_MARKET_SPECIALIST,
+  DEFAULT_MAX_CHARS,
   MARKET_DEPTHS,
   MARKET_STARTERS,
   MAX_MAX_CHARS,
@@ -47,23 +52,22 @@ import {
 } from "@/lib/market-client";
 import { specialistSourcesLine } from "@/lib/market-specialist";
 import { loadWatchlist, saveWatchlist } from "@/lib/market-watchlists";
-import { useWorkspaceScope } from "@/lib/workspace-scope";
-import { isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { modelPickBody, regenModelPick, studioModelPick } from "@/lib/model-choice";
+import { usePathname, useSearchParams } from "@/lib/nav";
+import { useProductBrand } from "@/lib/product-brand";
+import { labeled } from "@/lib/ui-copy";
 import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { useJobModel } from "@/lib/use-job-model";
-import { modelPickBody, regenModelPick, studioModelPick } from "@/lib/model-choice";
 import { useJobStream } from "@/lib/use-job-stream";
 import { useMarketBoard } from "@/lib/use-market-board";
-import { t, getLocale } from "@/lib/i18n";
-import { labeled } from "@/lib/ui-copy";
-import { useProductBrand } from "@/lib/product-brand";
-import { SettingsLinkHint } from "@/components/settings-link-hint";
+import { useWorkspaceScope } from "@/lib/workspace-scope";
+import "@/components/studio-minimal.css";
 
 function isLanguage(value: string): value is WatchLanguage {
   return value === "id" || value === "en";
 }
 
-/** The rail links a desk as `/market?specialist=<id>`; this pane reads it back. */
+/** The URL holds the active specialist as `/market?specialist=<id>`. */
 const MARKET_PATH = "/market";
 
 function clampMaxChars(value: number): number {
@@ -74,6 +78,7 @@ function clampMaxChars(value: number): number {
 }
 
 export function MarketStudio() {
+  const navigate = useNavigate();
   const { productName } = useProductBrand();
   const { models, model, pinned: modelPinned, setModel } = useJobModel("market");
   const job = useJobStream<MarketWatchResult>();
@@ -81,12 +86,6 @@ export function MarketStudio() {
   const searchParams = useSearchParams();
   const { id: workspaceId } = useWorkspaceScope();
 
-  /*
-   * The agent is chosen in the rail, so the URL owns it. This pane is kept
-   * mounted behind the other work modes, and off `/market` the query string
-   * belongs to whatever page is showing — so the last desk seen on `/market`
-   * is what stays active rather than the default silently taking over.
-   */
   const onMarket = pathname === MARKET_PATH;
   const rawSpecialist = searchParams.get("specialist");
   const urlSpecialist: MarketSpecialist = isMarketSpecialist(rawSpecialist) ? rawSpecialist : DEFAULT_MARKET_SPECIALIST;
@@ -105,44 +104,21 @@ export function MarketStudio() {
   const [busy, setBusy] = useState<"download" | "regen" | null>(null);
   const [regenIndex, setRegenIndex] = useState<number | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
-  // A finished job keeps its error forever; this hides it once the user edits the watchlist.
   const [errorStale, setErrorStale] = useState(false);
   const board = useMarketBoard(tickers);
   const scopeKey = `${workspaceId ?? ""}|${specialist}`;
   const lastScopeRef = useRef(scopeKey);
 
-  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key. Hosted only; false elsewhere.
-  // (Not `needsKey`: that name is the market client's text matcher, imported above.)
   const keyMissing = useHostedNeedsKey();
   const rawError = errorStale ? null : (localError ?? job.error?.message ?? null);
   const error = rawError ? friendlyMarketError(rawError) : null;
   const locked = job.busy || busy !== null;
   const ready = tickers.length > 0 && prompt.trim().length > 0;
 
-  /*
-   * Only a desk whose harness names analysts can run the team. The state is
-   * still clamped on the way out rather than trusted: a desk switch and a
-   * render can race, and the host would have to refuse a depth this desk never
-   * offered. `teamReady` drives the control, `requestDepth` is what is sent.
-   */
   const teamReady = teamAvailable(specialist);
   const requestDepth = nextDepth({ depth, specialist });
-
-  /*
-   * `JobProgressList` shows the label the host streamed, and the packet phases
-   * are labelled there in English. The team phases are the first market phases
-   * the catalog carries, so they are swapped to the reader's language here; a
-   * phase the catalog does not know keeps whatever the host called it.
-   */
   const teamProgress = localizeMarketProgress(job.progress, labeled);
 
-  /*
-   * Every desk keeps its own board. When the rail points the URL at another
-   * agent this pane swaps to that agent's watchlist — its starter list the
-   * first time it is opened — and, while the instruction box still holds one
-   * of our defaults, to that agent's default instruction. The board refetches
-   * off `tickers`, so nothing else has to be told about the move.
-   */
   useEffect(() => {
     const movedDesk = lastSpecialistRef.current !== specialist;
     lastSpecialistRef.current = specialist;
@@ -155,14 +131,12 @@ export function MarketStudio() {
     setErrorStale(true);
     if (movedDesk) {
       setPrompt((current) => nextPrompt({ prompt: current, specialist, language }));
-      // A desk with no analysts cannot be read in team depth; drop back to quick.
       setDepth((current) => nextDepth({ depth: current, specialist }));
     }
   }, [scopeKey, specialist, workspaceId, language]);
 
   function changeTickers(next: string[]): void {
     setTickers(next);
-    // Chips are the board; remember them for this desk and this agent alone.
     saveWatchlist(workspaceId, specialist, next);
     setLocalError(null);
     setErrorStale(true);
@@ -173,8 +147,14 @@ export function MarketStudio() {
       return;
     }
     setLanguage(next);
-    // Swap the prefilled instruction only while the user has not written their own.
     setPrompt(nextPrompt({ prompt, specialist, language: next }));
+  }
+
+  function onSpecialistPick(next: string): void {
+    if (!isMarketSpecialist(next) || next === specialist) {
+      return;
+    }
+    navigate(`${MARKET_PATH}?specialist=${encodeURIComponent(next)}`);
   }
 
   async function onGenerate(event: FormEvent) {
@@ -192,7 +172,6 @@ export function MarketStudio() {
       specialist,
       depth: requestDepth,
       maxChars: clampMaxChars(maxChars),
-      // Only a deliberate pick travels as pinned: a seeded default stays rescuable by the host's fallback.
       ...modelPickBody(studioModelPick(model, modelPinned)),
     };
     const next = await job.run("/api/v1/market/stream", body);
@@ -244,126 +223,83 @@ export function MarketStudio() {
     changeTickers([...starter.tickers]);
   }
 
-  // The catalog names the agents; the core meta is the fallback when a key is missing.
   const uiLocale = getLocale();
   const specialistName = (id: MarketSpecialist): string =>
     labeled(`market.specialists.${id}.label`, specialistLabel(id, uiLocale));
   const specialistTip = (id: MarketSpecialist): string =>
     labeled(`market.specialists.${id}.hint`, specialistHint(id, uiLocale));
 
-  /*
-   * Where this agent's numbers come from, read off its harness. The vendor
-   * names stay in English; only the on-device wording is translated.
-   *
-   * A desk whose harness allows web research would earn a "· Web" item, but
-   * nothing the studio already loads says whether a web key is configured —
-   * `/api/v1/settings` carries no readiness flag and `useJobModel` keeps the
-   * payload to itself — so the badge stays silent about it rather than
-   * promising a source that may not be wired.
-   */
+  const specialistOptions = useMemo(
+    () =>
+      MARKET_SPECIALISTS.map((id) => ({
+        value: id,
+        label: labeled(`market.specialists.${id}.label`, specialistLabel(id, uiLocale)),
+        description: labeled(`market.specialists.${id}.hint`, specialistHint(id, uiLocale)),
+      })),
+    [uiLocale],
+  );
+
   const specialistSources = specialistSourcesLine({
     specialist,
     prefix: t("market.studio.sourcesLabel"),
     computedLabel: t("market.studio.sourcesComputed"),
   });
 
-  /*
-   * The agent is picked in the left rail, under the Market entry, and the row
-   * that was clicked is in the URL — so the studio only has to say which desk
-   * is open. One header line, mounted once: beside the language select while a
-   * watchlist exists, and in the empty state above the starters.
-   */
-  const specialistPicker = (
-    <div className="flex flex-col gap-1" role="group" aria-label={t("market.studio.specialistAria")}>
-      <span className="panel-label">{t("market.studio.specialistLabel")}</span>
-      <span
-        className="text-sm font-medium text-[var(--text)]"
-        title={specialistTip(specialist)}
-        data-testid="market-specialist-current"
-      >
-        {specialistName(specialist)}
-      </span>
-      <span className="text-xs text-[var(--text-3)]" data-testid="market-specialist-hint">
-        {specialistTip(specialist)}
-      </span>
-      <span className="text-xs text-[var(--text-3)]" data-testid="market-specialist-sources">
-        {specialistSources}
-      </span>
-    </div>
-  );
-
-  /*
-   * Quick is one call over the packet; Team is four analyst reads, a bull and
-   * bear round, and a risk pass before the briefing is written. Written once
-   * and mounted beside both placements of the header above, so the two never
-   * drift apart. A desk with no analysts keeps the control visible but inert,
-   * with a line saying why — a control that vanishes reads as a bug.
-   */
   const depthControl = (
-    <div className="flex flex-col gap-1" role="group" aria-label={t("market.depth.aria")} data-testid="market-depth">
-      <span className="panel-label">{t("market.depth.label")}</span>
-      {/* `w-fit self-start` keeps the pair hugging its two buttons: the column
-          is a flex item beside the language select, and without it the track
-          stretches to the row's full width. */}
-      <div className="inline-flex w-fit self-start rounded-md border border-[var(--line)] p-0.5">
-        {MARKET_DEPTHS.map((option) => (
-          <button
-            key={option}
-            type="button"
-            className={`rounded px-3 py-1 text-xs font-medium disabled:opacity-50 ${
-              requestDepth === option ? "bg-[var(--accent-soft)] text-[var(--text)]" : "text-[var(--text-2)]"
-            }`}
-            aria-pressed={requestDepth === option}
-            onClick={() => setDepth(option)}
-            disabled={locked || (option === "team" && !teamReady)}
-            data-testid={`market-depth-${option}`}
-          >
-            {t(`market.depth.${option}`)}
-          </button>
-        ))}
-      </div>
-      <span
-        className="text-xs text-[var(--text-3)]"
-        data-testid={teamReady ? "market-depth-hint" : "market-depth-unavailable"}
-      >
-        {teamReady ? t("market.depth.hint") : t("market.depth.unavailable")}
-      </span>
+    <div
+      className="studio-segmented"
+      role="group"
+      aria-label={t("market.depth.aria")}
+      data-testid="market-depth"
+      title={teamReady ? t("market.depth.hint") : t("market.depth.unavailable")}
+    >
+      {MARKET_DEPTHS.map((option) => (
+        <button
+          key={option}
+          type="button"
+          className="studio-segmented-btn"
+          aria-pressed={requestDepth === option}
+          onClick={() => setDepth(option)}
+          disabled={locked || (option === "team" && !teamReady)}
+          data-testid={`market-depth-${option}`}
+        >
+          {t(`market.depth.${option}`)}
+        </button>
+      ))}
     </div>
   );
 
   return (
-    <main
-      data-mode="market"
-      className="mx-auto w-full max-w-[var(--content-wide)] px-6 pb-10 pt-8 text-[var(--text)]"
-      data-testid="market-studio"
-    >
-      <div className="mb-5">
-        <ModeHeader
-          icon="market"
-          title={t("market.studio.title")}
-          outcome={t("market.studio.expectedInputs")}
-          actions={
-            result ? (
-              <button
-                type="button"
-                onClick={() => void onDownload()}
-                disabled={locked}
-                className="btn btn-primary"
-                data-testid="market-download"
-              >
-                {busy === "download" ? (
-                  <WorkingStatus label={t("market.studio.building")} />
-                ) : (
-                  t("market.studio.download")
-                )}
-              </button>
-            ) : null
-          }
-        />
-      </div>
+    <main data-mode="market" className="studio-shell" data-testid="market-studio">
+      <header className="studio-head">
+        <div className="studio-head-main">
+          <span className="studio-head-icon" aria-hidden="true">
+            <ModeIcon name="market" size={18} strokeWidth={1.75} />
+          </span>
+          <div className="min-w-0">
+            <h1 className="studio-head-title">{t("market.studio.title")}</h1>
+            <p className="studio-head-sub">{t("market.studio.expectedInputs")}</p>
+          </div>
+        </div>
+        {result ? (
+          <button
+            type="button"
+            onClick={() => void onDownload()}
+            disabled={locked}
+            className="btn btn-primary h-9 rounded-pill px-4"
+            data-testid="market-download"
+          >
+            {busy === "download" ? <WorkingStatus label={t("market.studio.building")} /> : t("market.studio.download")}
+          </button>
+        ) : null}
+      </header>
 
-      {error && tickers.length === 0 && !isGatewayBlockedText(error) ? (
-        <p className="mb-4 text-sm text-[var(--danger)]" role="alert" data-testid="market-error">
+      {error && !isGatewayBlockedText(error) ? (
+        <p
+          className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--danger)]"
+          role="alert"
+          data-testid="market-error"
+        >
           {error}
           {needsKey(rawError ?? "") ? (
             <>
@@ -375,120 +311,138 @@ export function MarketStudio() {
       ) : null}
 
       {keyMissing ? (
-        // Quotes, charts and technicals need no key, so the line says what still works and what does not.
-        <p className="mb-4 text-xs text-[var(--text-3)]" role="status" data-testid="market-needs-key">
+        <p className="text-xs text-[var(--text-3)]" role="status" data-testid="market-needs-key">
           <SettingsLinkHint i18nKey="market.studio.needsKeyNote" testId="market-needs-key-settings" />
         </p>
       ) : null}
 
       <form className="space-y-4" onSubmit={(event) => void onGenerate(event)} data-testid="market-inputs">
-        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
-          <MarketWatchlistInput tickers={tickers} onChange={changeTickers} disabled={locked} />
-          <div className="mt-3" data-testid="market-starters">
-            {tickers.length === 0 ? (
-              <div className="mb-3 flex flex-wrap items-end gap-4">
-                {specialistPicker}
-                {depthControl}
-              </div>
-            ) : null}
-            <p className="text-xs text-[var(--text-3)]">{t("market.studio.startersLead")}</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+        {/* Tier 1: Compact watchlist bar + single-row starter chips */}
+        <section className="studio-composer">
+          <div className="space-y-3 p-4">
+            <MarketWatchlistInput tickers={tickers} onChange={changeTickers} disabled={locked} />
+            <div className="studio-chips-row" data-testid="market-starters" aria-label={t("market.studio.startersLead")}>
               <button
                 type="button"
-                className="card-live enter-rise px-3 py-1.5 text-left text-xs text-[var(--text)]"
-                style={{ "--i": 0 } as CSSProperties}
+                className="studio-chip"
                 data-testid="market-specialist-starter"
                 title={specialistStarterTickers(specialist).join(", ")}
                 onClick={() => changeTickers(specialistStarterTickers(specialist))}
                 disabled={locked}
               >
-                <span className="font-medium">
-                  {t("market.studio.specialistStarter", { label: specialistName(specialist) })}
-                </span>
+                {t("market.studio.specialistStarter", { label: specialistName(specialist) })}
               </button>
-              {MARKET_STARTERS.map((starter, index) => (
+              {MARKET_STARTERS.map((starter) => (
                 <button
                   key={starter.id}
                   type="button"
-                  className="card-live enter-rise px-3 py-1.5 text-left text-xs text-[var(--text)]"
-                  style={{ "--i": index + 1 } as CSSProperties}
+                  className="studio-chip"
                   data-testid="market-starter"
                   title={starter.tickers.join(", ")}
                   onClick={() => applyStarter(starter)}
                   disabled={locked}
                 >
-                  <span className="font-medium">{labeled(`market.starters.${starter.id}.label`, starter.label)}</span>
-                  <span className="ml-2 text-[var(--text-3)]">
-                    {labeled(`market.starters.${starter.id}.hint`, starter.hint)}
-                  </span>
+                  <span>{labeled(`market.starters.${starter.id}.label`, starter.label)}</span>
                 </button>
               ))}
             </div>
           </div>
-        </div>
 
-        {tickers.length > 0 ? (
-          <div className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
-            {error && !isGatewayBlockedText(error) ? (
-              <p className="text-sm text-[var(--danger)]" role="alert" data-testid="market-error">
-                {error}
-                {needsKey(rawError ?? "") ? (
-                  <>
-                    {" "}
-                    <SettingsLinkHint i18nKey="market.studio.openSettings" testId="market-error-settings" />
-                  </>
-                ) : null}
-              </p>
-            ) : null}
-            <div className="flex flex-wrap items-center gap-3">
+          {/* Tier 2: Unified minimalist control strip */}
+          <div className="studio-composer-bar">
+            <UiSelect
+              variant="pill"
+              prefix={t("market.studio.specialistLabel")}
+              ariaLabel={t("market.studio.specialistAria")}
+              testId="market-specialist-select"
+              value={specialist}
+              onChange={onSpecialistPick}
+              disabled={locked}
+              options={specialistOptions}
+              minPanelWidth={280}
+            />
+            <UiSelect
+              variant="pill"
+              ariaLabel={t("market.studio.languageAria")}
+              testId="market-language"
+              value={language}
+              onChange={onLanguageChange}
+              disabled={locked}
+              options={[
+                { value: "id", label: t("common.bahasa") },
+                { value: "en", label: t("common.english") },
+              ]}
+              minPanelWidth={180}
+            />
+            <ModelSelect
+              models={models}
+              value={model}
+              onChange={setModel}
+              disabled={locked}
+              testId="market-studio-model"
+              variant="pill"
+              prefix={t("market.studio.modelLabel")}
+              ariaLabel={t("market.studio.modelLabel")}
+            />
+            {depthControl}
+            <button
+              type="button"
+              className={`studio-pill-toggle ${showOptions ? "studio-pill-toggle-active" : ""}`}
+              onClick={() => setShowOptions((open) => !open)}
+              aria-expanded={showOptions}
+              data-testid="market-options-toggle"
+            >
+              {showOptions ? t("market.studio.hideOptions") : t("market.studio.options")}
+            </button>
+            <div className="ml-auto flex items-center gap-2">
+              {job.busy ? (
+                <button
+                  type="button"
+                  className="studio-pill-toggle"
+                  onClick={job.cancel}
+                  data-testid="market-cancel"
+                >
+                  {t("market.studio.cancel")}
+                </button>
+              ) : null}
               <button
                 type="submit"
-                className="btn btn-primary"
+                className="btn btn-primary h-8 shrink-0 rounded-pill px-4 text-xs"
                 disabled={locked || !ready || keyMissing}
                 data-testid="market-generate"
               >
                 {job.busy ? <WorkingStatus label={t("market.studio.writing")} /> : t("market.studio.writeBriefing")}
               </button>
-              {job.busy ? (
-                <button type="button" className="btn" onClick={job.cancel} data-testid="market-cancel">
-                  {t("market.studio.cancel")}
-                </button>
-              ) : null}
-              <select
-                aria-label={t("market.studio.languageAria")}
-                className="input"
-                style={{ width: "auto" }}
-                value={language}
-                onChange={(event) => onLanguageChange(event.target.value)}
-                disabled={locked}
-                data-testid="market-language"
-              >
-                <option value="id">{t("common.bahasa")}</option>
-                <option value="en">{t("common.english")}</option>
-              </select>
-              <button
-                type="button"
-                className="text-xs text-[var(--text-2)] underline"
-                onClick={() => setShowOptions(!showOptions)}
-                aria-expanded={showOptions}
-                data-testid="market-options-toggle"
-              >
-                {showOptions ? t("market.studio.hideOptions") : t("market.studio.options")}
-              </button>
-              {depthControl}
-              {specialistPicker}
+            </div>
+          </div>
+
+          <div className="studio-composer-notes">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-3)]">
+              <span className="font-medium text-[var(--text-2)]" data-testid="market-specialist-current">
+                {specialistName(specialist)}
+              </span>
+              <span data-testid="market-specialist-hint">{specialistTip(specialist)}</span>
+              <span data-testid="market-specialist-sources">{specialistSources}</span>
+              <span data-testid={teamReady ? "market-depth-hint" : "market-depth-unavailable"}>
+                {teamReady ? t("market.depth.hint") : t("market.depth.unavailable")}
+              </span>
             </div>
             <p className="text-xs text-[var(--text-3)]">{t("market.studio.machineNote", { product: productName })}</p>
+          </div>
 
-            {showOptions ? (
-              <div className="space-y-4 border-t border-[var(--line)] pt-4" data-testid="market-options">
+          {showOptions ? (
+            <div
+              className="grid gap-4 border-t border-[var(--line)] p-4 md:grid-cols-2"
+              data-testid="market-options"
+            >
+              <div className="space-y-4">
                 <div>
                   <label htmlFor="market-position-input" className="panel-label">
                     {t("market.studio.positionLabel")}
                   </label>
                   <textarea
                     id="market-position-input"
-                    rows={3}
+                    rows={4}
                     value={position}
                     onChange={(event) => setPosition(event.target.value)}
                     className="input mt-2 text-[13px]"
@@ -499,72 +453,63 @@ export function MarketStudio() {
                   <p className="mt-1 text-xs text-[var(--text-3)]">{t("market.studio.positionHelp")}</p>
                 </div>
                 <div>
-                  <label htmlFor="market-prompt-input" className="panel-label">
-                    {t("market.studio.promptLabel")}
+                  <label htmlFor="market-maxchars-input" className="panel-label">
+                    {t("market.studio.lengthLimit")}
                   </label>
-                  <textarea
-                    id="market-prompt-input"
-                    rows={7}
-                    value={prompt}
-                    onChange={(event) => setPrompt(event.target.value)}
-                    className="input mt-2 text-[13px]"
+                  <input
+                    id="market-maxchars-input"
+                    type="number"
+                    min={MIN_MAX_CHARS}
+                    max={MAX_MAX_CHARS}
+                    step={500}
+                    className="input mt-2 w-40"
+                    value={maxChars}
+                    onChange={(event) => setMaxChars(Number(event.target.value))}
+                    onBlur={() => setMaxChars(clampMaxChars(maxChars))}
                     disabled={locked}
-                    data-testid="market-prompt"
-                  />
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      className="btn text-xs"
-                      onClick={() => setPrompt(defaultWatchPrompt(specialist, language))}
-                      disabled={locked || prompt === defaultWatchPrompt(specialist, language)}
-                      data-testid="market-prompt-reset"
-                    >
-                      {t("market.studio.resetPrompt")}
-                    </button>
-                    <EnhancePromptButton
-                      text={prompt}
-                      surface="market"
-                      model={model}
-                      disabled={locked}
-                      testId="market-enhance"
-                      onApply={setPrompt}
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-end gap-4">
-                  <div>
-                    <label htmlFor="market-maxchars-input" className="panel-label">
-                      {t("market.studio.lengthLimit")}
-                    </label>
-                    <input
-                      id="market-maxchars-input"
-                      type="number"
-                      min={MIN_MAX_CHARS}
-                      max={MAX_MAX_CHARS}
-                      step={500}
-                      className="input mt-2 w-40"
-                      value={maxChars}
-                      onChange={(event) => setMaxChars(Number(event.target.value))}
-                      onBlur={() => setMaxChars(clampMaxChars(maxChars))}
-                      disabled={locked}
-                      data-testid="market-maxchars"
-                    />
-                  </div>
-                  <ModelSelect
-                    models={models}
-                    value={model}
-                    onChange={setModel}
-                    disabled={locked}
-                    testId="market-studio-model"
+                    data-testid="market-maxchars"
                   />
                 </div>
               </div>
-            ) : null}
-          </div>
-        ) : null}
+              <div>
+                <label htmlFor="market-prompt-input" className="panel-label">
+                  {t("market.studio.promptLabel")}
+                </label>
+                <textarea
+                  id="market-prompt-input"
+                  rows={6}
+                  value={prompt}
+                  onChange={(event) => setPrompt(event.target.value)}
+                  className="input mt-2 text-[13px]"
+                  disabled={locked}
+                  data-testid="market-prompt"
+                />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn text-xs"
+                    onClick={() => setPrompt(defaultWatchPrompt(specialist, language))}
+                    disabled={locked || prompt === defaultWatchPrompt(specialist, language)}
+                    data-testid="market-prompt-reset"
+                  >
+                    {t("market.studio.resetPrompt")}
+                  </button>
+                  <EnhancePromptButton
+                    text={prompt}
+                    surface="market"
+                    model={model}
+                    disabled={locked}
+                    testId="market-enhance"
+                    onApply={setPrompt}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </section>
 
         {tickers.length > 0 && !(job.busy || (job.progress.phases.length > 0 && !result)) ? (
-          <div className="mb-3 flex">
+          <div className="flex">
             <MascotSlot mode="market" placement="empty" />
           </div>
         ) : null}
@@ -579,7 +524,7 @@ export function MarketStudio() {
         ) : null}
       </form>
 
-      <div className="mt-5 space-y-4">
+      <div className="space-y-4">
         {job.busy || (job.progress.phases.length > 0 && !result) ? (
           <JobProgressList progress={teamProgress} busy={job.busy} mode="market" testId="market-progress" />
         ) : null}
@@ -615,11 +560,11 @@ export function MarketStudio() {
         ) : null}
         {tickers.length === 0 && !job.busy ? (
           <div
-            className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-10 text-center text-[var(--text-2)]"
+            className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4 py-10 text-center text-[var(--text-2)]"
             data-testid="market-studio-empty"
           >
             <ModeIllustration mode="market" />
-            <p className="mt-4">{t("market.studio.empty")}</p>
+            <p className="mt-4 text-sm">{t("market.studio.empty")}</p>
           </div>
         ) : null}
       </div>

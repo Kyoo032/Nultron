@@ -10,7 +10,7 @@
  * client, which is what releases the microphone.
  */
 
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import type { VoiceMode } from "@agentforge/core/voice";
 import { browserVoiceDeps } from "@/lib/voice-browser-deps";
 import { VoiceClient } from "@/lib/voice-client";
@@ -50,6 +50,10 @@ export type VoiceSession = {
   readonly available: boolean;
   /** The voice view is on screen. */
   readonly shown: boolean;
+  /** Smoothed 20 ms microphone RMS level (0..1). */
+  readonly micLevel: number;
+  /** True when outgoing mic PCM is suppressed locally. */
+  readonly muted: boolean;
   /** The mic button: opens voice, or ends it while it is open. */
   toggle(): void;
   /** Ends voice and closes the view. */
@@ -59,12 +63,61 @@ export type VoiceSession = {
   setMode(mode: VoiceMode): void;
   holdStart(): void;
   holdEnd(): void;
+  toggleMute(): void;
+  interrupt(): void;
+  commit(): void;
+  dismissCard(): void;
   /** The card's one tap. */
   runCard(): void;
 };
 
+export type VoiceBridgeSnapshot = {
+  readonly active: boolean;
+  readonly micLevel: number;
+  readonly muted: boolean;
+  readonly toggleMute: (() => void) | null;
+  readonly interrupt: (() => void) | null;
+  readonly commit: (() => void) | null;
+  readonly dismissCard: (() => void) | null;
+};
+
+const EMPTY_BRIDGE: VoiceBridgeSnapshot = {
+  active: false,
+  micLevel: 0,
+  muted: false,
+  toggleMute: null,
+  interrupt: null,
+  commit: null,
+  dismissCard: null,
+};
+
+let bridgeSnapshot: VoiceBridgeSnapshot = EMPTY_BRIDGE;
+const bridgeListeners = new Set<() => void>();
+
+function publishBridge(next: VoiceBridgeSnapshot): void {
+  bridgeSnapshot = next;
+  for (const listener of bridgeListeners) {
+    listener();
+  }
+}
+
+function subscribeBridge(listener: () => void): () => void {
+  bridgeListeners.add(listener);
+  return () => bridgeListeners.delete(listener);
+}
+
+function getBridgeSnapshot(): VoiceBridgeSnapshot {
+  return bridgeSnapshot;
+}
+
+/** Reads live interactive controls published by the active `useVoiceSession` hook. */
+export function useVoiceBridge(): VoiceBridgeSnapshot {
+  return useSyncExternalStore(subscribeBridge, getBridgeSnapshot, () => EMPTY_BRIDGE);
+}
+
 export function useVoiceSession(options: UseVoiceSessionOptions): VoiceSession {
   const [available, setAvailable] = useState(false);
+  const [micLevel, setMicLevel] = useState(0);
   const [view, dispatch] = useReducer(voiceViewReducer, undefined, () => initialVoiceViewState(readStoredVoiceMode()));
   const clientRef = useRef<VoiceClient | null>(null);
   const threadRef = useRef<string | null>(null);
@@ -96,6 +149,7 @@ export function useVoiceSession(options: UseVoiceSessionOptions): VoiceSession {
     const client = clientRef.current;
     clientRef.current = null;
     client?.stop();
+    setMicLevel(0);
   }, []);
 
   const close = useCallback(() => {
@@ -113,6 +167,12 @@ export function useVoiceSession(options: UseVoiceSessionOptions): VoiceSession {
         const id = await latest.current.ensureThread();
         threadRef.current = id;
         return id;
+      },
+      onLevel: (level) => {
+        if (clientRef.current === client) {
+          const quantized = Math.round(level * 100) / 100;
+          setMicLevel((prev) => (prev === quantized ? prev : quantized));
+        }
       },
       // A client that has been replaced or stopped says nothing more to the view.
       emit: (action) => {
@@ -154,6 +214,17 @@ export function useVoiceSession(options: UseVoiceSessionOptions): VoiceSession {
   const holdEnd = useCallback(() => {
     void clientRef.current?.holdEnd();
   }, []);
+  const toggleMute = useCallback(() => {
+    const client = clientRef.current;
+    if (client) {
+      client.setMuted(!client.isMuted);
+    } else {
+      dispatch({ type: "muted", value: !viewRef.current.muted });
+    }
+  }, []);
+  const interrupt = useCallback(() => clientRef.current?.interrupt(), []);
+  const commit = useCallback(() => clientRef.current?.commit(), []);
+  const dismissCard = useCallback(() => dispatch({ type: "dismiss_card" }), []);
 
   const runCard = useCallback(() => {
     const card = viewRef.current.card;
@@ -239,8 +310,44 @@ export function useVoiceSession(options: UseVoiceSessionOptions): VoiceSession {
     return () => clearTimeout(timer);
   }, [cardStarted, close]);
 
+  // Publish live interactive state and controls for `VoiceView` without requiring parent shell edits.
+  useEffect(() => {
+    if (!shown) {
+      publishBridge(EMPTY_BRIDGE);
+      return;
+    }
+    publishBridge({
+      active: true,
+      micLevel,
+      muted: view.muted,
+      toggleMute,
+      interrupt,
+      commit,
+      dismissCard,
+    });
+  }, [shown, micLevel, view.muted, toggleMute, interrupt, commit, dismissCard]);
+
+  useEffect(() => () => publishBridge(EMPTY_BRIDGE), []);
+
   // Leaving the page, or the chat going away: every track stopped, the context and the socket closed.
   useEffect(() => stopClient, [stopClient]);
 
-  return { view, available: available && options.allowed !== false, shown, toggle, close, reconnect, setMode, holdStart, holdEnd, runCard };
+  return {
+    view,
+    available: available && options.allowed !== false,
+    shown,
+    micLevel,
+    muted: view.muted,
+    toggle,
+    close,
+    reconnect,
+    setMode,
+    holdStart,
+    holdEnd,
+    toggleMute,
+    interrupt,
+    commit,
+    dismissCard,
+    runCard,
+  };
 }

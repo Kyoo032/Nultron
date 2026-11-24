@@ -111,7 +111,9 @@ async function resolveFromSession(session: HostSession, preferredWorkspaceId?: s
   if (!resolution.ok) {
     throw new ApiError(resolution.code, FAILURE_MESSAGE[resolution.code], FAILURE_STATUS[resolution.code]);
   }
-  return resolution.tenant;
+  return session.gatewayEndpoint
+    ? { ...resolution.tenant, gatewayEndpoint: session.gatewayEndpoint }
+    : resolution.tenant;
 }
 
 async function resolveLocalOwner(preferredWorkspaceId?: string | null): Promise<TenantContext> {

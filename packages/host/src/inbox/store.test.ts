@@ -4,6 +4,7 @@
  */
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { isEnvelope } from "@agentforge/core";
 import { INBOX_CAPS, WHATSAPP_WINDOW_MS } from "@agentforge/core/inbox";
 import { ensureSchema } from "@agentforge/db/ensure-schema";
 import { createInboxStore, type DeskScope, type EndpointRow, type InboxStore } from "./store";
@@ -495,5 +496,58 @@ describe("purgeDesk", () => {
     expect(store.listConversations(deskA, {}, NOW)).toEqual([]);
     expect(store.listConversations(deskB, {}, NOW)).toHaveLength(1);
     expect(count("customer_messages")).toBe(1);
+  });
+});
+
+describe("encryption at rest (SR-193)", () => {
+  it("seals contact_name, last_message_preview, and message text in SQLite while keeping webhook lookup and search working", () => {
+    const endpoint = endpointFor(deskA, "1000001");
+    store.recordInbound(endpoint, inbound({ contactId: "6281299990001", contactName: "Siti Rahma", text: "Confidential order #44" }), NOW);
+
+    const rawConv = db
+      .prepare("SELECT contact_id, contact_name, last_message_preview FROM customer_conversations WHERE endpoint_id = ? AND contact_id = ?")
+      .get(endpoint.id, "6281299990001") as { contact_id: string; contact_name: string; last_message_preview: string };
+    expect(rawConv.contact_id).toBe("6281299990001");
+    expect(rawConv.contact_name).not.toContain("Siti Rahma");
+    expect(rawConv.last_message_preview).not.toContain("Confidential order #44");
+    expect(isEnvelope(JSON.parse(rawConv.contact_name))).toBe(true);
+    expect(isEnvelope(JSON.parse(rawConv.last_message_preview))).toBe(true);
+
+    const rawMsg = db.prepare("SELECT text FROM customer_messages").get() as { text: string };
+    expect(rawMsg.text).not.toContain("Confidential order #44");
+    expect(isEnvelope(JSON.parse(rawMsg.text))).toBe(true);
+
+    // Owner reply seals outbound text and preview
+    const conv = store.listConversations(deskA, { query: "rahma" }, NOW)[0];
+    expect(conv.contactName).toBe("Siti Rahma");
+    expect(conv.lastMessagePreview).toBe("Confidential order #44");
+
+    const queued = store.beginOutbound(deskA, conv.id, "Private reply 77", NOW + MIN);
+    store.finishOutbound(deskA, queued.id, { ok: true, externalId: "wamid.PRIV1" }, NOW + MIN);
+
+    const rawAfter = db
+      .prepare("SELECT last_message_preview FROM customer_conversations WHERE id = ?")
+      .get(conv.id) as { last_message_preview: string };
+    expect(rawAfter.last_message_preview).not.toContain("Private reply 77");
+    expect(isEnvelope(JSON.parse(rawAfter.last_message_preview))).toBe(true);
+    expect(store.getConversation(deskA, conv.id, NOW + MIN)?.lastMessagePreview).toBe("Private reply 77");
+  });
+
+  it("reads legacy plaintext customer rows cleanly as fallback", () => {
+    const endpoint = endpointFor(deskA, "1000001");
+    store.recordInbound(endpoint, inbound({ contactId: "6281299990002", contactName: "Placeholder", text: "placeholder" }), NOW);
+    const conv = store.listConversations(deskA, {}, NOW)[0];
+    db.prepare("UPDATE customer_conversations SET contact_name = ?, last_message_preview = ? WHERE id = ?").run(
+      "Legacy Customer",
+      "Legacy preview",
+      conv.id,
+    );
+    db.prepare("UPDATE customer_messages SET text = ? WHERE conversation_id = ?").run("Legacy text", conv.id);
+
+    expect(store.getConversation(deskA, conv.id, NOW)).toMatchObject({
+      contactName: "Legacy Customer",
+      lastMessagePreview: "Legacy preview",
+    });
+    expect(store.listMessages(deskA, conv.id)?.map((m) => m.text)).toEqual(["Legacy text"]);
   });
 });

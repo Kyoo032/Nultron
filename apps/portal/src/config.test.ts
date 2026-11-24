@@ -99,7 +99,7 @@ describe("loadConfig", () => {
   it("accepts a complete production environment", () => {
     const config = loadConfig({
       ...BASE,
-      PORTAL_MIGRATE_DATABASE_URL: "postgres://portal_owner:owner@db.internal:5432/tokotoken_portal",
+      PORTAL_MIGRATE_DATABASE_URL: "postgres://portal_owner:owner@db.internal:5432/tokotoken_portal?sslmode=require",
       NODE_ENV: "production",
       PORTAL_SIGNING_KEY: Buffer.alloc(32, 1).toString("base64url"),
       PORTAL_PUBLIC_URL: "https://portal.example.com",
@@ -115,7 +115,9 @@ describe("loadConfig", () => {
     expect(config.smtp.port).toBe(587);
     expect(config.allowManualOtp).toBe(false);
     expect(config.databaseUrl).toBe(BASE.PORTAL_DATABASE_URL);
-    expect(config.migrateDatabaseUrl).toBe("postgres://portal_owner:owner@db.internal:5432/tokotoken_portal");
+    expect(config.migrateDatabaseUrl).toBe(
+      "postgres://portal_owner:owner@db.internal:5432/tokotoken_portal?sslmode=require",
+    );
   });
 
   it("defaults SMTP to Mailpit outside production", () => {
@@ -313,7 +315,7 @@ describe("PORTAL_PUBLIC_URL and PORTAL_TRUST_PROXY", () => {
 describe("PORTAL_SIGNIN_MODE", () => {
   const PRODUCTION = {
     ...BASE,
-    PORTAL_MIGRATE_DATABASE_URL: "postgres://portal_owner:owner@db.internal:5432/tokotoken_portal",
+    PORTAL_MIGRATE_DATABASE_URL: "postgres://portal_owner:owner@db.internal:5432/tokotoken_portal?sslmode=require",
     NODE_ENV: "production",
     PORTAL_SIGNING_KEY: Buffer.alloc(32, 1).toString("base64url"),
     PORTAL_PUBLIC_URL: "https://portal.example.com",
@@ -385,5 +387,62 @@ describe("PORTAL_SIGNIN_MODE", () => {
     expect(problemsOf({ ...BASE, PORTAL_SIGNIN_MODE: "password", PORTAL_SMTP_USER: "portal" }).join()).toContain(
       "PORTAL_SMTP_USER is set without PORTAL_SMTP_PASS",
     );
+  });
+});
+
+describe("Postgres TLS enforcement in production", () => {
+  const PROD_BASE = {
+    PORTAL_DATA_DIR: BASE.PORTAL_DATA_DIR,
+    NODE_ENV: "production",
+    PORTAL_SIGNIN_MODE: "password",
+    PORTAL_SIGNING_KEY: Buffer.alloc(32, 1).toString("base64url"),
+    PORTAL_PUBLIC_URL: "https://portal.example.com",
+  } as const;
+
+  it("refuses non-loopback Postgres DSNs without sslmode=require|verify-ca|verify-full in production", () => {
+    for (const dsn of [
+      "postgres://portal_app:pw@db.example.com:5432/tokotoken_portal",
+      "postgres://portal_app:pw@db.example.com:5432/tokotoken_portal?sslmode=disable",
+      "postgres://portal_app:pw@db.example.com:5432/tokotoken_portal?sslmode=allow",
+      "postgres://portal_app:pw@db.example.com:5432/tokotoken_portal?sslmode=prefer",
+      "postgres://portal_app:pw@portal-db:5432/tokotoken_portal?sslmode=disable",
+    ]) {
+      const problems = problemsOf({
+        ...PROD_BASE,
+        PORTAL_DATABASE_URL: dsn,
+        PORTAL_MIGRATE_DATABASE_URL: "postgres://owner:pw@db.example.com:5432/tokotoken_portal?sslmode=verify-full",
+      });
+      expect(problems.some((p) => p.includes("PORTAL_DATABASE_URL")), dsn).toBe(true);
+    }
+  });
+
+  it("accepts sslmode=require, verify-ca, and verify-full for non-loopback Postgres DSNs in production", () => {
+    for (const mode of ["require", "verify-ca", "verify-full"]) {
+      const config = loadConfig({
+        ...PROD_BASE,
+        PORTAL_DATABASE_URL: `postgres://portal_app:pw@db.example.com:5432/tokotoken_portal?sslmode=${mode}`,
+        PORTAL_MIGRATE_DATABASE_URL: `postgres://owner:pw@db.example.com:5432/tokotoken_portal?sslmode=${mode}`,
+      });
+      expect(config.databaseUrl).toContain(`sslmode=${mode}`);
+    }
+  });
+
+  it("allows loopback, in-compose portal-db without sslmode, or explicit PORTAL_DB_ALLOW_INSECURE_LOCAL=1", () => {
+    expect(() =>
+      loadConfig({
+        ...PROD_BASE,
+        PORTAL_DATABASE_URL: "postgres://portal_app:pw@portal-db:5432/tokotoken_portal",
+        PORTAL_MIGRATE_DATABASE_URL: "postgres://portal:pw@portal-db:5432/tokotoken_portal",
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      loadConfig({
+        ...PROD_BASE,
+        PORTAL_DATABASE_URL: "postgres://portal_app:pw@10.0.0.12:5432/tokotoken_portal?sslmode=disable",
+        PORTAL_MIGRATE_DATABASE_URL: "postgres://portal:pw@10.0.0.12:5432/tokotoken_portal?sslmode=disable",
+        PORTAL_DB_ALLOW_INSECURE_LOCAL: "1",
+      }),
+    ).not.toThrow();
   });
 });

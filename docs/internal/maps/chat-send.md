@@ -2,6 +2,8 @@
 
 Product: both · Instance: main :3000
 
+Last verified: 2026-11-24 on `main`, for `inChatRun` in `packages/host/src/runs.ts` wrapping execution in `withAssignedGatewayEndpoint` so detached chat runs preserve the signed-in user's operator-assigned gateway endpoint (`gateway-endpoint-scope.ts`). Nothing else on the page was re-read.
+
 Last verified: 2026-11-10 at fc855d7d on `tester` for the live voice touchpoints only: `prepareChatRun` (`packages/host/src/runs.ts:158-279`) and `chatHistoryFromRows` (`packages/host/src/runs.ts:286-314`), shared with `startModalityRun` (which calls `prepareChatRun` at `runs.ts:345`) so `askNultron` (`packages/host/src/voice/ask.ts:30,229,248`) reuses the same prompt, Knowledge Base, memory, soul and tool setup (see [`voice-mode.md`](voice-mode.md)); and the voice sheet and mic button hooks in `apps/web/components/chat-session.tsx:36-37,406-418,609-620,640` and `apps/web/components/chat-composer.tsx:30,85,739`. Code-read and unit-tested (`packages/host/src/voice/ask.test.ts`); not driven on `:3000`. Nothing else on the page was re-read.
 
 Last verified: 2026-11-20 on `feat/team-ui`, for the renderer-side delegate and greeting changes only: `DelegateCard` shows `agentName` when the host sends one and links a `tb-` agent to its own `/chat?agent=tb-…&thread=…` address (`chat-delegate-card.tsx`, `delegate-result.ts`); `ChatGreeting` gains the "Build your team" CTA to `/team` (`chat-greeting.tsx`); `ChatSession` takes an optional `hrefForThread` so a bot's new threads stay on its address (`chat-session.tsx`). Unit-tested (`delegate-card.test.tsx`); not driven on `:3000`. Nothing else on the page was re-read.

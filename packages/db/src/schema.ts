@@ -934,6 +934,7 @@ export const authSessions = sqliteTable(
     revokedAt: integer("revoked_at"),
     portalCheckedAt: integer("portal_checked_at"),
     refreshSealed: text("refresh_sealed"),
+    gatewayEndpoint: text("gateway_endpoint"),
   },
   (table) => [
     // The Phase 5 seat counter reads "members with a live session in the last 30 days" off this.

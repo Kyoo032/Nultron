@@ -5,6 +5,7 @@ import {
   ApiError,
   isServerMode,
   mediaKind,
+  normalizeAssignedGatewayEndpoint,
   parseAvailabilityStore,
   sanitizePublishedMediaParams,
   type AvailabilityStore,
@@ -13,6 +14,7 @@ import {
   type PricingHints,
   type PublishedMediaMap,
 } from "@agentforge/core";
+import { assignedEndpointSlotTag, currentAssignedGatewayEndpoint } from "./gateway-endpoint-scope";
 import { assertTenantId } from "./tenant-paths";
 import { currentRequestSession } from "./tenant-scope";
 import { companyStateKey, dbTenantStateBackend, type TenantStateSlot } from "./tenant-state-store";
@@ -66,14 +68,17 @@ export type ModelCache = {
  * started it. Anything else on the hosted server is refused (`modelCacheOwner`), never answered from the
  * partner's row.
  */
-export type ModelCacheScope = Readonly<{ tenantId: string; organizationId?: string }> | null | undefined;
+export type ModelCacheScope =
+  | Readonly<{ tenantId: string; organizationId?: string; gatewayEndpoint?: string | null }>
+  | null
+  | undefined;
 
 /**
  * A settings scope as a cache scope. A tenant object names itself; a bare desk id or nothing names no
  * tenant, which is right on a desk (one cache) and is refused on the hosted server.
  */
 export function modelCacheScopeOf(
-  scope: Readonly<{ tenantId: string; organizationId?: string }> | string | null | undefined,
+  scope: Readonly<{ tenantId: string; organizationId?: string; gatewayEndpoint?: string | null }> | string | null | undefined,
 ): ModelCacheScope {
   return typeof scope === "object" && scope !== null ? scope : undefined;
 }
@@ -81,8 +86,12 @@ export function modelCacheScopeOf(
 /** Which `tenant_state` payload holds a company's cache. See `tenant-state-store.ts`. */
 const MODEL_CACHE_KEY = "model_cache" as const;
 
-/** Whose cache, on the hosted server: the partner (the table's owner) and the company inside it. */
-export type ModelCacheOwner = { readonly tenantId: string; readonly companyId: string };
+/** Whose cache, on the hosted server: the partner (the table's owner), the company inside it, and optional custom endpoint. */
+export type ModelCacheOwner = {
+  readonly tenantId: string;
+  readonly companyId: string;
+  readonly assignedEndpoint?: string | null;
+};
 
 /**
  * The partner and company a hosted call is about. Throws `tenant_required` when no partner can be
@@ -110,26 +119,36 @@ export function modelCacheOwner(scope: ModelCacheScope): ModelCacheOwner {
       500,
     );
   }
-  return { tenantId: assertTenantId(tenantId), companyId };
+  const assignedEndpoint =
+    normalizeAssignedGatewayEndpoint(scope?.gatewayEndpoint) ??
+    (session && session.tenantId === tenantId ? normalizeAssignedGatewayEndpoint(session.gatewayEndpoint) : null) ??
+    currentAssignedGatewayEndpoint();
+  return assignedEndpoint
+    ? { tenantId: assertTenantId(tenantId), companyId, assignedEndpoint }
+    : { tenantId: assertTenantId(tenantId), companyId };
 }
 
-/** The stored slot for one company's cache. */
+/** The stored slot for one company's cache (isolated per operator-assigned endpoint when set). */
 function companySlot(owner: ModelCacheOwner): TenantStateSlot {
-  return companyStateKey(MODEL_CACHE_KEY, owner.companyId);
+  return owner.assignedEndpoint
+    ? companyStateKey(MODEL_CACHE_KEY, `${owner.companyId}:ep:${assignedEndpointSlotTag(owner.assignedEndpoint)}`)
+    : companyStateKey(MODEL_CACHE_KEY, owner.companyId);
 }
 
 /**
  * What a derived value built from the cache (the memoized catalogue, a warm-up in flight) is keyed by:
- * the partner and company on the hosted server, one constant on a desk. Throws on the hosted server when
- * no company can be named.
+ * the partner and company (plus assigned endpoint when custom) on the hosted server, one constant on a desk.
+ * Throws on the hosted server when no company can be named.
  */
 export function modelCacheSlot(scope?: ModelCacheScope): string {
   if (!isServerMode()) {
     return "desk";
   }
   const owner = modelCacheOwner(scope);
-  // JSON, not a joined string: two (partner, company) pairs never spell the same key.
-  return JSON.stringify([owner.tenantId, owner.companyId]);
+  // JSON, not a joined string: two (partner, company, endpoint) tuples never spell the same key.
+  return owner.assignedEndpoint
+    ? JSON.stringify([owner.tenantId, owner.companyId, owner.assignedEndpoint])
+    : JSON.stringify([owner.tenantId, owner.companyId]);
 }
 
 function cachePath(): string {

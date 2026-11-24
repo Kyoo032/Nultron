@@ -75,6 +75,7 @@ import { readRetryTurn, turnIsStored } from "./chat-retry";
 import { readMediaPermission } from "./paid-media-body";
 import { saveGeneratedImage, saveGeneratedVideo } from "./media";
 import { getRunContext, hostedRequestLocale, localeForRun, withRunContext } from "./run-context";
+import { currentAssignedGatewayEndpoint, withAssignedGatewayEndpoint } from "./gateway-endpoint-scope";
 import { withToolRun } from "./tool-run-context";
 import type { JobEvent } from "@agentforge/core/jobs";
 import {
@@ -688,9 +689,11 @@ export async function* startModalityRun(options: {
         locale,
       });
       const inChatRun = <T>(fn: () => Promise<T>): Promise<T> =>
-        withToolRun({ runId: run.id, mode: agentPolicy ? agentPolicy.agent.id : "chat" }, () =>
-          withRunContext({ threadId: thread.id, agentId: thread.agentId, locale }, () =>
-            runOutboundGuarded(outbound, () => withWorkerChannel(workerChannel, fn)),
+        withAssignedGatewayEndpoint(options.tenant.gatewayEndpoint ?? currentAssignedGatewayEndpoint(), () =>
+          withToolRun({ runId: run.id, mode: agentPolicy ? agentPolicy.agent.id : "chat" }, () =>
+            withRunContext({ threadId: thread.id, agentId: thread.agentId, locale }, () =>
+              runOutboundGuarded(outbound, () => withWorkerChannel(workerChannel, fn)),
+            ),
           ),
         );
       const attempt = () =>

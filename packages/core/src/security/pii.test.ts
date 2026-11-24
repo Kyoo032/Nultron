@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { PII_MASK, maskOutboundRunInput, maskPii, maskPiiInParts, passesLuhn, piiWarning, scanPii } from "./pii";
+import {
+  PII_MASK,
+  maskOutboundRunInput,
+  maskPii,
+  maskPiiInJson,
+  maskPiiInParts,
+  passesLuhn,
+  piiWarning,
+  scanPii,
+} from "./pii";
 
 describe("scanPii", () => {
   it("finds email addresses", () => {
@@ -207,5 +216,86 @@ describe("piiWarning", () => {
     expect(warning).toMatch(/email addresses/i);
     expect(warning).toMatch(/phone numbers/i);
     expect(warning).toMatch(/Remove personal data/i);
+  });
+});
+
+describe("free-text person name detection", () => {
+  it("masks names introduced by Indonesian and English person cues and honorifics", () => {
+    expect(maskPii("Kirim ringkasan ke Rina Wijaya di rina@example.com")).toBe(
+      "Kirim ringkasan ke [name] di [email]",
+    );
+    expect(maskPii("Nama: Budi Santoso")).toBe("Nama: [name]");
+    expect(maskPii("Name: Alex Rivera")).toBe("Name: [name]");
+    expect(maskPii("a.n. Dewi Anggraini")).toBe("a.n. [name]");
+    expect(maskPii("Atas nama Andi Kurniawan")).toBe("Atas nama [name]");
+    expect(maskPii("Kepada Yth. Siti Aminah")).toBe("Kepada Yth. [name]");
+    expect(maskPii("Untuk Nadia Puspita")).toBe("Untuk [name]");
+    expect(maskPii("Dari Hendra Kusuma")).toBe("Dari [name]");
+    expect(maskPii("Hubungi Maya Lestari sebelum jam 5")).toBe("Hubungi [name] sebelum jam 5");
+    expect(maskPii("Contact Alex Rivera at alex.rivera@example.com")).toBe("Contact [name] at [email]");
+    expect(maskPii("Dear Sarah Jenkins,")).toBe("Dear [name],");
+    expect(maskPii("Signed by Muhammad Rizky Pratama.")).toBe("Signed by [name].");
+    expect(maskPii("Ditulis oleh Dian Permata Sari")).toBe("Ditulis oleh [name]");
+    expect(maskPii("Bpk. Joko Widodo hadir")).toBe("Bpk. [name] hadir");
+    expect(maskPii("Bapak Agus Salim")).toBe("Bapak [name]");
+    expect(maskPii("Ibu Sri Mulyani")).toBe("Ibu [name]");
+    expect(maskPii("Pak Eko Prasetyo")).toBe("Pak [name]");
+    expect(maskPii("Bu Ani Yudhoyono")).toBe("Bu [name]");
+    expect(maskPii("Sdr. Dimas Anggara dan Sdri. Putri Ayu")).toBe("Sdr. [name] dan Sdri. [name]");
+    expect(maskPii("Mr. John Smith, Mrs. Jane Doe, Ms. Clara Oswald, Dr. Alan Grant")).toBe(
+      "Mr. [name], Mrs. [name], Ms. [name], Dr. [name]",
+    );
+  });
+
+  it("stops before stoplist words after a real name", () => {
+    expect(maskPii("Kirim ke Rina Wijaya Senin")).toBe("Kirim ke [name] Senin");
+    expect(maskPii("Untuk Budi Santoso Jakarta")).toBe("Untuk [name] Jakarta");
+  });
+
+  it("never corrupts ordinary prose, headers, places, orgs, or finance lines", () => {
+    const safeLines = [
+      "Ringkasan untuk Nultron Enterprise di Jakarta Indonesia pada hari Senin Januari",
+      "Laporan dari Bank Mandiri dan Bank Central Asia",
+      "Multiply by Gross Margin and divide by Total Revenue",
+      "Summary for Q1 Budget by Finance Team",
+      "Kepada Tim Keuangan dan Divisi Pemasaran",
+      "Untuk Laporan Keuangan Tahun 2025",
+      "Harga Pokok Penjualan | (23.960.000.000) | (4.025.000.000)",
+      "Contact Support Team or Customer Service",
+      "Signed by Board Committee",
+      "Dari Jakarta Selatan ke Bandung Barat",
+    ];
+    for (const line of safeLines) {
+      expect({ line, masked: maskPii(line) }).toEqual({ line, masked: line });
+    }
+  });
+});
+
+describe("maskPiiInJson", () => {
+  it("masks PII in content fields while preserving technical references and links", () => {
+    const input = {
+      id: "hit-123",
+      toolKey: "knowledge_search",
+      path: "/notes/Kirim ke Budi Santoso.md",
+      url: "https://example.com/alex.rivera@example.com",
+      href: "/api/v1/media/asset-1/file",
+      mediaId: "med-1",
+      artifactId: "art-1",
+      snippet: "Contact alex.rivera@example.com or Kirim ke Rina Wijaya",
+      nested: [{ body: "NIK 3273010101900001 and HP 081234567890", link: "https://news.example/a" }],
+    };
+    const masked = maskPiiInJson(input);
+    expect(masked).toEqual({
+      id: "hit-123",
+      toolKey: "knowledge_search",
+      path: "/notes/Kirim ke Budi Santoso.md",
+      url: "https://example.com/alex.rivera@example.com",
+      href: "/api/v1/media/asset-1/file",
+      mediaId: "med-1",
+      artifactId: "art-1",
+      snippet: "Contact [email] or Kirim ke [name]",
+      nested: [{ body: "NIK [nik] and HP [phone]", link: "https://news.example/a" }],
+    });
+    expect(input.snippet).toContain("alex.rivera@example.com");
   });
 });

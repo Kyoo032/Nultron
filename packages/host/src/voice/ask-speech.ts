@@ -21,6 +21,36 @@ export type AskCopy = {
   readonly needsTap: string;
   /** A delegated run started; the label is who was asked (`Research agent`, a bot's name). */
   readonly delegating: (label: string) => string;
+  /** A transient talker error on try 1 or 2, asking the person to repeat. */
+  readonly transientError: string;
+  /** Live status caption while a read tool is running. */
+  readonly toolStatus: (toolKey: string) => string;
+};
+
+const TOOL_STATUS_EN: Readonly<Record<string, string>> = {
+  web_search: "Searching the web…",
+  web_fetch: "Reading web page…",
+  knowledge_search: "Searching Knowledge Base…",
+  past_sessions: "Checking past sessions…",
+  list_files: "Listing files…",
+  read_file: "Reading file…",
+  search_files: "Searching files…",
+  calculator: "Calculating…",
+  datetime: "Checking the date and time…",
+  self_check: "Checking details…",
+};
+
+const TOOL_STATUS_ID: Readonly<Record<string, string>> = {
+  web_search: "Mencari di web…",
+  web_fetch: "Membaca halaman web…",
+  knowledge_search: "Mencari di Basis Pengetahuan…",
+  past_sessions: "Mengecek percakapan lalu…",
+  list_files: "Melihat daftar file…",
+  read_file: "Membaca file…",
+  search_files: "Mencari di file…",
+  calculator: "Menghitung…",
+  datetime: "Mengecek tanggal dan waktu…",
+  self_check: "Memeriksa detail…",
 };
 
 export const ASK_COPY: Readonly<Record<VoiceLocale, AskCopy>> = {
@@ -31,6 +61,8 @@ export const ASK_COPY: Readonly<Record<VoiceLocale, AskCopy>> = {
     failed: "I couldn't get that just now. Please try again.",
     needsTap: "That one needs your okay. It's on the screen, and one tap starts it.",
     delegating: (label: string) => `Asking ${label}…`,
+    transientError: "I had a quick hiccup. Could you say that again?",
+    toolStatus: (toolKey: string) => TOOL_STATUS_EN[toolKey] ?? "Looking that up…",
   },
   id: {
     gatewayBlocked: "Saya belum bisa menjawab sekarang. Akunnya perlu dicek di layar.",
@@ -39,6 +71,8 @@ export const ASK_COPY: Readonly<Record<VoiceLocale, AskCopy>> = {
     failed: "Saya belum bisa mengambil itu sekarang. Coba lagi.",
     needsTap: "Yang itu perlu persetujuan. Kartunya ada di layar, satu ketukan untuk memulai.",
     delegating: (label: string) => `Meminta ${label}…`,
+    transientError: "Maaf, ada gangguan sebentar. Bisa ulangi lagi?",
+    toolStatus: (toolKey: string) => TOOL_STATUS_ID[toolKey] ?? "Mencari informasi…",
   },
 };
 

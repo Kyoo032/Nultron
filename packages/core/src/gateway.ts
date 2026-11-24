@@ -1,4 +1,4 @@
-import { gatewayUrlOverride, PINNED_GATEWAY_BASE_URL } from "./gateway/pinned";
+import { assignedGatewayEndpoint, gatewayUrlOverride, PINNED_GATEWAY_BASE_URL } from "./gateway/pinned";
 import { assertAllowedEndpointUrl } from "./security/tls";
 
 /** Toko Token OpenAI-compatible gateway. Public Nultron’s home inference path. */
@@ -37,15 +37,17 @@ export function resolvedAssistantName(): string {
 }
 
 /**
- * The pinned gateway, unless a channel that is allowed to move it says otherwise.
+ * The pinned gateway, unless an operator-assigned per-user endpoint or an allowed channel moves it.
  *
- * A packaged build moves only for a brand flavor (Kemenkeu AI, AIHub Metranet), through
- * `AGENTFORGE_BRAND_GATEWAY_URL`, which `main.cjs` assigns from the installed `brand.json`.
- * `AGENTFORGE_GATEWAY_URL` is a **dev/test hook only**: ignored in a packaged build and in production.
- * The rule is `gatewayUrlOverride()` in `gateway/pinned.ts`.
+ * Resolution order:
+ *   1. Per-user operator-assigned gateway endpoint (Nultron admin only, carried on the hosted
+ *      portal session and bound to the request via `registerAssignedGatewayEndpointReader`).
+ *   2. Packaged brand gateway (`AGENTFORGE_BRAND_GATEWAY_URL`) or dev/test hook
+ *      (`AGENTFORGE_GATEWAY_URL`, ignored in packaged builds and production).
+ *   3. `PINNED_GATEWAY_BASE_URL`.
  */
 export function resolvedGatewayBaseUrl(): string {
-  return gatewayUrlOverride() ?? PINNED_GATEWAY_BASE_URL;
+  return assignedGatewayEndpoint() ?? gatewayUrlOverride() ?? PINNED_GATEWAY_BASE_URL;
 }
 
 export function resolvedGatewayHost(): string {

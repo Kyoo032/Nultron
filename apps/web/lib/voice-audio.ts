@@ -261,6 +261,7 @@ export class VoiceAudio implements VoiceAudioLike {
   }
 
   endAgentTurn(): void {
+    this.pausedHere = false;
     if (this.playback) {
       this.command(this.playback, { type: "turn" });
     }

@@ -24,6 +24,7 @@ import { jsonError, jsonOk } from "./errors";
 import { sessionLocale } from "./locale-boot";
 import { withLogContext } from "./log";
 import { withRequestLocale } from "./run-context";
+import { withAssignedGatewayEndpoint } from "./gateway-endpoint-scope";
 import { withRequestSession } from "./tenant-scope";
 import { clearedWorkspaceCookie } from "./workspace";
 import {
@@ -599,6 +600,7 @@ async function gate(
         tenantId: session.tenantId,
         orgId: session.orgId,
         userId: session.userId,
+        ...(session.gatewayEndpoint ? { gatewayEndpoint: session.gatewayEndpoint } : {}),
       },
     };
   } catch (error) {
@@ -653,14 +655,16 @@ export async function dispatch(request: HostRequest, options: DispatchOptions = 
     // And the same scope carries the person's own language (Phase 4), so `localeForRun()` answers
     // in it in every mode rather than only in Chat. Read lazily, from the session's tenant and user
     // only; off server mode nothing is set and the boot locale stands (./run-context.ts).
-    const { tenantId, userId } = session;
+    const { tenantId, userId, gatewayEndpoint } = session;
     const result = await withLogContext({ tenantId, route: route.path }, () =>
       withRequestSession(session, () =>
-        withRequestLocale(
-          // The browser's own language joins the person's stored choice, for someone who never chose
-          // (`./locale-boot.ts`). Forwarded by the HTTP adapter on the hosted server only.
-          () => sessionLocale({ tenantId, userId }, request.headers["accept-language"]),
-          () => route.handler(scoped),
+        withAssignedGatewayEndpoint(gatewayEndpoint ?? null, () =>
+          withRequestLocale(
+            // The browser's own language joins the person's stored choice, for someone who never chose
+            // (`./locale-boot.ts`). Forwarded by the HTTP adapter on the hosted server only.
+            () => sessionLocale({ tenantId, userId }, request.headers["accept-language"]),
+            () => route.handler(scoped),
+          ),
         ),
       ),
     );

@@ -113,7 +113,7 @@ async function liveEmbedBatch(texts: string[], model: string, scope?: SettingsSc
     throw new Error(`embeddings ${res.status}`);
   }
   const parsed = parseEmbeddingResponse(await res.json());
-  if (parsed.length !== texts.length) {
+  if (parsed.length !== maskedTexts.length) {
     throw new Error("embeddings response length mismatch");
   }
   return parsed;

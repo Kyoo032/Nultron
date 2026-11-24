@@ -2,14 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DEFAULT_GATEWAY_IMAGE_MODEL, DEFAULT_GATEWAY_VIDEO_MODEL } from "@agentforge/core/media-kind";
-import { AccountPlanPanel } from "./account-plan-panel";
-import { AccountSessionRow } from "./account-session-row";
-import { SettingsGuideCard } from "./settings-guide-card";
-import { availabilityFrom, SettingsModelsCard, type ModelAvailabilityWire } from "./settings-models-card";
-import { SettingsResetCard } from "./settings-reset-card";
-// Phase 8: renders only where there is a ceiling to show (hosted); null on a desk.
-import { SettingsStorageCard } from "./settings-storage-card";
-import { UsagePanel, type AccountUsage } from "./usage-panel";
+import { isAppLocale, parseAppLocale, type AppLocale } from "@agentforge/core/locale";
+import { UiSelect } from "@/components/ui-select";
 import { apiFetch, checkGateway, relaunchDesktopApp } from "@/lib/api-client";
 import { useMayChangeCompanyKey } from "@/lib/company-key-access";
 import { publishGate } from "@/lib/gate-state";
@@ -23,10 +17,16 @@ import {
   type GatewayGateStatus,
 } from "@/lib/gateway-gate";
 import { applyLocale, getLocale, LOCALE_RESTART_EVENT, t } from "@/lib/i18n";
-import { ModeHeader } from "@/components/mode-header";
-import { isAppLocale, parseAppLocale, type AppLocale } from "@agentforge/core/locale";
 import { gatewayHostLabel, useProductBrand } from "@/lib/product-brand";
 import { useWorkspaceScope } from "@/lib/workspace-scope";
+import { AccountPlanPanel } from "./account-plan-panel";
+import { AccountSessionRow } from "./account-session-row";
+import { SettingsGuideCard } from "./settings-guide-card";
+import { availabilityFrom, SettingsModelsCard, type ModelAvailabilityWire } from "./settings-models-card";
+import { SettingsResetCard } from "./settings-reset-card";
+// Phase 8: renders only where there is a ceiling to show (hosted); null on a desk.
+import { SettingsStorageCard } from "./settings-storage-card";
+import { UsagePanel, type AccountUsage } from "./usage-panel";
 
 type Probe = {
   openaiCount?: number;
@@ -41,7 +41,7 @@ type Probe = {
 };
 
 const fieldClass =
-  "mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]";
+  "mt-1.5 w-full rounded-xl border border-[var(--line)] bg-[var(--surface-2)]/50 px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-3)] focus:border-[var(--accent)] focus:bg-[var(--surface)] focus:outline-none";
 
 export function runtimeStatusLabel(mode: "ai" | "stub", mayChangeKey: boolean): string {
   if (mode === "ai") {
@@ -212,8 +212,6 @@ export function SettingsPage() {
     setRuntime(payload.runtime === "ai" ? "ai" : "stub");
     const reportedGate = parseGatewayGate(payload.gateway);
     setGateway(reportedGate);
-    // The panes the person opened earlier are still mounted (kept alive): a key saved here has to
-    // unlock them, and a closed gate has to say so, without a reload. Hosted only; a no-op elsewhere.
     publishGate(reportedGate);
     setGoogleBaseUrl(typeof payload.googleBaseUrl === "string" ? payload.googleBaseUrl : "");
     setAnthropicBaseUrl(typeof payload.anthropicBaseUrl === "string" ? payload.anthropicBaseUrl : "");
@@ -273,7 +271,6 @@ export function SettingsPage() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: applyPayload is redeclared every render and only sets state; the settings load must run once on mount
   useEffect(() => {
     let cancelled = false;
-    // A failed first load used to leave the defaults on screen as if they were this desk's settings.
     void readSettingsAnswer(() => apiFetch("/api/v1/settings"), "settings.loadFailed").then((answer) => {
       if (cancelled) {
         return;
@@ -296,7 +293,6 @@ export function SettingsPage() {
     setMessage(null);
     setBusy(true);
     try {
-      // The endpoint is pinned by the host; never send it back.
       const answer = await readSettingsAnswer(
         () =>
           apiFetch("/api/v1/settings", {
@@ -329,7 +325,6 @@ export function SettingsPage() {
     if (!isAppLocale(next) || localeSaving) {
       return false;
     }
-    // The select shows the choice while it saves, and goes back if the save does not land.
     const previous = savedLocale;
     setSavedLocale(next);
     setLocaleError(null);
@@ -405,8 +400,6 @@ export function SettingsPage() {
       }
       applyPayload(answer.payload);
       applyLocale(answer.payload.locale);
-      // A refused relaunch (installing an update, already quitting, webdev) must still reach the
-      // in-app restart notice, or the language change would look like it did nothing.
       const relaunched = await relaunchDesktopApp();
       if (relaunched.ok) {
         return;
@@ -417,122 +410,91 @@ export function SettingsPage() {
     }
   }
 
+  const introText = !mayChangeKey
+    ? t("settings.introRestricted", { workspaceName, gatewayName })
+    : hasOpenai
+      ? t("settings.intro", {
+          workspaceName,
+          gatewayName,
+          gatewayHost: gatewayHostLabel(gatewayEndpoint),
+        })
+      : t("settings.introNeedsKey", { gatewayName });
+
+  const statusDetails = !loaded
+    ? t("settings.statusReading")
+    : [
+        runtimeStatusLabel(runtime, mayChangeKey),
+        hasOpenai ? t("settings.keyGateway") : null,
+        hasAnthropic ? t("settings.keyAnthropic") : null,
+        hasGoogle ? t("settings.keyGoogle") : null,
+        hasVolcengine ? t("settings.keyVolcengine") : null,
+        probe?.detectedDialect ? t("settings.detected", { dialect: probe.detectedDialect }) : null,
+        !hasOpenai && !hasGoogle && !hasAnthropic && !hasVolcengine ? t("settings.noKeys") : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
   return (
-    <main className="mx-auto max-w-[var(--content-narrow)] px-6 py-8 text-[var(--text)]">
-      <ModeHeader
-        icon="settings"
-        title={t("settings.title")}
-        shapes={false}
-        outcomeTestId="settings-intro"
-        outcome={
-          !mayChangeKey
-            ? t("settings.introRestricted", { workspaceName, gatewayName })
-            : hasOpenai
-              ? t("settings.intro", {
-                  workspaceName,
-                  gatewayName,
-                  gatewayHost: gatewayHostLabel(gatewayEndpoint),
-                })
-              : t("settings.introNeedsKey", { gatewayName })
-        }
-      />
-
-      {loadError ? (
-        <p className="mt-3 text-sm text-[var(--danger)]" role="alert" data-testid="settings-load-error">
-          {loadError}
+    <main className="mx-auto max-w-[var(--content-narrow)] space-y-6 px-6 py-7 text-[var(--text)]">
+      <div className="space-y-1.5">
+        <p className="text-sm text-[var(--text-2)]" data-testid="settings-intro">
+          {introText}
         </p>
-      ) : null}
-
-      <p className="mt-3 text-sm text-[var(--text-3)]" data-testid="runtime-status">
-        {t("settings.status", {
-          details: !loaded
-            ? t("settings.statusReading")
-            : [
-                runtimeStatusLabel(runtime, mayChangeKey),
-                hasOpenai ? t("settings.keyGateway") : null,
-                hasAnthropic ? t("settings.keyAnthropic") : null,
-                hasGoogle ? t("settings.keyGoogle") : null,
-                hasVolcengine ? t("settings.keyVolcengine") : null,
-                probe?.detectedDialect ? t("settings.detected", { dialect: probe.detectedDialect }) : null,
-                !hasOpenai && !hasGoogle && !hasAnthropic && !hasVolcengine ? t("settings.noKeys") : null,
-              ]
-                .filter(Boolean)
-                .join(" · "),
-        })}
-      </p>
-
-      <section className="mt-6 space-y-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
-        <label className="block text-sm text-[var(--text)]">
-          {t("settings.languageLabel")}
-          <select
-            className={fieldClass}
-            value={savedLocale}
-            onChange={(event) => void onLocaleChange(event.target.value)}
-            disabled={localeSaving}
-            data-testid="settings-locale"
-          >
-            <option value="en">{t("common.english")}</option>
-            <option value="id">{t("common.bahasa")}</option>
-          </select>
-        </label>
-        <p className="text-xs text-[var(--text-3)]">{t("settings.languageHelp")}</p>
-        {localeError ? (
-          <p className="text-sm text-[var(--danger)]" role="alert" data-testid="settings-locale-error">
-            {localeError}
+        <p className="text-xs text-[var(--text-3)]" data-testid="runtime-status">
+          {t("settings.status", { details: statusDetails })}
+        </p>
+        {loadError ? (
+          <p className="pt-1 text-sm text-[var(--danger)]" role="alert" data-testid="settings-load-error">
+            {loadError}
           </p>
         ) : null}
-        {savedLocale !== locale ? (
-          <div className="space-y-2" data-testid="settings-locale-restart">
-            <p className="text-sm text-[var(--text-2)]">{t("common.restartHint")}</p>
-            <button
-              type="button"
-              className="btn btn-primary"
-              data-testid="settings-locale-restart-button"
-              onClick={() => void onRestart()}
-              disabled={localeBusy || localeSaving}
-            >
-              {t("common.restartApp")}
-            </button>
-          </div>
-        ) : null}
-      </section>
+      </div>
 
-      <SettingsGuideCard />
-
-      <form onSubmit={(event) => void onSubmit(event)} className="mt-6 space-y-6" data-testid="settings-form">
-        <section className="space-y-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
-          <div>
-            <h2 className="font-medium text-[var(--text)]">{t("settings.gatewayHeading", { gatewayName })}</h2>
-            {mayChangeKey ? <p className="mt-1 text-xs text-[var(--text-3)]">{t("settings.gatewayHelp")}</p> : null}
-          </div>
-          <div
-            className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-3)]"
-            data-testid="settings-gateway-status"
-          >
-            {gateway ? <span>{t(gatewayStatusKey(gateway.status))}</span> : null}
-            {gatewayCheckedAt ? <span>{t("settings.gateway.lastChecked", { date: gatewayCheckedAt })}</span> : null}
-            <button
-              type="button"
-              className="underline underline-offset-2 hover:text-[var(--text)] disabled:opacity-50"
-              onClick={() => void onRecheckGateway()}
-              disabled={gatewayBusy}
-              data-testid="settings-gateway-recheck"
+      {/* Primary: Gateway key & spend cap */}
+      <form onSubmit={(event) => void onSubmit(event)} className="space-y-3" data-testid="settings-form">
+        <section className="space-y-4 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold text-[var(--text)]">
+                {t("settings.gatewayHeading", { gatewayName })}
+              </h2>
+              {mayChangeKey ? <p className="mt-0.5 text-xs text-[var(--text-3)]">{t("settings.gatewayHelp")}</p> : null}
+            </div>
+            <div
+              className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[var(--text-3)]"
+              data-testid="settings-gateway-status"
             >
-              {t("settings.gateway.recheck")}
-            </button>
+              {gateway ? (
+                <span className="rounded-pill border border-[var(--line)] bg-[var(--surface-2)] px-2.5 py-0.5 font-medium text-[var(--text-2)]">
+                  {t(gatewayStatusKey(gateway.status))}
+                </span>
+              ) : null}
+              {gatewayCheckedAt ? <span>{t("settings.gateway.lastChecked", { date: gatewayCheckedAt })}</span> : null}
+              <button
+                type="button"
+                className="underline underline-offset-2 hover:text-[var(--text)] disabled:opacity-50"
+                onClick={() => void onRecheckGateway()}
+                disabled={gatewayBusy}
+                data-testid="settings-gateway-recheck"
+              >
+                {t("settings.gateway.recheck")}
+              </button>
+            </div>
           </div>
+
           {gateway?.grace && gatewayLastOkAt ? (
-            <p className="-mt-2 text-xs text-[var(--text-2)]" data-testid="settings-gateway-grace">
+            <p className="text-xs text-[var(--text-2)]" data-testid="settings-gateway-grace">
               {t("settings.gateway.grace", { date: gatewayLastOkAt })}
             </p>
           ) : null}
           {gatewayReason ? (
-            <p className="-mt-2 text-sm text-[var(--danger)]" data-testid="settings-gateway-reason">
+            <p className="text-sm text-[var(--danger)]" data-testid="settings-gateway-reason">
               {t(gatewayReason, { gatewayName })}
             </p>
           ) : null}
+
           {mayChangeKey ? (
-            <label className="block text-sm text-[var(--text)]">
+            <label className="block text-xs font-medium text-[var(--text-2)]">
               {t("settings.keyLabel")}
               <input
                 className={fieldClass}
@@ -549,8 +511,9 @@ export function SettingsPage() {
               {t("settings.keyRestricted")}
             </p>
           )}
+
           {hasOpenai ? (
-            <label className="block text-sm text-[var(--text)]">
+            <label className="block text-xs font-medium text-[var(--text-2)]">
               {t("settings.editCapLabel")}
               <input
                 className={fieldClass}
@@ -570,8 +533,9 @@ export function SettingsPage() {
               />
             </label>
           ) : null}
+
           {hasOpenai && openaiKeyFingerprint ? (
-            <p className="mt-1 text-xs text-[var(--text-3)]" data-testid="key-fingerprint">
+            <p className="text-xs text-[var(--text-3)]" data-testid="key-fingerprint">
               {t("settings.fingerprint", { fingerprint: openaiKeyFingerprint })}
             </p>
           ) : null}
@@ -582,7 +546,7 @@ export function SettingsPage() {
           ) : null}
           {message ? <p className="text-sm text-[var(--text-2)]">{message}</p> : null}
           <UsagePanel usage={usage} />
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 pt-1">
             <button
               type="submit"
               className="btn btn-primary disabled:opacity-50"
@@ -594,20 +558,73 @@ export function SettingsPage() {
           </div>
         </section>
 
-        <p className="text-sm text-[var(--text-3)]" data-testid="privacy-note">
+        <p className="px-1 text-xs text-[var(--text-3)]" data-testid="privacy-note">
           {t("settings.privacy", { productName, gatewayName, gatewayHost: gatewayHostLabel(gatewayEndpoint) })}
         </p>
       </form>
 
-      {/* Phase 9: who is signed in (lane C) and what this account is on (lane G). Both render
-          nothing of substance where there is no session and no plan, which is every desk. */}
-      <div className="mt-6">
+      {/* Preferences: Language (UiSelect) & Guide */}
+      <section className="space-y-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5">
+        <div className="space-y-1.5">
+          <span className="block text-xs font-medium text-[var(--text-2)]" id="settings-locale-label">
+            {t("settings.languageLabel")}
+          </span>
+          <UiSelect
+            variant="field"
+            ariaLabel={t("settings.languageLabel")}
+            ariaLabelledBy="settings-locale-label"
+            testId="settings-locale"
+            value={savedLocale}
+            disabled={localeSaving}
+            onChange={(next) => void onLocaleChange(next)}
+            options={[
+              { value: "en", label: t("common.english") },
+              { value: "id", label: t("common.bahasa") },
+            ]}
+          />
+          <p className="text-xs text-[var(--text-3)]">{t("settings.languageHelp")}</p>
+        </div>
+        {localeError ? (
+          <p className="text-sm text-[var(--danger)]" role="alert" data-testid="settings-locale-error">
+            {localeError}
+          </p>
+        ) : null}
+        {savedLocale !== locale ? (
+          <div className="space-y-2 pt-1" data-testid="settings-locale-restart">
+            <p className="text-sm text-[var(--text-2)]">{t("common.restartHint")}</p>
+            <button
+              type="button"
+              className="btn btn-primary"
+              data-testid="settings-locale-restart-button"
+              onClick={() => void onRestart()}
+              disabled={localeBusy || localeSaving}
+            >
+              {t("common.restartApp")}
+            </button>
+          </div>
+        ) : null}
+      </section>
+
+      <SettingsGuideCard />
+
+      {/* Account, Plan & collapsible Advanced (Models, Storage) + Reset */}
+      <div className="space-y-4">
         <AccountSessionRow />
+        <AccountPlanPanel />
+        <details
+          className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-5 py-3.5"
+          data-testid="settings-advanced"
+        >
+          <summary className="cursor-pointer select-none text-sm font-medium text-[var(--text)]">
+            {t("settings.advancedHeading")}
+          </summary>
+          <div className="mt-2 space-y-4">
+            <SettingsModelsCard availability={modelAvailability} onRefreshed={setModelAvailability} hasKey={hasOpenai} />
+            <SettingsStorageCard />
+          </div>
+        </details>
+        <SettingsResetCard resetPending={resetPending} />
       </div>
-      <AccountPlanPanel />
-      <SettingsModelsCard availability={modelAvailability} onRefreshed={setModelAvailability} hasKey={hasOpenai} />
-      <SettingsStorageCard />
-      <SettingsResetCard resetPending={resetPending} />
     </main>
   );
 }

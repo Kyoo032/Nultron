@@ -209,7 +209,14 @@ describe("parseInviteArgs", () => {
       role: null,
       language: "en",
       printCode: false,
+      gatewayEndpoint: null,
     });
+    expect(parseInviteArgs(["--email", "a@b.test", "--gateway-endpoint", "https://gw.example/v1/"])).toMatchObject({
+      gatewayEndpoint: "https://gw.example/v1",
+    });
+    expect(() => parseInviteArgs(["--email", "a@b.test", "--gateway-endpoint", "http://bad.example/v1"])).toThrow(
+      InviteArgsError,
+    );
     expect(() => parseInviteArgs([])).toThrow(InviteArgsError);
     expect(() => parseInviteArgs(["--email", "no-at-sign"])).toThrow(InviteArgsError);
   });

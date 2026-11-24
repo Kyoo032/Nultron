@@ -24,7 +24,8 @@
     "positionHelp": "Apa yang Anda pegang dan di harga berapa. Briefing boleh memakai angka-angka ini, tetapi tidak akan mengarang angka lain.",
     "promptLabel": "Apa yang harus dicakup briefing",
     "resetPrompt": "Kembalikan ke bawaan",
-    "lengthLimit": "Batas panjang (karakter)"
+    "lengthLimit": "Batas panjang (karakter)",
+    "modelLabel": "Model"
   },
   "depth": {
     "label": "Analisis",

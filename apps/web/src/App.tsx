@@ -6,7 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { ComponentSetupSilent } from "@/components/component-setup";
 import { GuideTour } from "@/components/guide-tour";
 import { apiFetch } from "@/lib/api-client";
-import { hydrateGuide, offerGuideAfterOnboarding } from "@/lib/guide-store";
+import { hydrateGuide } from "@/lib/guide-store";
 import { readSettings } from "@/lib/settings-read";
 import {
   browserShellModesStore,
@@ -19,6 +19,7 @@ import {
 } from "@/lib/shell-modes";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { SettingsPage } from "@/components/settings-page";
+import { SettingsShell } from "@/components/settings-shell";
 import { UsagePage } from "@/components/usage-page";
 import { VirtualAgentsPage } from "@/components/virtual-agents-page";
 import { TeamPage } from "@/components/team-page";
@@ -343,8 +344,7 @@ export function AppRoutes() {
         <OnboardingScreen
           gateway={gateway}
           onDone={() => {
-            // First-run setup just ended: offer the quick tour, once (`lib/guide-store.ts`).
-            offerGuideAfterOnboarding();
+            // Go straight into Chat without auto-launching the modal tour (still replayable in Settings).
             setGate("app");
           }}
           // Enterprise only. A signed-in person on the hosted build may start without a key; nobody
@@ -407,7 +407,9 @@ export function AppRoutes() {
               path="/settings"
               element={
                 <DeskPane>
-                  <SettingsPage />
+                  <SettingsShell>
+                    <SettingsPage />
+                  </SettingsShell>
                 </DeskPane>
               }
             />
@@ -415,7 +417,9 @@ export function AppRoutes() {
               path="/usage"
               element={
                 <DeskPane>
-                  <UsagePage />
+                  <SettingsShell>
+                    <UsagePage />
+                  </SettingsShell>
                 </DeskPane>
               }
             />
@@ -423,7 +427,9 @@ export function AppRoutes() {
               path="/workspaces"
               element={
                 <DeskPane>
-                  {SHELL_LAYOUT === "chat-first" ? <VirtualAgentsPage /> : <WorkspacesPage />}
+                  <SettingsShell>
+                    {SHELL_LAYOUT === "chat-first" ? <VirtualAgentsPage /> : <WorkspacesPage />}
+                  </SettingsShell>
                 </DeskPane>
               }
             />
@@ -431,7 +437,9 @@ export function AppRoutes() {
               path="/team"
               element={
                 <DeskPane>
-                  {SHELL_LAYOUT === "chat-first" ? <TeamPage /> : <Navigate to="/workspaces" replace />}
+                  <SettingsShell>
+                    {SHELL_LAYOUT === "chat-first" ? <TeamPage /> : <Navigate to="/workspaces" replace />}
+                  </SettingsShell>
                 </DeskPane>
               }
             />
@@ -447,7 +455,9 @@ export function AppRoutes() {
               path="/channels"
               element={
                 <DeskPane>
-                  <ChannelsPage />
+                  <SettingsShell>
+                    <ChannelsPage />
+                  </SettingsShell>
                 </DeskPane>
               }
             />
@@ -455,7 +465,9 @@ export function AppRoutes() {
               path="/customers"
               element={
                 <DeskPane>
-                  <CustomersPage />
+                  <SettingsShell>
+                    <CustomersPage />
+                  </SettingsShell>
                 </DeskPane>
               }
             />

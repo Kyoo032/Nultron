@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_EMBEDDING_MODEL, stubEmbed, type TenantContext } from "@agentforge/core";
 import { sql } from "@agentforge/db";
 import {
+  embedQuery,
   embedTexts,
   embedTextsWithModel,
   indexSourceVectors,
@@ -213,5 +214,55 @@ describe("knowledge-embed", () => {
     });
     expect(getKnowledgeModels(ctx)).toEqual(saved);
     sql.prepare("DELETE FROM knowledge_settings WHERE workspace_id = ?").run(ctx.workspaceId);
+  });
+
+  it("masks PII in outbound /embeddings payloads for chunks and queries while keeping raw text locally", async () => {
+    const previous = process.env.AGENTFORGE_RUNTIME;
+    process.env.AGENTFORGE_RUNTIME = "ai";
+    const ctx = tenant();
+    saveSettings({ openaiApiKey: "sk-test-embed-key-0001" }, ctx);
+    resetEmbedCircuit();
+    const sentInputs: string[][] = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (_url, init) => {
+      const parsed = JSON.parse(String(init?.body ?? "{}")) as { input: string[] };
+      sentInputs.push(parsed.input);
+      return new Response(
+        JSON.stringify({
+          data: parsed.input.map((_item, index) => ({ embedding: [0.1 * (index + 1), 0.2, 0.3] })),
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    try {
+      const insertSource = sql.prepare(
+        `INSERT INTO knowledge_sources (id, workspace_id, name, type, status, chunks, error, created_at)
+         VALUES (?, ?, ?, 'Paste', 'Indexed', 1, NULL, ?)`,
+      );
+      insertSource.run("src-pii", ctx.workspaceId, "pii", Date.now());
+
+      const rawChunk = "Kirim ringkasan ke Rina Wijaya di alex.rivera@example.com, NIK 3273010101900001";
+      await indexSourceVectors(ctx, "src-pii", [rawChunk], DEFAULT_EMBEDDING_MODEL);
+      await embedQuery("Contact alex.rivera@example.com or 081234567890", DEFAULT_EMBEDDING_MODEL, ctx);
+
+      expect(sentInputs[0]).toEqual(["Kirim ringkasan ke [name] di [email], NIK [nik]"]);
+      expect(sentInputs[1]).toEqual(["Contact [email] or [phone]"]);
+
+      const stored = sql
+        .prepare("SELECT body FROM knowledge_vectors WHERE workspace_id = ? AND source_id = ?")
+        .get(ctx.workspaceId, "src-pii") as { body: string } | undefined;
+      expect(stored?.body).toBe(rawChunk);
+    } finally {
+      globalThis.fetch = original;
+      resetEmbedCircuit();
+      sql.prepare("DELETE FROM knowledge_vectors WHERE workspace_id = ?").run(ctx.workspaceId);
+      sql.prepare("DELETE FROM knowledge_sources WHERE workspace_id = ?").run(ctx.workspaceId);
+      if (previous === undefined) {
+        delete process.env.AGENTFORGE_RUNTIME;
+      } else {
+        process.env.AGENTFORGE_RUNTIME = previous;
+      }
+    }
   });
 });

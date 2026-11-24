@@ -85,5 +85,6 @@
     "emptySections": "Some sections came back empty.",
     "hint": "The dossier is saved. Open the sources before you rely on a finding, or run the question again.",
     "listAria": "What the checks found"
-  }
+  },
+  "modelLabel": "Model"
 }

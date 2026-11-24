@@ -25,6 +25,7 @@ import {
   listAccounts,
   parseAccountArgs,
   resetPassword,
+  setAccountEndpoint,
   setAccountRole,
   type AccountDeps,
 } from "./index";
@@ -646,6 +647,88 @@ describe("enable", () => {
   }, 60_000);
 });
 
+describe("set-endpoint (Nultron admin only)", () => {
+  it("assigns a gateway endpoint at create time, updates it, clears it, and shows it in list", async () => {
+    const made = await create({ gatewayEndpoint: "https://gw-alpha.example/v1/" });
+    expect(made.ok).toBe(true);
+    if (!made.ok) {
+      return;
+    }
+    expect(made.gatewayEndpoint).toBe("https://gw-alpha.example/v1");
+    expect(formatCreated(made)).toContain("endpoint   https://gw-alpha.example/v1");
+
+    const listed1 = await listAccounts(deps, { tenantSlug: SLUG, orgSlug: null });
+    expect(listed1.ok).toBe(true);
+    if (listed1.ok) {
+      expect(formatList(listed1)).toContain("https://gw-alpha.example/v1");
+    }
+
+    const updated = await setAccountEndpoint(deps, {
+      tenantSlug: SLUG,
+      person: { by: "username", username: made.username },
+      gatewayEndpoint: "https://gw-beta.example/v1",
+    });
+    expect(updated).toEqual({
+      ok: true,
+      username: made.username,
+      email: made.email,
+      userId: made.userId,
+      from: "https://gw-alpha.example/v1",
+      to: "https://gw-beta.example/v1",
+    });
+
+    const same = await setAccountEndpoint(deps, {
+      tenantSlug: SLUG,
+      person: { by: "username", username: made.username },
+      gatewayEndpoint: "https://gw-beta.example/v1/",
+    });
+    expect(same).toEqual({ ok: false, reason: "same_endpoint" });
+
+    const cleared = await setAccountEndpoint(deps, {
+      tenantSlug: SLUG,
+      person: { by: "email", email: made.email },
+      gatewayEndpoint: null,
+    });
+    expect(cleared).toEqual({
+      ok: true,
+      username: made.username,
+      email: made.email,
+      userId: made.userId,
+      from: "https://gw-beta.example/v1",
+      to: null,
+    });
+
+    const rows = (await audit("account.gateway_endpoint_updated")).filter((row) => row.targetId === made.userId);
+    expect(rows).toHaveLength(2);
+    // Audit rows are returned newest-first.
+    expect(rows[0].before).toEqual({ gateway_endpoint: "https://gw-beta.example/v1" });
+    expect(rows[0].after).toMatchObject({ gateway_endpoint: null });
+    expect(rows[1].before).toEqual({ gateway_endpoint: "https://gw-alpha.example/v1" });
+    expect(rows[1].after).toMatchObject({ gateway_endpoint: "https://gw-beta.example/v1" });
+  }, 60_000);
+
+  it("rejects invalid non-HTTPS or credentialed endpoints", async () => {
+    const made = await create();
+    expect(made.ok).toBe(true);
+    if (!made.ok) {
+      return;
+    }
+    for (const bad of [
+      "http://external.example/v1",
+      "https://user:pass@gw.example/v1",
+      "https://gw.example/v1?foo=bar",
+      "not-a-url",
+    ]) {
+      const res = await setAccountEndpoint(deps, {
+        tenantSlug: SLUG,
+        person: { by: "username", username: made.username },
+        gatewayEndpoint: bad,
+      });
+      expect(res, bad).toEqual({ ok: false, reason: "invalid_gateway_endpoint" });
+    }
+  }, 30_000);
+});
+
 describe("the argument parser", () => {
   it("reads each command and defaults the tenant to nultron", () => {
     expect(parseAccountArgs(["create", "--username", "Alice.Fake", "--email", "Alice@Example.Test"])).toEqual({
@@ -656,6 +739,7 @@ describe("the argument parser", () => {
       email: "alice@example.test",
       role: null,
       displayName: null,
+      gatewayEndpoint: null,
     });
     expect(
       parseAccountArgs([
@@ -667,10 +751,35 @@ describe("the argument parser", () => {
         "admin",
         "--name",
         "Bob",
+        "--gateway-endpoint",
+        "https://gw.example/v1/",
       ]),
     ).toMatchObject({
       role: "admin",
       displayName: "Bob",
+      gatewayEndpoint: "https://gw.example/v1",
+    });
+    expect(
+      parseAccountArgs([
+        "set-endpoint",
+        "--username",
+        "alice.fake",
+        "--gateway-endpoint",
+        "https://gw-custom.example/v1/",
+      ]),
+    ).toEqual({
+      command: "set-endpoint",
+      tenantSlug: "nultron",
+      orgSlug: null,
+      person: { by: "username", username: "alice.fake" },
+      gatewayEndpoint: "https://gw-custom.example/v1",
+    });
+    expect(parseAccountArgs(["set-endpoint", "--email", "a@example.test", "--clear"])).toEqual({
+      command: "set-endpoint",
+      tenantSlug: "nultron",
+      orgSlug: null,
+      person: { by: "email", email: "a@example.test" },
+      gatewayEndpoint: null,
     });
     expect(parseAccountArgs(["reset-password", "--email", "x@example.test", "--tenant", "hyp"])).toEqual({
       command: "reset-password",
@@ -701,6 +810,9 @@ describe("the argument parser", () => {
       ["list", "extra"],
       ["list", "--tenant", "Bad Tenant"],
       ["create", "--username"],
+      ["create", "--username", "alice.fake", "--email", "a@example.test", "--gateway-endpoint", "http://bad.example/v1"],
+      ["set-endpoint", "--username", "alice.fake"],
+      ["set-endpoint", "--username", "alice.fake", "--clear", "--gateway-endpoint", "https://gw.example/v1"],
     ];
     for (const argv of cases) {
       expect(() => parseAccountArgs(argv), argv.join(" ")).toThrow(AccountArgsError);

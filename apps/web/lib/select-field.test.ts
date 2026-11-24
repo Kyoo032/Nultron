@@ -70,7 +70,7 @@ function hasClass(className: string, token: string): boolean {
 describe("select-field", () => {
   it("finds the select call sites it is meant to guard", () => {
     expect(tags.length).toBeGreaterThan(10);
-    expect(tags.some((tag) => tag.file === "videos-studio.tsx")).toBe(true);
+    expect(tags.some((tag) => tag.file === "presentations-studio.tsx")).toBe(true);
   });
 
   it("never combines a fixed h-8 height with py-2 on a select", () => {
@@ -119,10 +119,12 @@ describe("select-field", () => {
     expect(globalsCss.indexOf(".text-field {")).toBeGreaterThan(layer);
   });
 
-  it("routes the studios that clipped through .select-field", () => {
-    for (const file of ["videos-studio.tsx", "images-studio.tsx", "presentations-studio.tsx"]) {
+  it("routes native select studios through .select-field while redesigned studios use UiSelect", () => {
+    const pres = files.find((entry) => entry.name === "presentations-studio.tsx")?.src ?? "";
+    expect(pres, "presentations-studio.tsx should use .select-field").toContain("select-field");
+    for (const file of ["videos-studio.tsx", "images-studio.tsx"]) {
       const src = files.find((entry) => entry.name === file)?.src ?? "";
-      expect(src, `${file} should use .select-field`).toContain("select-field");
+      expect(src, `${file} should not render raw native <select>`).not.toContain("<select");
     }
   });
 });

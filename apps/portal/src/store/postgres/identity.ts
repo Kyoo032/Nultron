@@ -193,8 +193,8 @@ export function usersOps(client: PoolClient): PortalOps["users"] {
   return {
     async create(input) {
       const { rows } = await client.query<Row>(
-        `INSERT INTO users (tenant_id, org_id, email, display_name, status, role)
-         VALUES ($1, $2, $3, $4, COALESCE($5, 'invited'), COALESCE($6, 'member'))
+        `INSERT INTO users (tenant_id, org_id, email, display_name, status, role, gateway_endpoint)
+         VALUES ($1, $2, $3, $4, COALESCE($5, 'invited'), COALESCE($6, 'member'), $7)
          RETURNING *`,
         [
           input.tenantId,
@@ -203,6 +203,7 @@ export function usersOps(client: PoolClient): PortalOps["users"] {
           input.displayName ?? null,
           input.status ?? null,
           input.role ?? null,
+          input.gatewayEndpoint ?? null,
         ],
       );
       return toUser(rows[0]);
@@ -222,6 +223,14 @@ export function usersOps(client: PoolClient): PortalOps["users"] {
     },
     async setRole(id, role) {
       const { rows } = await client.query<Row>(`UPDATE users SET role = $2::text WHERE id = $1 RETURNING *`, [id, role]);
+      const row = first(rows);
+      return row ? toUser(row) : null;
+    },
+    async setGatewayEndpoint(id, gatewayEndpoint) {
+      const { rows } = await client.query<Row>(
+        `UPDATE users SET gateway_endpoint = $2::text WHERE id = $1 RETURNING *`,
+        [id, gatewayEndpoint],
+      );
       const row = first(rows);
       return row ? toUser(row) : null;
     },

@@ -75,6 +75,7 @@ export interface CreateUserInput {
   readonly displayName?: string | null;
   readonly status?: UserStatus;
   readonly role?: UserRole;
+  readonly gatewayEndpoint?: string | null;
 }
 
 export interface UpsertDeviceInput {

@@ -104,7 +104,11 @@ export type PortalCheckContext = {
 
 export type PortalRefreshOutcome =
   /** Rotated: the new pair is in the vault, sealed on the row, and the check is stamped. */
-  | { readonly kind: "rotated"; readonly tokens: PortalTokenSet & { readonly accessToken: string } }
+  | {
+      readonly kind: "rotated";
+      readonly tokens: PortalTokenSet & { readonly accessToken: string };
+      readonly gatewayEndpoint?: string | null;
+    }
   /** The portal ended the session: already revoked here, tokens already dropped. */
   | { readonly kind: "ended"; readonly error: PortalError }
   /**
@@ -116,7 +120,7 @@ export type PortalRefreshOutcome =
   | { readonly kind: "unanswered"; readonly error: PortalError };
 
 export type PortalGateVerdict =
-  | { readonly ok: true }
+  | { readonly ok: true; readonly gatewayEndpoint?: string | null }
   | { readonly ok: false; readonly reason: AuthReason; readonly message: string | null };
 
 export interface PortalSessionCheck {
@@ -313,6 +317,7 @@ export function createPortalSessionCheck(options: PortalSessionCheckOptions): Po
     }
     let rotated: PortalTokenSet & { readonly accessToken: string };
     let role: PortalRole | null;
+    let gatewayEndpoint: string | null;
     try {
       const client = clientCredentials();
       const answer = await options.portal.refresh({
@@ -321,6 +326,7 @@ export function createPortalSessionCheck(options: PortalSessionCheckOptions): Po
         ...(client ? { clientId: client.clientId, clientSecret: client.clientSecret } : {}),
       });
       role = answer.role;
+      gatewayEndpoint = answer.gatewayEndpoint ?? null;
       rotated = {
         refreshToken: answer.refreshToken,
         accessToken: answer.accessToken,
@@ -359,16 +365,16 @@ export function createPortalSessionCheck(options: PortalSessionCheckOptions): Po
     await options.vault.put(session.id, rotated);
     retryAt.delete(session.id);
     try {
-      // One write: the sealed token and the stamp can never disagree about which rotation they
-      // belong to, and a row revoked meanwhile keeps neither token.
-      await context.store.recordRotation(session.id, clock(), sealRotated(session, rotated));
+      // One write: the sealed token, assigned gateway endpoint, and stamp can never disagree about
+      // which rotation they belong to, and a row revoked meanwhile keeps neither token.
+      await context.store.recordRotation(session.id, clock(), sealRotated(session, rotated), gatewayEndpoint);
     } catch (error) {
       // The pair is safe in the vault until a restart. The row still holds the token just spent,
       // so a restart before the next rotation ends this session at the portal as a replay.
       log.error("portal_check_not_recorded", { tenantId: session.tenantId, fault: faultOf(error) });
     }
     await reconcileRole(session, role);
-    return { kind: "rotated", tokens: rotated };
+    return { kind: "rotated", tokens: rotated, gatewayEndpoint };
   }
 
   /**
@@ -425,6 +431,11 @@ export function createPortalSessionCheck(options: PortalSessionCheckOptions): Po
         return { ok: false, reason: outcome.error.reason, message: outcome.error.messageEn };
       case "no_tokens":
         return { ok: false, reason: "refresh_expired", message: null };
+      case "rotated": {
+        const nextEndpoint = outcome.gatewayEndpoint ?? null;
+        const prevEndpoint = session.gatewayEndpoint ?? null;
+        return nextEndpoint !== prevEndpoint ? { ok: true, gatewayEndpoint: nextEndpoint } : { ok: true };
+      }
       default:
         return { ok: true };
     }

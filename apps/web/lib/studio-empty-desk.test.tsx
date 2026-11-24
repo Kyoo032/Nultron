@@ -74,7 +74,8 @@ describe("a studio's first visit", () => {
       // One empty-desk character, plus the header stage that takes over from it in a browser once the header is
       // on screen (`announceStage` -> `staged`; held by desk-buddy-store.test.ts). A server render sees both.
       expect(count(html, 'data-placement="empty"')).toBe(1);
-      expect(count(html, 'data-testid="buddy-stage-header"')).toBe(1);
+      // Research uses the compact minimalist studio header without the decorative ModeHeader buddy stage.
+      expect(count(html, 'data-testid="buddy-stage-header"')).toBe(mode === "research" ? 0 : 1);
       expect(html).toContain('data-placement="empty"');
       // An empty desk waves first and settles on the mode's home pose after 1.4 s (`MascotSlot`, `mascot-states.test.ts`).
       expect(html).toContain(`data-mode="${mode}"`);

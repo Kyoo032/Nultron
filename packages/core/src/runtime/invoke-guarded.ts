@@ -4,6 +4,7 @@ import { invokeTool, type ToolDefinition } from "../tools/define-tool";
 import { getDisabledTools, getInjectionGuardBypass } from "../tools/secret-scope";
 import { blockedInjectionOutput, scanJson } from "../security/injection-guard";
 import { runInToolCall } from "../security/outbound-guard";
+import { maskPiiInJson } from "../security/pii";
 import { thinToolOutput } from "../security/tool-thin";
 import type { EgressGuard } from "./egress-guard";
 import type { MediaPermission } from "./media-permission";
@@ -90,6 +91,7 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
     }
   }
 
+  thin = maskPiiInJson(thin);
   reportToolIo({ toolKey: tool.key, input: args, full, thin });
   return thin;
 }

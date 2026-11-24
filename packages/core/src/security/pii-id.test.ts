@@ -82,6 +82,44 @@ describe("scanIndonesianIds", () => {
     expect(scanIndonesianIds("Accounts receivable 1250000000")).toEqual([]);
   });
 
+  it("finds account numbers when a recognized bank name sits between the cue and digits", () => {
+    expect(scanIndonesianIds("Rekening BCA 1234567890")).toEqual([
+      { kind: "account", match: "1234567890", index: "Rekening BCA ".length },
+    ]);
+    expect(scanIndonesianIds("No. Rek Mandiri: 1370004567890")).toEqual([
+      { kind: "account", match: "1370004567890", index: "No. Rek Mandiri: ".length },
+    ]);
+    expect(scanIndonesianIds("No. Rekening BNI 0123-456-789")).toEqual([
+      { kind: "account", match: "0123-456-789", index: "No. Rekening BNI ".length },
+    ]);
+  });
+
+  it("finds safe unlabelled bank accounts (bank-cued, bank-grouped, IBAN) without touching amounts or cards", () => {
+    expect(scanIndonesianIds("Transfer ke 1370004567891")).toEqual([
+      { kind: "account", match: "1370004567891", index: "Transfer ke ".length },
+    ]);
+    expect(scanIndonesianIds("BCA 1234567890")).toEqual([
+      { kind: "account", match: "1234567890", index: "BCA ".length },
+    ]);
+    expect(scanIndonesianIds("Kirim ke 9000-1234-0001 segera")).toEqual([
+      { kind: "account", match: "9000-1234-0001", index: "Kirim ke ".length },
+    ]);
+    expect(scanIndonesianIds("IBAN: DE89 3704 0044 0532 0130 00")).toEqual([
+      { kind: "account", match: "DE89 3704 0044 0532 0130 00", index: "IBAN: ".length },
+    ]);
+    expect(scanIndonesianIds("Wire to GB29NWBK60161331926819")).toEqual([
+      { kind: "account", match: "GB29NWBK60161331926819", index: "Wire to ".length },
+    ]);
+
+    // Never mask amounts, round totals, grouped thousands, bare 16-digit runs, or cards
+    expect(scanIndonesianIds("Transfer Rp 1.250.000.000")).toEqual([]);
+    expect(scanIndonesianIds("Transfer Saldo 1234567890")).toEqual([]);
+    expect(scanIndonesianIds("BCA 1250000000")).toEqual([]);
+    expect(scanIndonesianIds("1234567890123456")).toEqual([]);
+    expect(scanIndonesianIds("Transfer 4111-1111-1111-1111")).toEqual([]);
+    expect(scanIndonesianIds("Call 415-555-2671 or 021-5551234")).toEqual([]);
+  });
+
   it("leaves money alone in every shape Finance writes it", () => {
     const money = [
       "Pendapatan 2024: 1.250.000.000",
