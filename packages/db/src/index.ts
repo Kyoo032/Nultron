@@ -1,4 +1,4 @@
-export { db, sql } from "./client";
+export { checkpointWalTruncate, db, sql } from "./client";
 export type { Database } from "./client";
 export { assertKernelTables, ensureSchema, listKernelTables } from "./ensure-schema";
 export {

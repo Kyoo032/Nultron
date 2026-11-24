@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { JobMode } from "@agentforge/core";
 import { modelsForMode, type ModelCatalogWire } from "@agentforge/core/mode-catalog";
 import { apiFetch } from "./api-client";
+import { useCatalogVersion } from "./catalog-version";
 import { readSettings } from "./settings-read";
 
 export type JobStudioModel = {
@@ -98,7 +99,10 @@ export function useJobModel(mode: JobMode): {
   const [model, setModel] = useState("");
   const [pinned, setPinned] = useState(false);
 
+  const catalogVersion = useCatalogVersion();
+
   useEffect(() => {
+    void catalogVersion;
     let cancelled = false;
     setPinned(false);
     void Promise.all([
@@ -115,7 +119,7 @@ export function useJobModel(mode: JobMode): {
     return () => {
       cancelled = true;
     };
-  }, [mode]);
+  }, [mode, catalogVersion]);
 
   const pickModel = useCallback((id: string) => {
     setPinned(true);

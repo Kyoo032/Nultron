@@ -33,6 +33,7 @@ import {
   type VideoPick,
 } from "@/lib/media-options";
 import { keepModelChoice } from "@/lib/model-choice";
+import { useCatalogVersion } from "@/lib/catalog-version";
 import { useProductBrand } from "@/lib/product-brand";
 import { stillSource, type SavedPicture } from "@/lib/saved-picture";
 import { studioPickerEmpty } from "@/lib/studio-picker-empty";
@@ -91,8 +92,9 @@ export function VideosStudio() {
   const [error, setError] = useState<string | null>(null);
 
   const starters = useMemo(() => localizedLibrary("videos"), []);
-
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     setError(null);
     try {
@@ -100,6 +102,9 @@ export function VideosStudio() {
       const data = (await response.json().catch(() => ({}))) as GalleryResponse & {
         error?: { message?: string };
       };
+      if (seq !== loadSeq.current) {
+        return;
+      }
       if (!response.ok) {
         setError(data.error?.message ?? t("videos.loadError"));
         setReady(false);
@@ -111,16 +116,23 @@ export function VideosStudio() {
       setModel((current) => keepModelChoice(current, data.models ?? [], data.defaultModel));
       setReady(Boolean(data.ready));
     } catch (err) {
+      if (seq !== loadSeq.current) {
+        return;
+      }
       setError(err instanceof Error ? err.message : t("videos.loadError"));
       setReady(false);
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
+  const catalogVersion = useCatalogVersion();
   useEffect(() => {
+    void catalogVersion;
     void load();
-  }, [load]);
+  }, [load, catalogVersion]);
 
   const keyMissing = useHostedNeedsKey();
   const wasMissing = useRef(false);

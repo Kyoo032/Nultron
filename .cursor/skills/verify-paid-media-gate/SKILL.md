@@ -105,11 +105,14 @@ Previous full runs:
 | `packages/core/src/runtime/invoke-guarded.ts` | `invokeToolGuarded`, the `permission` lines |
 | `packages/core/src/runtime/ai-sdk-runtime.ts` | `AiSdkRuntime.stream`, where the gate is built |
 | `packages/core/src/agents/delegation.ts` | `DELEGATE_EXCLUDED_TOOLS`, `delegateToolKeys` |
+| `packages/core/src/agents/virtual-agents.ts` | virtual-agent tool sets (`FULL_CHAT_TOOLS`, `MODE_EXTRA_TOOLS`) carrying `image_generate` and `video_generate` |
 | `packages/core/src/harness/specs.ts` | `MODE_HARNESS_SPECS` tool sets |
 | `packages/core/src/harness/modes/` | the `tools` of each mode harness spec |
 | `packages/host/src/paid-media-body.ts` | `readMediaPermission`, `PAID_MEDIA_GRANTS_MAX` |
+| `packages/host/src/register-tools.ts` | binds `chatVideoGenerateTool` under `"video_generate"` in place of core's tool |
 | `packages/host/src/runs.ts` | Chat/mode `.execute({ bindings, mediaPermission })` |
 | `packages/host/src/voice/ask.ts` | `askNultron` `.execute({ bindings, mediaPermission })` via `prepareChatRun` + `voiceBindings` |
+| `packages/host/src/voice/ask-tools.ts` | `VOICE_DENIED_TOOLS` and `voiceBindings` excluding `image_generate` and `video_generate` from voice runs |
 | `packages/host/src/delegation/run-delegation.ts` | delegated `.execute({ bindings })` using `delegateToolKeys` (mode agents and team bots via `FULL_CHAT_TOOLS`) |
 | `packages/host/src/team-propose.ts` | team proposal `.execute({ bindings: [] })` |
 | `packages/host/src/job-regen.ts` | studio/worker `.execute({ bindings })` bounded by `toolKeysWithinSpec` |

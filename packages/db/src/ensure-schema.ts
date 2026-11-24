@@ -374,6 +374,7 @@ function ensureMarketTables(sqlite: Database.Database): void {
       published_at UNINDEXED
     );
   `);
+  enableFtsSecureDelete(sqlite, "market_news_fts");
 }
 
 /** Uploaded tables for analyst modes. Mirrors drizzle/0007_datasets.sql for DBs stamped before it existed. */
@@ -998,6 +999,25 @@ function ensureKnowledgeTables(sqlite: Database.Database): void {
       created_at integer NOT NULL
     );
   `);
+  enableFtsSecureDelete(sqlite, "knowledge_chunks");
+}
+
+/**
+ * Enable FTS5 `secure-delete` (SQLite 3.42+) so deleted tokens are scrubbed from the inverted
+ * index segments rather than left behind until a full segment merge.
+ */
+function enableFtsSecureDelete(sqlite: Database.Database, table: string): void {
+  try {
+    const existing = sqlite
+      .prepare(`SELECT v FROM ${table}_config WHERE k = 'secure-delete'`)
+      .get() as { v: number } | undefined;
+    if (existing?.v === 1) {
+      return;
+    }
+    sqlite.exec(`INSERT INTO ${table}(${table}, rank) VALUES('secure-delete', 1);`);
+  } catch {
+    // Older SQLite builds (<3.42) or read-only handles may not accept FTS5 secure-delete.
+  }
 }
 
 export function listKernelTables(sqlite: Database.Database): string[] {

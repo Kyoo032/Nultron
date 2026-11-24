@@ -55,6 +55,7 @@ import {
   OPTIONAL_PORTAL_ENV,
   parseArgs,
   PORTAL_IMAGE_REPO,
+  portalDockerfileBuildsBundle,
   PROXY_IMAGE,
   RELEASE_REPO,
   RELEASE_REPO_URL,
@@ -73,6 +74,21 @@ const IMAGE = `ghcr.io/kyoo032/nultron-ent:${TAG}`;
 const PORTAL_IMAGE = `ghcr.io/kyoo032/nultron-portal:${TAG}`;
 const CADDY_SOURCE =
   "# see packages/host/src/http-adapter.ts\n{\n\tadmin off\n}\n\n\n\n{$NULTRON_DOMAIN} {\n\t# comment\n\treverse_proxy 127.0.0.1:3000\n}\n";
+const BUNDLED_PORTAL_DOCKERFILE = [
+  "FROM base AS build",
+  'RUN pnpm install --frozen-lockfile --filter "@agentforge/portal..." && pnpm --filter @agentforge/portal build',
+  "FROM base AS prod",
+  "COPY --from=build /app/apps/portal/dist /app/apps/portal/dist",
+  'CMD ["node", "dist/main.mjs"]',
+  "",
+].join("\n");
+const PRE_BUNDLE_PORTAL_DOCKERFILE = [
+  "FROM base AS build",
+  'RUN pnpm install --frozen-lockfile --filter "@agentforge/portal..."',
+  "FROM base AS runtime",
+  'CMD ["./node_modules/.bin/tsx", "src/main.ts"]',
+  "",
+].join("\n");
 const README = "# Nultron Enterprise\n";
 const FAKE_NDA_TERMS = "# test terms only\nzebrapartner\n\n  Quokka Gateway  \n";
 /** The git a dry run may run: reads of this repo only. */
@@ -176,6 +192,7 @@ function fakeGit({
   cloneReadme = README,
   missingAtSha = [],
   siteFiles = FAKE_SITE_FILES,
+  portalDockerfile = BUNDLED_PORTAL_DOCKERFILE,
   branch = "main",
 } = {}) {
   const handlers = {
@@ -192,10 +209,11 @@ function fakeGit({
       const hit = known.find((sha) => sha.startsWith(wanted));
       return hit ? { status: 0, stdout: `${hit}\n` } : { status: 1, stdout: "" };
     },
-    // `git show <sha>:<path>`: the Caddyfile, or one of the company sites' files.
+    // `git show <sha>:<path>`: the Caddyfile, portal.Dockerfile, or one of the company sites' files.
     show: (args) => {
       const path = args.at(-1).slice(args.at(-1).indexOf(":") + 1);
       if (path === "webapp-deploy/Caddyfile") return { status: 0, stdout: CADDY_SOURCE };
+      if (path === "webapp-deploy/portal.Dockerfile") return { status: 0, stdout: portalDockerfile };
       return path in siteFiles ? { status: 0, stdout: siteFiles[path] } : { status: 128, stdout: "" };
     },
     "ls-tree": () => ({ status: 0, stdout: `${Object.keys(siteFiles).join(NUL)}${NUL}` }),
@@ -424,6 +442,7 @@ test("main refuses a sha that predates the portal image's files, before any dock
     "webapp-deploy/portal.Dockerfile",
     "webapp-deploy/portal-entry.sh",
     "webapp-deploy/k8s/base/scripts/prepare-db.mjs",
+    "apps/portal/scripts/build-server.mjs",
   ]) {
     const d = deps(root, { missingAtSha: [missing] });
     assert.throws(
@@ -432,6 +451,25 @@ test("main refuses a sha that predates the portal image's files, before any dock
     );
     assert.deepEqual(d.dockerCalls, [], "nothing was built");
   }
+});
+
+test("main refuses a pre-bundle sha whose portal.Dockerfile does not build dist/main.mjs, before any docker or gh call", () => {
+  const root = fakeRepo({ [TAG]: CLEAN_NOTES });
+  const preBundleSha = "d0c7fb5cd03b42526ab8765b22d43f5816b4c34a";
+  const d = deps(root, { known: [preBundleSha], portalDockerfile: PRE_BUNDLE_PORTAL_DOCKERFILE });
+  assert.throws(
+    () => main(["--tag", TAG, "--sha", preBundleSha], d),
+    (error) => error instanceof ReleaseError && /predates portal bundling.*dist\/main\.mjs/.test(error.message),
+  );
+  assert.deepEqual(d.dockerCalls, [], "nothing was built");
+  assert.deepEqual(d.tarCalls, [], "no archive extracted");
+  assert.ok(!d.gitCalls.some((call) => call.sub === "archive" || call.sub === "clone"));
+
+  assert.equal(portalDockerfileBuildsBundle(PRE_BUNDLE_PORTAL_DOCKERFILE), false);
+  assert.equal(
+    portalDockerfileBuildsBundle(readFileSync(join(REPO_ROOT, "webapp-deploy", "portal.Dockerfile"), "utf8")),
+    true,
+  );
 });
 
 test("parseArgs requires --tag and --sha and rejects unknown flags", () => {

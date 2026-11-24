@@ -355,7 +355,7 @@ export async function askNultron(input: AskInput, options: AskOptions = {}): Pro
       const announced = new Set<string>();
       await withAssignedGatewayEndpoint(tenant.gatewayEndpoint ?? currentAssignedGatewayEndpoint(), () =>
         withToolRun({ runId, mode: prepared.agentPolicy ? prepared.agentPolicy.agent.id : "chat" }, () =>
-          withRunContext({ threadId: prepared.thread.id, agentId: prepared.thread.agentId, locale }, () =>
+          withRunContext({ threadId: prepared.thread.id, agentId: prepared.thread.agentId, locale, voice: true }, () =>
             runOutboundGuarded(outbound, () =>
               withWorkerChannel(
                 {

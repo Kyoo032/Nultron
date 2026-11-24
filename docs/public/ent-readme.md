@@ -36,7 +36,7 @@ Alongside the modes, every desk has a Knowledge Base, Workspaces with presets (L
 - **Secrets are encrypted at rest.** Keys and session tokens are stored with AES-256-GCM under a server key that comes from the environment. They never reach the browser.
 - **Personal details are masked before a request leaves the server.** Email addresses, phone numbers, card and account numbers, names, and Indonesian identifiers (NIK and NPWP) are masked before any text is sent to a model.
 - **Documents are read on the server.** There is no cloud OCR.
-- **Prompts are not logged.** Message bodies and tool results are encrypted at rest.
+- **Prompts are not logged.** Message bodies, tool results, thread titles, and Knowledge vector bodies are encrypted at rest with AES-256-GCM; Knowledge full-text search index chunks store pattern-masked searchable text, and SQLite runs with `secure_delete` and FTS5 `secure-delete` so deleted text is cleared on checkpoint.
 
 ## Get access
 

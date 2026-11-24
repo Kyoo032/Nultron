@@ -30,8 +30,25 @@ import { createThread, finishRun, insertMessage, insertRun, insertToolInvocation
 import { withToolRun } from "../tool-run-context";
 import { recordChatRunUsage } from "../usage-record";
 import { delegationRoster, resolveDelegatable } from "../team-bots";
+import { VOICE_TAP_TOOLS, isVoiceReadTool } from "../voice/ask-tools";
 import { currentWorkerChannel, runWithWorkerProgress, withWorkerChannel, WORKER_MAX_MS } from "../workers/worker-channel";
 import { currentDelegation, withDelegation } from "./delegation-context";
+
+const VOICE_TAP_TOOL_SET: ReadonlySet<string> = new Set(VOICE_TAP_TOOLS);
+
+/**
+ * Tools a voice-started delegated run may bind: the delegated set with every tap-only tool
+ * (`VOICE_TAP_TOOLS`) stripped and restricted to voice-allowed reads (`isVoiceReadTool`).
+ * A delegated bot or mode agent reached from voice cannot write files, run code, build decks,
+ * or start long worker harnesses without the person tapping a card.
+ */
+export function voiceDelegateToolKeys(toolKeys: readonly string[]): string[] {
+  return toolKeys.filter((key) => !VOICE_TAP_TOOL_SET.has(key) && isVoiceReadTool(key));
+}
+
+/** Added to a delegated run's system prompt when the delegation started from a voice turn. */
+export const VOICE_DELEGATED_RUN_RULES =
+  "This delegation started from a voice turn and is read-only. You cannot write, edit, or delete files, run code, build decks, or invoke long worker harnesses in this run; answer using only the read tools bound here, and if the task needs a file change, code run, deck, or worker, say so plainly in your answer so the owner can tap to start it.";
 
 export type DelegateRefusal =
   | "nested"
@@ -173,8 +190,10 @@ export async function runDelegation(args: DelegateArgs, tenant: TenantContext): 
 
   const published = await agentService.getPublishedForRun(tenant, target.row.id);
   const basePrompt = target.kind === "mode" ? target.agent.prompt : published.version.systemPrompt;
-  const toolKeys =
+  const isVoice = asking.voice === true;
+  const baseToolKeys =
     target.kind === "mode" ? delegateToolKeys(target.agent) : delegateToolKeys({ tools: FULL_CHAT_TOOLS });
+  const toolKeys = isVoice ? voiceDelegateToolKeys(baseToolKeys) : baseToolKeys;
   const locale = localeForRun();
   const { model, effort, explicit } = delegateModel(tenant);
   const message = delegatedTaskMessage(args.task, args.context);
@@ -198,10 +217,13 @@ export async function runDelegation(args: DelegateArgs, tenant: TenantContext): 
     config: {},
     enabled: true,
   }));
+  const delegatedPrompt = isVoice
+    ? `${delegatedRunPrompt({ prompt: basePrompt })}\n\n${VOICE_DELEGATED_RUN_RULES}`
+    : delegatedRunPrompt({ prompt: basePrompt });
   const version = {
     ...published.version,
     model,
-    systemPrompt: withChatOutputLanguage(delegatedRunPrompt({ prompt: basePrompt }), locale),
+    systemPrompt: withChatOutputLanguage(delegatedPrompt, locale),
   };
 
   const deadline = AbortSignal.timeout(WORKER_MAX_MS);
@@ -232,7 +254,7 @@ export async function runDelegation(args: DelegateArgs, tenant: TenantContext): 
   try {
     await withDelegation(delegation, () =>
       withToolRun({ runId: run.id, mode: toolRunMode }, () =>
-        withRunContext({ threadId: thread.id, agentId: target.row.id, locale }, () =>
+        withRunContext({ threadId: thread.id, agentId: target.row.id, locale, ...(isVoice ? { voice: true } : {}) }, () =>
           runWithWorkerProgress(DELEGATE_TOOL_KEY, async (emit) => {
             emit({ type: "job.phase", phase: "delegating", label });
             // A worker the asked agent runs (a dossier) reports to the asker's own row, not to a row of its own.

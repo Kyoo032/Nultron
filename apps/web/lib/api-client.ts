@@ -8,6 +8,7 @@ import {
   type IpcHostResponse,
 } from "./desktop-bridge";
 import { throwIfSaveFailed } from "./desktop-save";
+import { isCatalogMutationPath, notifyCatalogChanged } from "./catalog-version";
 import { publishGate } from "./gate-state";
 import { noteGatewayResponse } from "./gateway-blocked";
 import { parseGatewayGate, type GatewayGatePayload } from "./gateway-gate";
@@ -394,6 +395,9 @@ function sendWrite(input: string, init: RequestInit, method: string): Promise<Re
   return transportFetch(input, init, method).then(
     (response) => {
       dropSharedReads();
+      if (response.ok && isCatalogMutationPath(input)) {
+        notifyCatalogChanged();
+      }
       return isEventStream(response) ? clearReadsWhenStreamEnds(response) : response;
     },
     (error: unknown) => {

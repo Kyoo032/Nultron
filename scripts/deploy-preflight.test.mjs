@@ -431,7 +431,7 @@ case "$*" in
 *inspect*Health*)
 	n="$(cat "$FAKE_STATE" 2>/dev/null || echo 0)"
 	case "$*" in
-	*portal-cid*) echo "\${FAKE_PORTAL_HEALTH:-healthy running 0}" ;;
+	*portal-cid*) if [ "$n" -ge 2 ] && [ -n "\${FAKE_PORTAL_HEALTH_UP2:-}" ]; then echo "$FAKE_PORTAL_HEALTH_UP2"; else echo "\${FAKE_PORTAL_HEALTH:-healthy running 0}"; fi ;;
 	*) if [ "$n" -ge 2 ]; then echo "\${FAKE_HEALTH_UP2:-healthy running 0}"; else echo "\${FAKE_HEALTH_UP1:-healthy running 0}"; fi ;;
 	esac
 	exit 0
@@ -581,7 +581,7 @@ test("deploy.sh: an app that goes unhealthy after the swap is rolled back to the
   assert.equal(result.status, 1);
   assert.match(result.err, /error: the app did not go healthy/);
   assert.match(result.err, /==> rolling back to the images from before this deploy/);
-  assert.match(result.err, /==> rolled back: the previous app is healthy again\. This deploy did NOT land\./);
+  assert.match(result.err, /==> rolled back: the previous app and portal are healthy again\. This deploy did NOT land\./);
   assert.ok(result.calls.includes("docker image tag nultron-web:previous nultron-web:local"));
   assert.ok(result.calls.includes("docker image tag nultron-portal:previous nultron-portal:local"));
   assert.ok(
@@ -648,11 +648,59 @@ test("deploy.sh: a portal that never comes up is rolled back as well", () => {
   const result = runGate(fixture, {
     FAKE_PREV: "1",
     FAKE_PORTAL_HEALTH: "unhealthy running 0",
+    FAKE_PORTAL_HEALTH_UP2: "healthy running 0",
     FAKE_HEALTH_UP2: "healthy running 0",
   });
   assert.equal(result.status, 1);
   assert.match(result.err, /error: the portal did not go healthy/);
+  assert.match(result.err, /==> rolled back: the previous app and portal are healthy again\. This deploy did NOT land\./);
   assert.equal(ups(result.calls), 2);
+});
+
+test("deploy.sh: rollback also verifies portal health and reports failure when the rolled-back portal stays unhealthy", () => {
+  const fixture = gateFixture();
+  const result = runGate(fixture, {
+    FAKE_PREV: "1",
+    FAKE_HEALTH_UP1: "unhealthy running 0",
+    FAKE_HEALTH_UP2: "healthy running 0",
+    FAKE_PORTAL_HEALTH_UP2: "unhealthy running 0",
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.err, /error: the rolled-back portal did not go healthy/);
+  assert.match(result.err, /error: the rolled-back portal is not healthy either/);
+  assert.doesNotMatch(result.err, /previous app and portal are healthy again/);
+  assert.equal(ups(result.calls), 2);
+});
+
+test("compose.yml portal command boots both bundled and pre-bundle portal images on rollback", () => {
+  const compose = readFileSync(join(ROOT, "webapp-deploy", "compose.yml"), "utf8").replace(/\r\n/g, "\n");
+  const portalSection = compose.slice(compose.indexOf("\n  portal:\n"));
+  const cmdMatch = / {4}command:\n {6}- sh\n {6}- -c\n {6}- ([^\n]+)\n/.exec(portalSection);
+  assert.ok(cmdMatch, "portal.command must use sh -c fallback for pre-bundle rollback images");
+  const shellCmd = cmdMatch[1];
+
+  // 1. Bundled portal image (dist/main.mjs exists, no src/main.ts or tsx).
+  const bundledDir = makeTempDir("portal-bundled-");
+  mkdirSync(join(bundledDir, "dist"), { recursive: true });
+  writeFileSync(join(bundledDir, "dist", "main.mjs"), 'console.log("BOOT:bundled");\n', "utf8");
+  const bundledRun = spawnSync("sh", ["-c", shellCmd], { cwd: bundledDir, encoding: "utf8" });
+  assert.equal(bundledRun.status, 0, bundledRun.stderr);
+  assert.equal(bundledRun.stdout.trim(), "BOOT:bundled");
+
+  // 2. Pre-bundle portal image (no dist/main.mjs; ./node_modules/.bin/tsx + src/main.ts exist).
+  const preBundleDir = makeTempDir("portal-prebundle-");
+  mkdirSync(join(preBundleDir, "node_modules", ".bin"), { recursive: true });
+  mkdirSync(join(preBundleDir, "src"), { recursive: true });
+  writeFileSync(join(preBundleDir, "src", "main.ts"), "export {};\n", "utf8");
+  writeFileSync(
+    join(preBundleDir, "node_modules", ".bin", "tsx"),
+    '#!/bin/sh\necho "BOOT:prebundle:$1"\n',
+    "utf8",
+  );
+  chmodSync(join(preBundleDir, "node_modules", ".bin", "tsx"), 0o755);
+  const preBundleRun = spawnSync("sh", ["-c", shellCmd], { cwd: preBundleDir, encoding: "utf8" });
+  assert.equal(preBundleRun.status, 0, preBundleRun.stderr);
+  assert.equal(preBundleRun.stdout.trim(), "BOOT:prebundle:src/main.ts");
 });
 
 test("deploy.sh is plain LF, so sh reads it (the .mjs files follow biome.json's CRLF)", () => {

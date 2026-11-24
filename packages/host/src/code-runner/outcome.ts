@@ -44,11 +44,11 @@ export const NOTES = {
 export function classifyGuestError(language: CodeLanguage, result: ChildResult): CodeRunFailure {
   const text = result.error ?? "";
   if (language === "javascript") {
-    if (result.why === "deadline") {
-      return "timeout";
-    }
     if (result.why === "wasm-memory" || MEMORY_TEXT.test(text)) {
       return "memory";
+    }
+    if (result.why === "deadline") {
+      return "timeout";
     }
     return result.errorName === "SyntaxError" ? "syntax" : "runtime";
   }
