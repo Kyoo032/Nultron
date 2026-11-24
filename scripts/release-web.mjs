@@ -500,9 +500,28 @@ export const REQUIRED_SOURCE_FILES = [
   "webapp-deploy/portal.Dockerfile.dockerignore",
   "webapp-deploy/portal-entry.sh",
   "webapp-deploy/k8s/base/scripts/prepare-db.mjs",
+  "apps/portal/scripts/build-server.mjs",
   // The proxy's entrypoint and the company sites it switches on (compose.yml mounts ./sites into it).
   ...REQUIRED_SITE_FILES,
 ];
+
+/**
+ * Whether `webapp-deploy/portal.Dockerfile` at the released sha builds and ships the bundled portal
+ * (`dist/main.mjs`). The rendered compose.yml and DEPLOY.md expect `dist/main.mjs` and `dist/scripts/*.mjs`,
+ * so releasing a pre-bundle sha would publish a portal image whose operator commands and entrypoint fail.
+ */
+export function portalDockerfileBuildsBundle(text) {
+  const code = text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("#"))
+    .join("\n");
+  return (
+    /pnpm\s+--filter\s+@agentforge\/portal\s+build\b/.test(code) &&
+    /\/app\/apps\/portal\/dist\b/.test(code) &&
+    /dist\/main\.mjs/.test(code)
+  );
+}
 
 function checkSourceFiles(fullSha, deps) {
   const missing = REQUIRED_SOURCE_FILES.filter(
@@ -513,7 +532,13 @@ function checkSourceFiles(fullSha, deps) {
       `commit ${fullSha} does not contain ${missing.join(", ")}: the images cannot be built from it (commit them first)`,
     );
   }
-  deps.log("ok - the sha carries both Dockerfiles, the portal's scripts and the proxy's site files");
+  const portalDockerfile = deps.git(["show", `${fullSha}:webapp-deploy/portal.Dockerfile`], deps.repoRoot);
+  if (portalDockerfile.status !== 0 || !portalDockerfileBuildsBundle(portalDockerfile.stdout ?? "")) {
+    fail(
+      `commit ${fullSha} predates portal bundling (webapp-deploy/portal.Dockerfile does not build dist/main.mjs): the released bundle cannot boot it`,
+    );
+  }
+  deps.log("ok - the sha carries both Dockerfiles (with bundled portal), the portal's scripts and the proxy's site files");
 }
 
 function buildAndPushImages(fullSha, image, portalImage, workDir, deps) {

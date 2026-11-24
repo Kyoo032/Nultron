@@ -2,6 +2,8 @@
 
 Product: both Â· Instance: main :3000
 
+Last verified: 2026-11-24 on `fix/dfind-deploy-ci-formal`, for the QuickJS memory-limit guard and classification only (`packages/host/src/code-runner/child/qjs-child.mjs` `wasmMem.grow` cap + memory-before-deadline interrupt order, and `packages/host/src/code-runner/outcome.ts` classifying `wasm-memory` / OOM before `deadline`; tested against the real QuickJS child in `qjs-child.test.ts`). Nothing else on the page was re-read.
+
 Last verified: 2026-11-06 on `fix/redactor-gaps` (before merge) for the "Redaction of tool input and output" paragraph of § 13 only (the shapes and key names it lists, and the `redact-deep.ts` line numbers). Read against the code and the redactor tests; not driven.
 
 Last verified: 2026-11-06 at 39cd5f0c plus `fix/sec-005-guard-bypass-not-persisted` (SR-202), for the two sentences that name the `injectionGuardBypass` switch only (§ 3 step 4 and the injection-scan bullet of Gotchas); nothing else on the page was re-read. Before that: 2026-11-03 on `fix/zod-4` (AI SDK 5, before merge) for three paragraphs of § 13 only: invalid calls, a tool the run does not offer, and the step limit.

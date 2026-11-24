@@ -236,18 +236,22 @@ function parseArgs(argv) {
   return args;
 }
 
+class ToolingError extends Error {}
+
 function jarPath() {
   const jar = process.env.TLA2TOOLS_JAR || join(homedir(), ".cache", "nultron-formal", `tla2tools-${TLC.version}.jar`);
   if (!existsSync(jar)) {
-    console.error(`TLC ${TLC.version} is not at ${jar}.`);
-    console.error(`Fetch it once:  curl -L -o "${jar}" ${TLC.url}`);
-    console.error(`Expected sha256: ${TLC.sha256}`);
-    process.exit(3);
+    throw new ToolingError(
+      [
+        `TLC ${TLC.version} is not at ${jar}.`,
+        `Fetch it once:  curl -L -o "${jar}" ${TLC.url}`,
+        `Expected sha256: ${TLC.sha256}`,
+      ].join("\n"),
+    );
   }
   const sum = createHash("sha256").update(readFileSync(jar)).digest("hex");
   if (sum !== TLC.sha256) {
-    console.error(`${jar} has sha256 ${sum}, expected ${TLC.sha256}. Refusing to run an unpinned TLC.`);
-    process.exit(3);
+    throw new ToolingError(`${jar} has sha256 ${sum}, expected ${TLC.sha256}. Refusing to run an unpinned TLC.`);
   }
   return jar;
 }
@@ -271,12 +275,14 @@ export function formatJavaSpawnError(error) {
   return `Java 11+ is required to run TLC (spawn java failed: ${code || "unknown"}). Run inside \`nix develop\` / WSL NixOS or install Java 11+.`;
 }
 
-function check(jar, values, invariants, properties) {
-  const work = mkdtempSync(join(tmpdir(), "chat-run-settle-"));
+export function check(jar, values, invariants, properties, options = {}) {
+  const spawn = options.spawn ?? spawnSync;
+  const tmpRoot = options.tmpRoot ?? tmpdir();
+  const work = mkdtempSync(join(tmpRoot, "chat-run-settle-"));
   try {
     copyFileSync(SPEC, join(work, "ChatRunSettle.tla"));
     writeConfig(work, values, invariants, properties);
-    const result = spawnSync(
+    const result = spawn(
       "java",
       [
         "-XX:+UseParallelGC",
@@ -292,11 +298,15 @@ function check(jar, values, invariants, properties) {
         "ChatRunSettle.cfg",
         "ChatRunSettle.tla",
       ],
-      { cwd: work, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+      {
+        cwd: work,
+        encoding: "utf8",
+        maxBuffer: 64 * 1024 * 1024,
+        ...(options.env ? { env: options.env } : {}),
+      },
     );
     if (result.error) {
-      console.error(formatJavaSpawnError(result.error));
-      process.exit(3);
+      throw new ToolingError(formatJavaSpawnError(result.error));
     }
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     const violations = [...output.matchAll(/Invariant (\S+) is violated/g)].map((m) => m[1].replace(/\.$/, ""));
@@ -311,19 +321,23 @@ function check(jar, values, invariants, properties) {
   }
 }
 
-function main() {
-  const args = parseArgs(process.argv.slice(2));
+export function runMain(argv = process.argv.slice(2), deps = {}) {
+  const log = deps.log ?? console.log;
+  const errorLog = deps.error ?? console.error;
+  const resolveJar = deps.jarPath ?? jarPath;
+  const runCheck = deps.check ?? check;
+  const args = parseArgs(argv);
   let code;
   let notes;
   try {
     ({ switches: code, notes } = readCode());
   } catch (error) {
     if (error instanceof Drift) {
-      console.error(`DRIFT: ${error.message}`);
-      console.error(
+      errorLog(`DRIFT: ${error.message}`);
+      errorLog(
         "The covered code changed shape. Re-derive the model from the code (.cursor/skills/chat-run-settle/SKILL.md).",
       );
-      process.exit(2);
+      return 2;
     }
     throw error;
   }
@@ -334,38 +348,50 @@ function main() {
   for (const name of args.breaks) {
     values[name] = false;
   }
-  console.log("Read from the code:");
+  log("Read from the code:");
   for (const name of SWITCHES) {
     const forced = values[name] !== code[name] ? `  (forced from ${code[name]})` : "";
-    console.log(`  ${name.padEnd(24)} ${values[name]}${forced}`);
+    log(`  ${name.padEnd(24)} ${values[name]}${forced}`);
   }
   for (const note of notes) {
-    console.log(note);
+    log(note);
   }
-  const jar = jarPath();
-  if (args.hazard) {
-    const broken = [];
-    for (const name of [...INVARIANTS, ...PROPERTIES]) {
-      const isProperty = PROPERTIES.includes(name);
-      const run = check(jar, values, isProperty ? [] : [name], isProperty ? [name] : []);
-      console.log(`  ${name.padEnd(24)} ${run.passed ? "holds" : "VIOLATED"}`);
-      if (!run.passed) {
-        broken.push(name);
+  try {
+    const jar = resolveJar();
+    if (args.hazard) {
+      const broken = [];
+      for (const name of [...INVARIANTS, ...PROPERTIES]) {
+        const isProperty = PROPERTIES.includes(name);
+        const run = runCheck(jar, values, isProperty ? [] : [name], isProperty ? [name] : []);
+        log(`  ${name.padEnd(24)} ${run.passed ? "holds" : "VIOLATED"}`);
+        if (!run.passed) {
+          broken.push(name);
+        }
       }
+      log(broken.length === 0 ? "PASS: nothing breaks" : `FAIL: ${broken.join(", ")}`);
+      return broken.length === 0 ? 0 : 1;
     }
-    console.log(broken.length === 0 ? "PASS: nothing breaks" : `FAIL: ${broken.join(", ")}`);
-    process.exit(broken.length === 0 ? 0 : 1);
+    const run = runCheck(jar, values, INVARIANTS, PROPERTIES);
+    if (run.passed) {
+      log(`PASS: every invariant, Termination and StreamEnds hold (${run.states} distinct states).`);
+      return 0;
+    }
+    log(run.output);
+    log(
+      `FAIL: ${run.violations.length > 0 ? [...new Set(run.violations)].join(", ") : "TLC did not finish, see the output above"}`,
+    );
+    return 1;
+  } catch (error) {
+    if (error instanceof ToolingError) {
+      errorLog(error.message);
+      return 3;
+    }
+    throw error;
   }
-  const run = check(jar, values, INVARIANTS, PROPERTIES);
-  if (run.passed) {
-    console.log(`PASS: every invariant, Termination and StreamEnds hold (${run.states} distinct states).`);
-    process.exit(0);
-  }
-  console.log(run.output);
-  console.log(
-    `FAIL: ${run.violations.length > 0 ? [...new Set(run.violations)].join(", ") : "TLC did not finish, see the output above"}`,
-  );
-  process.exit(1);
+}
+
+function main() {
+  process.exit(runMain());
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {

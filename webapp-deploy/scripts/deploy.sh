@@ -220,10 +220,21 @@ rollback() {
 		exit 1
 	fi
 	RB_CID="$(app_container)"
+	RB_APP_OK=0
 	if [ -n "$RB_CID" ] && wait_healthy "$RB_CID" 60 "the rolled-back app" app; then
-		echo "==> rolled back: the previous app is healthy again. This deploy did NOT land." >&2
+		RB_APP_OK=1
 	else
 		echo "error: the rolled-back app is not healthy either. The site may be down. Run: dc logs app" >&2
+	fi
+	RB_PCID="$(dc ps -q portal)"
+	RB_PORTAL_OK=0
+	if [ -n "$RB_PCID" ] && wait_healthy "$RB_PCID" 36 "the rolled-back portal" portal portal-prepare; then
+		RB_PORTAL_OK=1
+	else
+		echo "error: the rolled-back portal is not healthy either. Sign-in may be down. Run: dc logs portal" >&2
+	fi
+	if [ "$RB_APP_OK" -eq 1 ] && [ "$RB_PORTAL_OK" -eq 1 ]; then
+		echo "==> rolled back: the previous app and portal are healthy again. This deploy did NOT land." >&2
 	fi
 	exit 1
 }

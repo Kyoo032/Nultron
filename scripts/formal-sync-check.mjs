@@ -94,7 +94,13 @@ export function checkFormalSync({ root = defaultRoot, base = "HEAD" } = {}) {
   const results = [];
   for (const skill of skills) {
     if (skill.coveredPaths.length === 0) {
-      results.push({ ...skill, status: "error", reason: "Sync commit present but no covered paths parsed", commits: [] });
+      results.push({
+        ...skill,
+        status: "error",
+        reason: "Sync commit present but no covered paths parsed",
+        commits: [],
+        changedPaths: [],
+      });
       continue;
     }
     try {
@@ -105,15 +111,35 @@ export function checkFormalSync({ root = defaultRoot, base = "HEAD" } = {}) {
         status: "skipped",
         reason: `sync commit ${skill.syncCommit} not in local git history`,
         commits: [],
+        changedPaths: [],
       });
       continue;
     }
     const log = git(root, ["log", "--oneline", `${skill.syncCommit}..${base}`, "--", ...skill.coveredPaths]);
     const commits = log ? log.split(/\r?\n/).filter(Boolean) : [];
+    const changedPaths =
+      commits.length === 0
+        ? []
+        : [
+            ...new Set(
+              git(root, [
+                "log",
+                "--name-only",
+                "--pretty=format:",
+                `${skill.syncCommit}..${base}`,
+                "--",
+                ...skill.coveredPaths,
+              ])
+                .split(/\r?\n/)
+                .map((line) => line.trim())
+                .filter(Boolean),
+            ),
+          ].sort();
     results.push({
       ...skill,
       status: commits.length === 0 ? "in_sync" : "drifted",
       commits,
+      changedPaths,
     });
   }
   return results;
@@ -154,6 +180,9 @@ function main() {
         console.log(
           `${args.advisory ? "warn" : "FAIL"}  ${item.name}: ${item.commits.length} commit(s) touched covered code since ${item.syncCommit}`,
         );
+        if (item.changedPaths.length > 0) {
+          console.log(`      paths: ${item.changedPaths.join(", ")}`);
+        }
         for (const commit of item.commits.slice(0, 10)) {
           console.log(`      ${commit}`);
         }
