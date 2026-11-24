@@ -45,14 +45,14 @@
     "noSpecialists": "No specialists hired.",
     "bots": "Your bots",
     "open": "Open chat",
-    "letGo": "Let go",
-    "lettingGo": "Letting go…",
-    "letGoAria": "Let go {name}"
+    "letGo": "Delete",
+    "lettingGo": "Deleting…",
+    "letGoAria": "Delete {name}"
   },
   "error": {
     "load": "Could not load your team.",
     "propose": "Could not build a team proposal.",
     "hire": "Could not hire the team.",
-    "release": "Could not let them go."
+    "release": "Could not delete the agent."
   }
 }

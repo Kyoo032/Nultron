@@ -15,7 +15,7 @@
   "connect": {
     "label": "Nomor WhatsApp",
     "intro": "Hubungkan nomor WhatsApp Business yang dipakai pelanggan untuk menghubungi Anda. Token akses disimpan terenkripsi di meja kerja ini dan tidak akan ditampilkan lagi.",
-    "phoneNumberId": "Phone number ID",
+    "phoneNumberId": "ID nomor telepon",
     "phoneNumberIdPlaceholder": "Ada di pengaturan WhatsApp di Meta, isinya angka saja",
     "accessToken": "Token akses",
     "accessTokenPlaceholder": "Token permanen dari Meta",
