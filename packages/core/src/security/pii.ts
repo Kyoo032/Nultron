@@ -1,5 +1,7 @@
 import type { ContentPart } from "../content/types";
-import { scanIndonesianIds } from "./pii-id";
+import { digitsOnly, passesLuhn, scanIndonesianIds } from "./pii-id";
+
+export { passesLuhn };
 
 export type PiiKind = "email" | "phone" | "id" | "card" | "nik" | "npwp" | "account" | "name";
 
@@ -31,29 +33,140 @@ const CARD_CANDIDATE_RE = /\b(?:\d[ -]*?){13,19}\b/g;
 /** Long ID-like numbers: SSN / national-id style with separators. Bare digit runs are quantities. */
 const ID_RE = /\b(?:\d{3}[-\s]\d{2}[-\s]\d{4}|\d{2}[-\s]\d{2}[-\s]\d{2}[-\s]\d{2,4})\b/g;
 
-function digitsOnly(value: string): string {
-  return value.replace(/\D/g, "");
-}
+/**
+ * Common non-person capitalized words (days, months, Indonesian/English places, banks, orgs,
+ * finance/document headers, product names, common function words). Any token here stops
+ * context-cued person-name collection so prose, headers, and finance tables stay intact.
+ */
+const NAME_STOPLIST: ReadonlySet<string> = new Set([
+  // Days & months (EN + ID)
+  "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+  "senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "minggu", "ahad",
+  "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
+  "januari", "februari", "maret", "mei", "juni", "juli", "agustus", "oktober", "desember",
+  "jan", "feb", "mar", "apr", "jun", "jul", "aug", "agu", "agt", "sep", "sept", "oct", "okt", "nov", "nop", "dec", "des",
+  // Honorifics & titles
+  "bapak", "bpk", "ibu", "pak", "bu", "sdr", "sdri", "tn", "ny", "nn", "yth",
+  "mr", "mrs", "ms", "miss", "dr", "prof", "ir", "haji", "hajjah",
+  // Places, cities, regions, countries
+  "indonesia", "jakarta", "bandung", "surabaya", "medan", "semarang", "yogyakarta", "jogja",
+  "makassar", "palembang", "tangerang", "depok", "bekasi", "bogor", "malang", "bali", "denpasar",
+  "batam", "pekanbaru", "padang", "balikpapan", "samarinda", "banjarmasin", "pontianak", "manado",
+  "jawa", "sumatra", "sumatera", "kalimantan", "sulawesi", "papua", "nusantara",
+  "singapore", "singapura", "malaysia", "kuala", "lumpur", "thailand", "bangkok", "vietnam",
+  "philippines", "japan", "tokyo", "china", "beijing", "shanghai", "korea", "seoul", "india",
+  "australia", "sydney", "melbourne", "united", "states", "america", "new", "york", "san",
+  "francisco", "london", "europe", "asia", "barat", "timur", "utara", "selatan", "tengah", "pusat",
+  // Banks, legal entities, orgs, brands, products
+  "bank", "bca", "bri", "bni", "mandiri", "bsi", "cimb", "niaga", "danamon", "ocbc", "nisp",
+  "btn", "panin", "maybank", "uob", "hsbc", "citibank", "jago", "seabank", "jenius", "blu",
+  "gopay", "ovo", "dana", "shopeepay", "linkaja", "qris", "ojk", "kemenkeu", "djp", "bpjs",
+  "pt", "cv", "tbk", "ud", "yayasan", "koperasi", "perusahaan", "persero", "inc", "ltd", "llc",
+  "corp", "gmbh", "group", "holdings", "ventures", "capital", "partners",
+  "nultron", "agentforge", "toko", "token", "enterprise", "personal", "desktop", "web", "api", "sdk",
+  "openai", "anthropic", "google", "deepmind", "gemini", "claude", "gpt", "deepseek", "qwen",
+  "minimax", "kimi", "seedance", "suno", "tavily", "brave", "metranet", "aihub", "weknora",
+  // Finance, document, business, tech & common nouns/adjectives
+  "revenue", "total", "subtotal", "summary", "ringkasan", "laporan", "report", "draft", "memo",
+  "brief", "notes", "note", "catatan", "dossier", "finance", "keuangan", "akuntansi", "accounting",
+  "budget", "anggaran", "cashflow", "arus", "kas", "saldo", "balance", "amount", "jumlah", "nilai",
+  "value", "profit", "laba", "loss", "rugi", "gross", "kotor", "net", "bersih", "ebit", "ebitda",
+  "tax", "pajak", "ppn", "pph", "npwp", "nik", "ktp", "rekening", "norek", "account", "accounts",
+  "payable", "receivable", "piutang", "hutang", "utang", "aset", "asset", "assets", "equity",
+  "ekuitas", "modal", "cost", "costs", "biaya", "beban", "expense", "expenses", "income",
+  "pendapatan", "sales", "penjualan", "margin", "ratio", "rasio", "growth", "pertumbuhan",
+  "forecast", "proyeksi", "projection", "quarter", "kuartal", "tahun", "year", "bulan", "month",
+  "week", "hari", "day", "tanggal", "date", "periode", "period", "table", "tabel", "sheet",
+  "lembar", "chart", "grafik", "data", "file", "berkas", "dokumen", "document", "documents",
+  "contract", "kontrak", "agreement", "perjanjian", "invoice", "faktur", "receipt", "kwitansi",
+  "kuitansi", "payment", "pembayaran", "transfer", "payroll", "gaji", "salary", "tunjangan",
+  "bonus", "reimbursement", "project", "proyek", "team", "tim", "divisi", "division",
+  "departemen", "department", "unit", "cabang", "branch", "kantor", "office", "headquarters",
+  "perihal", "subject", "lampiran", "attachment", "attachments", "status", "active", "aktif",
+  "pending", "approved", "rejected", "client", "klien", "customer", "pelanggan", "vendor",
+  "supplier", "pemasok", "partner", "mitra", "employee", "karyawan", "pegawai", "staff", "staf",
+  "manager", "director", "direktur", "ceo", "cfo", "cto", "coo", "owner", "pemilik", "admin",
+  "user", "pengguna", "support", "dukungan", "service", "layanan", "product", "produk", "barang",
+  "jasa", "harga", "price", "diskon", "discount", "promo", "order", "pesanan", "shipping",
+  "pengiriman", "address", "alamat", "email", "phone", "telepon", "nomor", "number", "kode",
+  "code", "id", "section", "bagian", "chapter", "bab", "page", "halaman", "slide", "slides",
+  "deck", "presentation", "presentasi", "research", "riset", "market", "pasar", "legal", "hukum",
+  "meeting", "rapat", "minutes", "notulen", "knowledge", "pengetahuan", "chat", "obrolan",
+  "images", "gambar", "videos", "video", "music", "musik", "edit", "studio", "workspace",
+  "workspaces", "settings", "pengaturan", "portal", "server", "app", "system", "platform",
+  "engine", "model", "agent", "worker", "bot", "tool", "mode", "plan", "tier", "pack", "desk",
+  "card", "list", "grid", "view", "form", "menu", "bar", "tab", "panel", "modal", "dialog",
+  "alert", "badge", "tag", "pill", "link", "icon", "logo", "image", "photo", "picture", "audio",
+  "clip", "track", "song", "lyrics", "voice", "speech", "text", "copy", "title", "heading",
+  "subhead", "bullet", "bullets", "aside", "footer", "header", "sidebar", "rail", "home",
+  "inbox", "archive", "trash", "profile", "login", "logout", "signup", "signin", "invite",
+  "reset", "verify", "confirm", "cancel", "delete", "remove", "create", "update", "save", "load",
+  "send", "submit", "run", "start", "stop", "pause", "resume", "retry", "export", "import",
+  "upload", "download", "search", "filter", "sort", "merge", "split", "share", "paste", "print",
+  "help", "about", "terms", "privacy", "policy", "security", "audit", "log", "logs", "trace",
+  "metric", "metrics", "kpi", "kpis", "roi", "irr", "npv", "wacc", "cagr", "yoy", "mom", "qoq",
+  "ytd", "mtd", "gdp", "cpi", "fx", "usd", "idr", "eur", "sgd", "myr", "jpy", "gbp", "aud",
+  "cny", "rmb", "info", "warning", "error", "all", "some", "any", "each", "every", "no", "not",
+  "and", "or", "but", "for", "from", "with", "without", "into", "onto", "upon", "above", "below",
+  "under", "over", "between", "among", "through", "during", "before", "after", "since", "until",
+  "while", "where", "when", "who", "whom", "whose", "which", "what", "how", "why", "please",
+  "thank", "thanks", "hello", "hi", "dear", "regards", "best", "sincerely", "the", "this",
+  "that", "these", "those", "my", "your", "our", "their", "his", "her", "its", "dan", "atau",
+  "yang", "di", "ke", "dari", "untuk", "pada", "dengan", "tanpa", "oleh", "sebagai", "adalah",
+  "akan", "sudah", "belum", "tidak", "bukan", "ini", "itu", "tersebut", "kami", "kita", "anda",
+  "saya", "mereka", "beliau", "terima", "kasih", "hormat", "salam", "mohon", "tolong", "silakan",
+  "perhatian", "new", "old", "high", "low", "first", "second", "third", "last", "next",
+  "previous", "open", "close", "main", "core", "full", "half", "one", "two", "three", "four",
+  "five", "zero", "top", "bottom", "left", "right", "public", "private", "local", "global",
+  "internal", "external", "default", "standard", "custom", "auto", "manual", "daily", "weekly",
+  "monthly", "quarterly", "annual", "yearly", "fiscal", "final", "initial", "primary",
+  "secondary", "general", "special", "executive", "senior", "junior", "chief", "head", "lead",
+  "vice", "assistant", "associate", "board", "committee", "council", "ministry", "agency",
+  "bureau", "authority", "commission", "central", "national", "international", "federal",
+  "state", "city", "town", "village", "street", "road", "avenue", "building", "floor", "room",
+  "suite", "tower", "plaza", "mall", "park", "center", "centre", "station", "airport", "port",
+  "hospital", "school", "university", "college", "institute", "academy", "hotel", "resort",
+  "club", "restaurant", "cafe", "shop", "store", "factory", "plant", "warehouse", "depot", "lab",
+]);
 
-/** Luhn checksum — rejects random digit runs that look card-like. */
-export function passesLuhn(digits: string): boolean {
-  if (!/^\d{13,19}$/.test(digits)) {
-    return false;
-  }
-  let sum = 0;
-  let alternate = false;
-  for (let i = digits.length - 1; i >= 0; i -= 1) {
-    let n = Number(digits[i]);
-    if (alternate) {
-      n *= 2;
-      if (n > 9) {
-        n -= 9;
-      }
+const HONORIFIC_PART = "(?:bpk|bapak|ibu|pak|bu|sdr|sdri|tn|ny|nn|mr|mrs|ms|miss|dr|prof|ir)\\.?";
+const LABEL_CUE_PART =
+  "(?:nama(?:\\s+(?:lengkap|karyawan|pegawai|penerima|pemilik|nasabah|pic|kontak))?|name|full\\s+name|contact\\s+person|a\\.?\\s*n\\.?|atas\\s+nama|penerima|payee|signed\\s+by|ditandatangani\\s+oleh)";
+const PREP_CUE_PART =
+  "(?:kepada(?:\\s+yth\\.?)?|untuk|dari|ke|hubungi|contact|dear|oleh|by|attention|attn\\.?)";
+
+const NAME_CUE_ONLY_RE = new RegExp(
+  `(?:\\b${LABEL_CUE_PART}\\s*[:=-]?[ \\t]*(?:${HONORIFIC_PART}[ \\t]+)?|\\b${PREP_CUE_PART}[,:\\t ]+(?:${HONORIFIC_PART}[ \\t]+)?|\\b${HONORIFIC_PART}[ \\t]+)`,
+  "gi",
+);
+
+/** Case-sensitive: each token must genuinely open with an uppercase letter followed by lowercase. */
+const TITLE_NAME_SPAN_RE =
+  /^([A-Z][a-z'’-]{1,24}(?:[ \t]+(?:[A-Z]\.?|[A-Z][a-z'’-]{1,24})){0,2}[ \t]+[A-Z][a-z'’-]{1,24})(?![A-Za-z])/;
+
+function extractSafePersonName(rawSpan: string): string | null {
+  const tokens = rawSpan.split(/[ \t]+/);
+  const kept: string[] = [];
+  for (const token of tokens) {
+    const normalized = token.replace(/\.$/, "").toLowerCase();
+    if (NAME_STOPLIST.has(normalized)) {
+      break;
     }
-    sum += n;
-    alternate = !alternate;
+    kept.push(token);
   }
-  return sum % 10 === 0;
+  // Require at least two tokens and at least two multi-letter words (no trailing initial-only span).
+  while (kept.length > 0) {
+    const last = kept[kept.length - 1];
+    if (!last || last.replace(/\./g, "").length >= 2) {
+      break;
+    }
+    kept.pop();
+  }
+  const fullWords = kept.filter((token) => token.replace(/\./g, "").length >= 2);
+  if (kept.length < 2 || fullWords.length < 2) {
+    return null;
+  }
+  return kept.join(" ");
 }
 
 function pushUnique(findings: PiiFinding[], finding: PiiFinding): void {
@@ -234,6 +347,26 @@ export function scanPii(text: string): PiiFinding[] {
     pushUnique(findings, { kind: "id", match: raw, index: match.index });
   }
 
+  for (const cueMatch of text.matchAll(NAME_CUE_ONLY_RE)) {
+    if (cueMatch.index === undefined) {
+      continue;
+    }
+    const start = cueMatch.index + cueMatch[0].length;
+    const spanMatch = TITLE_NAME_SPAN_RE.exec(text.slice(start));
+    const rawCandidate = spanMatch?.[1];
+    if (!rawCandidate) {
+      continue;
+    }
+    const candidate = extractSafePersonName(rawCandidate);
+    if (!candidate) {
+      continue;
+    }
+    if (overlapsFinding(findings, start, candidate.length)) {
+      continue;
+    }
+    pushUnique(findings, { kind: "name", match: candidate, index: start });
+  }
+
   findings.sort((a, b) => a.index - b.index || a.kind.localeCompare(b.kind));
   return findings;
 }
@@ -272,6 +405,51 @@ export function maskPii(text: string): string {
     consumed.push({ index: finding.index, end });
   }
   return result;
+}
+
+const SKIP_JSON_MASK_KEYS: ReadonlySet<string> = new Set([
+  "url",
+  "href",
+  "path",
+  "id",
+  "mediaId",
+  "artifactId",
+  "toolKey",
+  "sourceId",
+]);
+
+const STANDALONE_LINK_RE = /^(?:https?:\/\/|\/api\/|data:)\S+$/i;
+
+function maskPiiJsonWalk(value: unknown, key: string | undefined, seen: WeakSet<object>): unknown {
+  if (typeof value === "string") {
+    if ((key && SKIP_JSON_MASK_KEYS.has(key)) || STANDALONE_LINK_RE.test(value.trim())) {
+      return value;
+    }
+    return maskPii(value);
+  }
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  if (seen.has(value)) {
+    return value;
+  }
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.map((item) => maskPiiJsonWalk(item, undefined, seen));
+  }
+  const out: Record<string, unknown> = {};
+  for (const [entryKey, entryValue] of Object.entries(value)) {
+    out[entryKey] = maskPiiJsonWalk(entryValue, entryKey, seen);
+  }
+  return out;
+}
+
+/**
+ * Recursively masks PII in string values of a JSON-shaped tool output while keeping technical
+ * references (`url`, `href`, `path`, `id`, `mediaId`, `artifactId`, `toolKey`, `/api/...`, `http(s)://...`) intact.
+ */
+export function maskPiiInJson<T>(value: T): T {
+  return maskPiiJsonWalk(value, undefined, new WeakSet()) as T;
 }
 
 export function maskPiiInParts(parts: ContentPart[]): ContentPart[] {

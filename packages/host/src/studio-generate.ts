@@ -596,7 +596,7 @@ export async function generateStudioVideo(
   const sourceImage = await studioSourceImage(tenant, body.imageUrl);
   const harness = await runVideoHarness(
     {
-      prompt: body.prompt,
+      prompt: maskPii(body.prompt),
       requestedModel: requested,
       availableIds,
       aspect: body.aspect,

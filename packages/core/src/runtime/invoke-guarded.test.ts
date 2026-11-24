@@ -146,4 +146,51 @@ describe("invokeToolGuarded", () => {
     expect(called).toBe(0);
     expect(result).toEqual({ success: false, error: "Tool calculator is disabled on this machine." });
   });
+
+  it("masks PII in thin tool output for the model while keeping full output on the ALS sink", async () => {
+    const tool = defineTool({
+      key: "knowledge_search",
+      name: "Knowledge search",
+      description: "Search notes",
+      trust: "user_content",
+      schema: z.object({ query: z.string() }),
+      execute: async () => ({
+        success: true,
+        hits: [
+          {
+            id: "hit-1",
+            path: "/notes/Rina Wijaya.md",
+            url: "https://example.com/alex.rivera@example.com",
+            snippet: "Contact alex.rivera@example.com or Kirim ke Rina Wijaya di 081234567890",
+          },
+        ],
+      }),
+    });
+    const seen = await runWithToolIoSink(async () => {
+      const thin = await invokeToolGuarded(tool, { query: "contact" }, tenant);
+      return { thin, recorded: takeLastToolIo("knowledge_search") };
+    });
+    expect(seen.thin).toEqual({
+      success: true,
+      hits: [
+        {
+          id: "hit-1",
+          path: "/notes/Rina Wijaya.md",
+          url: "https://example.com/alex.rivera@example.com",
+          snippet: "Contact [email] or Kirim ke [name] di [phone]",
+        },
+      ],
+    });
+    expect(seen.recorded?.full).toEqual({
+      success: true,
+      hits: [
+        {
+          id: "hit-1",
+          path: "/notes/Rina Wijaya.md",
+          url: "https://example.com/alex.rivera@example.com",
+          snippet: "Contact alex.rivera@example.com or Kirim ke Rina Wijaya di 081234567890",
+        },
+      ],
+    });
+  });
 });

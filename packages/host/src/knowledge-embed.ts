@@ -2,6 +2,7 @@ import {
   DEFAULT_OPENAI_BASE_URL,
   cosineSimilarity,
   hasLiveProvider,
+  maskPii,
   parseEmbeddingResponse,
   resolveProviderKeys,
   resolveRuntimeMode,
@@ -91,6 +92,7 @@ async function liveEmbedBatch(texts: string[], model: string, scope?: SettingsSc
   if (!key) {
     return texts.map((text) => stubEmbed(text));
   }
+  const maskedTexts = texts.map((text) => maskPii(text));
   // Pinned endpoint only: the gateway key rides this request, so a stored `openaiBaseUrl` must
   // never decide where it goes. `resolveProviderKeys` is the single source of that URL.
   const base = (resolveProviderKeys(settings).openaiBaseUrl || DEFAULT_OPENAI_BASE_URL).replace(/\/+$/, "");
@@ -100,7 +102,7 @@ async function liveEmbedBatch(texts: string[], model: string, scope?: SettingsSc
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ model, input: texts }),
+    body: JSON.stringify({ model, input: maskedTexts }),
     // Same rule as every other key-bearing call: never follow a redirect with the bearer token
     // attached (docs/internal/security-owasp-2026-09.md, A10-4). A 3xx is not ok, so it throws.
     redirect: "manual",
@@ -110,7 +112,7 @@ async function liveEmbedBatch(texts: string[], model: string, scope?: SettingsSc
     throw new Error(`embeddings ${res.status}`);
   }
   const parsed = parseEmbeddingResponse(await res.json());
-  if (parsed.length !== texts.length) {
+  if (parsed.length !== maskedTexts.length) {
     throw new Error("embeddings response length mismatch");
   }
   return parsed;
