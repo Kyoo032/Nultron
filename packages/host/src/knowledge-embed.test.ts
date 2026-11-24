@@ -14,6 +14,7 @@ import {
   STUB_EMBED_MODEL,
 } from "./knowledge-embed";
 import { getKnowledgeModels, indexKnowledgeSource, putKnowledgeModels } from "./knowledge";
+import { isSealedVectorBody, openVectorBody } from "./knowledge-vector-seal";
 import { saveSettings } from "./settings-store";
 
 function tenant(): TenantContext {
@@ -252,7 +253,9 @@ describe("knowledge-embed", () => {
       const stored = sql
         .prepare("SELECT body FROM knowledge_vectors WHERE workspace_id = ? AND source_id = ?")
         .get(ctx.workspaceId, "src-pii") as { body: string } | undefined;
-      expect(stored?.body).toBe(rawChunk);
+      expect(stored?.body).toBeDefined();
+      expect(isSealedVectorBody(stored?.body ?? "")).toBe(true);
+      expect(openVectorBody(stored?.body ?? "")).toBe(rawChunk);
     } finally {
       globalThis.fetch = original;
       resetEmbedCircuit();

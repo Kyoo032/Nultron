@@ -130,13 +130,15 @@ const NAME_STOPLIST: ReadonlySet<string> = new Set([
 ]);
 
 const HONORIFIC_PART = "(?:bpk|bapak|ibu|pak|bu|sdr|sdri|tn|ny|nn|mr|mrs|ms|miss|dr|prof|ir)\\.?";
+const SELF_INTRO_CUE_PART =
+  "(?:nama[ \\t]+(?:lengkap[ \\t]+)?saya(?:[ \\t]+adalah)?|my[ \\t]+(?:full[ \\t]+)?name[ \\t]+is|(?:perkenalkan|kenalkan)(?:[, \\t]+(?:nama[ \\t]+)?saya(?:[ \\t]+adalah)?)?)";
 const LABEL_CUE_PART =
   "(?:nama(?:\\s+(?:lengkap|karyawan|pegawai|penerima|pemilik|nasabah|pic|kontak))?|name|full\\s+name|contact\\s+person|a\\.?\\s*n\\.?|atas\\s+nama|penerima|payee|signed\\s+by|ditandatangani\\s+oleh)";
 const PREP_CUE_PART =
   "(?:kepada(?:\\s+yth\\.?)?|untuk|dari|ke|hubungi|contact|dear|oleh|by|attention|attn\\.?)";
 
 const NAME_CUE_ONLY_RE = new RegExp(
-  `(?:\\b${LABEL_CUE_PART}\\s*[:=-]?[ \\t]*(?:${HONORIFIC_PART}[ \\t]+)?|\\b${PREP_CUE_PART}[,:\\t ]+(?:${HONORIFIC_PART}[ \\t]+)?|\\b${HONORIFIC_PART}[ \\t]+)`,
+  `(?:\\b${SELF_INTRO_CUE_PART}(?:[ \\t]*[,:=-])?[ \\t]+(?:${HONORIFIC_PART}[ \\t]+)?|\\b${LABEL_CUE_PART}\\s*[:=-]?[ \\t]*(?:${HONORIFIC_PART}[ \\t]+)?|\\b${PREP_CUE_PART}[,:\\t ]+(?:${HONORIFIC_PART}[ \\t]+)?|\\b${HONORIFIC_PART}[ \\t]+)`,
   "gi",
 );
 

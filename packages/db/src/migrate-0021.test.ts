@@ -98,6 +98,7 @@ describe("0021 on a fresh database", () => {
       "revoked_at",
       "portal_checked_at",
       "refresh_sealed",
+      "gateway_endpoint",
     ]);
     insertSession(sqlite, "a".repeat(64));
     const row = sqlite.prepare("SELECT portal_checked_at, refresh_sealed FROM auth_sessions").get() as {
@@ -229,6 +230,7 @@ describe("the healer", () => {
     ensureSchema(sqlite);
     expect(columnNames(sqlite, "auth_sessions")).toContain("portal_checked_at");
     expect(columnNames(sqlite, "auth_sessions")).toContain("refresh_sealed");
+    expect(columnNames(sqlite, "auth_sessions")).toContain("gateway_endpoint");
     // A healer adds; it never deletes. Only the migration, once, clears the raw ids.
     expect(count(sqlite, "auth_sessions")).toBe(1);
   });

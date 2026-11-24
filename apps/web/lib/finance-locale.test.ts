@@ -18,6 +18,16 @@ function keys(value: unknown, prefix = ""): string[] {
   );
 }
 
+function stringValues(value: unknown): string[] {
+  if (typeof value === "string") {
+    return [value];
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return [];
+  }
+  return Object.values(value as Record<string, unknown>).flatMap((child) => stringValues(child));
+}
+
 describe("finance locale JSON", () => {
   it("keeps en and id key trees aligned", () => {
     expect(keys(load("id")).sort()).toEqual(keys(load("en")).sort());
@@ -26,5 +36,12 @@ describe("finance locale JSON", () => {
   it("keeps brand names untranslated in id", () => {
     const raw = readFileSync(resolve(localesDir, "id", "finance.json"), "utf8");
     expect(raw).toContain("Toko Token");
+  });
+
+  it("translates all preview literals out of id while keeping preview in en", () => {
+    const idHits = stringValues(load("id")).filter((text) => /preview/i.test(text));
+    const enHits = stringValues(load("en")).filter((text) => /preview/i.test(text));
+    expect(idHits).toEqual([]);
+    expect(enHits.length).toBeGreaterThan(0);
   });
 });
