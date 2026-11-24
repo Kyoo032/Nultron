@@ -39,6 +39,7 @@ import {
 import { keepModelChoice } from "@/lib/model-choice";
 import { stillSource, type SavedPicture } from "@/lib/saved-picture";
 import { apiFetch, mediaSrc } from "@/lib/api-client";
+import { useCatalogVersion } from "@/lib/catalog-version";
 import { useProductBrand } from "@/lib/product-brand";
 
 type StudioModel = {
@@ -94,7 +95,9 @@ export function VideosStudio() {
   const [landed, setLanded] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     setError(null);
     try {
@@ -102,6 +105,9 @@ export function VideosStudio() {
       const data = (await response.json().catch(() => ({}))) as GalleryResponse & {
         error?: { message?: string };
       };
+      if (seq !== loadSeq.current) {
+        return;
+      }
       if (!response.ok) {
         setError(data.error?.message ?? t("videos.loadError"));
         setReady(false);
@@ -115,16 +121,23 @@ export function VideosStudio() {
       setModel((current) => keepModelChoice(current, data.models ?? [], data.defaultModel));
       setReady(Boolean(data.ready));
     } catch (err) {
+      if (seq !== loadSeq.current) {
+        return;
+      }
       setError(err instanceof Error ? err.message : t("videos.loadError"));
       setReady(false);
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
+  const catalogVersion = useCatalogVersion();
   useEffect(() => {
+    void catalogVersion;
     void load();
-  }, [load]);
+  }, [load, catalogVersion]);
 
   // Nultron Enterprise: a signed-in tenant may open the desk before adding a key (hosted only; false
   // elsewhere). `ready` above is what the gallery read said at mount, so when a key is saved in Settings

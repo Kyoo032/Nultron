@@ -159,12 +159,19 @@ export function EditGenerateTab({
     liveModelIds: liveIds,
     requireImageToVideo: sub === "video" && (Boolean(clipStill) || Boolean(stillUrl.trim())),
   });
-  const activeModel = model || routed || liveIds[0] || "";
+  const chosenModel = model && liveIds.includes(model) ? model : "";
+  const activeModel = chosenModel || routed || liveIds[0] || "";
   const videoSpec = useMemo(() => videoSpecOf(activeModel, videoCatalog), [activeModel, videoCatalog]);
   const imageSpec = useMemo(() => imageSpecOf(activeModel, imageCatalog), [activeModel, imageCatalog]);
   const imageToVideo = videoCapabilitiesOf(videoSpec).imageToVideo;
   const activeSpec = sub === "image" ? imageSpec : videoSpec;
   const seconds = videoPick.seconds;
+
+  useEffect(() => {
+    if (model && !liveIds.includes(model)) {
+      setModel("");
+    }
+  }, [liveIds, model]);
 
   useEffect(() => {
     if (!imageToVideo) {
