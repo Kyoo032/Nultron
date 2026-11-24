@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-11-09 at 6080cbba plus the working tree of `fix/desk-key-warn`, for the desk wrap-key paragraph (the desk warns, it does not refuse; SR-203). Before that: 2026-11-06 at f6c9acc1 for the desk wrap-key floor paragraph (SR-203). Before that: 2026-10-29 at 464b00c5 for the 2026-10-21 one-agent first-desk comments in `packages/db/src/ensure-local-owner.ts` (`FIRST_RUN_MODES`) and `packages/db/src/portal-owner.ts` (`HOSTED_FIRST_DESK_MODES`). Before that: 2026-10-21 at 8953014 for the test-limit sentence above the unit-suite table. Before that: 2026-09-29 for the three `apps/desktop/main.cjs` citations (`bootstrapPackaged` lines), re-anchored in the
+Last verified: 2026-11-24 at 5118c795 plus `fix/dfind-143-147-knowledge-at-rest`, for `secure_delete`, `journal_size_limit`, `checkpointWalTruncate`, and FTS5 `secure-delete` on `knowledge_chunks` and `market_news_fts`. Before that: 2026-11-09 at 6080cbba plus the working tree of `fix/desk-key-warn`, for the desk wrap-key paragraph (the desk warns, it does not refuse; SR-203). Before that: 2026-11-06 at f6c9acc1 for the desk wrap-key floor paragraph (SR-203). Before that: 2026-10-29 at 464b00c5 for the 2026-10-21 one-agent first-desk comments in `packages/db/src/ensure-local-owner.ts` (`FIRST_RUN_MODES`) and `packages/db/src/portal-owner.ts` (`HOSTED_FIRST_DESK_MODES`). Before that: 2026-10-21 at 8953014 for the test-limit sentence above the unit-suite table. Before that: 2026-09-29 for the three `apps/desktop/main.cjs` citations (`bootstrapPackaged` lines), re-anchored in the
 working tree, not committed, after the ffmpeg probe moved behind the first paint. Before that: 2026-09-23 at d4561b8 + uncommitted tree for the migrations table and the numbering note (now
 through `0021`), the `auth_sessions` row of the schema families, "Start over, applied at next boot" (every
 `reset.ts` citation, and the partial-failure retry) and the drizzle row of Where things live. Not driven:
@@ -100,8 +100,8 @@ In order:
    a tool that only wanted `db`.
 4. The connection, cached on `globalThis` outside production so hot reload does not open a second
    handle (`:19-21`, `:48-51`).
-5. Pragmas: `journal_mode = WAL` and `foreign_keys = ON` (`:53-54`), and `busy_timeout = 5000` (`:59`).
-6. `ensureSchema(sql)` (`:60`), then `drizzle(sql, { schema })` (`:62`).
+5. Pragmas: `journal_mode = WAL`, `foreign_keys = ON`, `secure_delete = ON`, `journal_size_limit = 16777216`, and `busy_timeout = 5000` (`:53-63`).
+6. `ensureSchema(sql)` (`:64`) — which also enables FTS5 `secure-delete` on `knowledge_chunks` and `market_news_fts` (`enableFtsSecureDelete` in `ensure-schema.ts`) — then `drizzle(sql, { schema })` (`:78`). `checkpointWalTruncate()` (`:70-76`) runs a best-effort `wal_checkpoint(TRUNCATE)` after sensitive deletes (`deleteSource`, `deleteMemory`, `sweepOrphanSources`, `deleteThread`) so removed frames are truncated from `-wal`.
 
 The two processes allowed to set `AGENTFORGE_APPLY_PENDING_RESET=1` are the webdev server
 (`apps/web/server-env.ts:54`, imported first precisely because ESM hoists imports — `:5-8`) and the
@@ -439,6 +439,7 @@ The real coverage is the unit suite, `pnpm --filter @agentforge/db test`
 
 | Test file | Proves |
 |---|---|
+| `packages/db/src/client.test.ts` | `secure_delete`, `foreign_keys`, `journal_mode = wal`, `journal_size_limit`, FTS5 `secure-delete` on `knowledge_chunks`, and raw `.sqlite` + `.sqlite-wal` byte scans confirming deleted B-tree rows and deleted FTS5 tokens leave zero remnants on disk. |
 | `packages/db/src/vault-key.test.ts` | The Postgres refusal and `file:` handling (`:40-50`), every entropy case including the documented passphrase limit (`:52-121`), server mode's two refusals and what it accepts (`:123-178`), and that a desk still creates and reuses `.master-key` and still accepts a short env key (`:180-193`). |
 | `packages/db/src/ensure-schema.test.ts` | Fresh create, idempotence, baseline stamping, each healer, and `drizzle-kit check` as an anti-drift gate (`:447-475`) — which **skips itself with a warning when `drizzle-kit` is not installed** (`:459-462`), so a green run in a workspace without dependencies proves less than it looks. |
 | `packages/db/src/reset.test.ts` | Marker atomicity, escape rejection, the malformed-marker keep-data path, the `DATABASE_URL`-elsewhere trio, and the symlink defenses. |

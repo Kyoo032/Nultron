@@ -1,14 +1,17 @@
-import { and, asc, desc, eq, ne, notInArray } from "drizzle-orm";
-import { agents, db, messages, runs, threads, toolInvocations } from "@agentforge/db";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
+import { agents, checkpointWalTruncate, db, messages, runs, threads, toolInvocations } from "@agentforge/db";
 import type { ContentPart, InputModality, TenantContext } from "@agentforge/core";
 import { ApiError, DEFAULT_CHAT_SLUG, isDefaultChatAgent, openPayload, sealPayload } from "@agentforge/core";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
-import { DEFAULT_THREAD_TITLES, defaultThreadTitle, isDefaultThreadTitle, titleFromParts } from "./thread-title";
+import { defaultThreadTitle, isDefaultThreadTitle, titleFromParts } from "./thread-title";
+import { isSealedThreadTitle, openThreadTitle, sealThreadTitle } from "./thread-title-seal";
 import { localeForRun } from "./run-context";
 import { deleteSourceByOrigin } from "./knowledge";
 import { removeGraphForThread } from "./knowledge-graph-prune";
 import { messageText } from "./message-text";
 import { log } from "./log";
+
+export { isSealedThreadTitle, openThreadTitle, sealThreadTitle };
 
 const PREVIEW_MAX = 80;
 const READ_MESSAGE_MAX = 2_000;
@@ -34,6 +37,7 @@ function openJson(value: unknown): unknown {
 }
 
 export async function createThread(tenant: TenantContext, agentId: string, title?: string) {
+  const plainTitle = title ?? defaultThreadTitle(localeForRun());
   const [row] = await db
     .insert(threads)
     .values({
@@ -41,10 +45,10 @@ export async function createThread(tenant: TenantContext, agentId: string, title
       workspaceId: tenant.workspaceId,
       agentId,
       userId: tenant.userId,
-      title: title ?? defaultThreadTitle(localeForRun()),
+      title: sealThreadTitle(plainTitle),
     })
     .returning();
-  return row;
+  return row ? { ...row, title: openThreadTitle(row.title) } : row;
 }
 
 export async function getThread(tenant: TenantContext, threadId: string) {
@@ -61,11 +65,12 @@ export async function getThread(tenant: TenantContext, threadId: string) {
       ),
     )
     .limit(1);
-  return rows[0] ?? null;
+  const row = rows[0];
+  return row ? { ...row, title: openThreadTitle(row.title) } : null;
 }
 
 export async function listThreads(tenant: TenantContext, agentId: string) {
-  return db
+  const rows = await db
     .select()
     .from(threads)
     .where(
@@ -76,6 +81,7 @@ export async function listThreads(tenant: TenantContext, agentId: string) {
       ),
     )
     .orderBy(desc(threads.createdAt));
+  return rows.map((row) => ({ ...row, title: openThreadTitle(row.title) }));
 }
 
 export type WorkspaceThreadScope = "chat" | "agent" | "all";
@@ -116,10 +122,11 @@ export async function listWorkspaceThreads(
     .orderBy(desc(threads.createdAt))
     .limit(limit);
 
+  const opened = rows.map((row) => ({ ...row, title: openThreadTitle(row.title) }));
   if (scope === "agent" && !options.agentId) {
-    return rows.filter((row) => !isDefaultChatAgent({ slug: row.agentSlug }));
+    return opened.filter((row) => !isDefaultChatAgent({ slug: row.agentSlug }));
   }
-  return rows;
+  return opened;
 }
 
 export async function deleteThread(tenant: TenantContext, threadId: string): Promise<boolean> {
@@ -150,6 +157,7 @@ export async function deleteThread(tenant: TenantContext, threadId: string): Pro
       detail: error instanceof Error ? error.message : "unknown",
     });
   }
+  checkpointWalTruncate();
   return true;
 }
 
@@ -179,14 +187,17 @@ export async function listPastSessionsForAgent(
         eq(threads.agentId, agentId),
         eq(threads.userId, tenant.userId),
         ne(threads.id, excludeThreadId),
-        notInArray(threads.title, [...DEFAULT_THREAD_TITLES]),
       ),
     )
-    .orderBy(desc(threads.createdAt))
-    .limit(limit);
+    .orderBy(desc(threads.createdAt));
+
+  const named = rows
+    .map((row) => ({ ...row, title: openThreadTitle(row.title) }))
+    .filter((row) => !isDefaultThreadTitle(row.title))
+    .slice(0, limit);
 
   const summaries: PastSessionSummary[] = [];
-  for (const row of rows) {
+  for (const row of named) {
     const [firstUser] = await db
       .select({ content: messages.content })
       .from(messages)
@@ -251,7 +262,7 @@ export async function setThreadTitleFromParts(tenant: TenantContext, threadId: s
   }
   await db
     .update(threads)
-    .set({ title })
+    .set({ title: sealThreadTitle(title) })
     .where(and(eq(threads.organizationId, tenant.organizationId), eq(threads.id, threadId)));
 }
 
