@@ -20,6 +20,7 @@ const roundTrip = <T>(parse: (raw: string) => T | null, frame: unknown): T | nul
 describe("parseVoiceBrowserFrame", () => {
   const FRAMES: VoiceBrowserFrame[] = [
     { type: "barge_in" },
+    { type: "barge_in", immediate: true },
     { type: "played", ms: 1_250 },
     { type: "commit" },
     { type: "stop" },
@@ -29,6 +30,11 @@ describe("parseVoiceBrowserFrame", () => {
 
   it.each(FRAMES)("round-trips %j", (frame) => {
     expect(roundTrip(parseVoiceBrowserFrame, frame)).toEqual(frame);
+  });
+
+  it("keeps barge_in.immediate only when true", () => {
+    expect(roundTrip(parseVoiceBrowserFrame, { type: "barge_in", immediate: false })).toEqual({ type: "barge_in" });
+    expect(roundTrip(parseVoiceBrowserFrame, { type: "barge_in", immediate: "yes" })).toEqual({ type: "barge_in" });
   });
 
   it("accepts mode only with a valid value", () => {

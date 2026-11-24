@@ -98,6 +98,7 @@ class VoicePlaybackProcessor extends AudioWorkletProcessor {
           break;
         case "turn":
           this.queue.endTurn();
+          this.report(null);
           break;
         case "clear":
           this.queue.clear();

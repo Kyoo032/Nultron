@@ -233,3 +233,13 @@ describe("after dispose", () => {
     expect(log).not.toContain("drop");
   });
 });
+
+describe("explicit interruptNow", () => {
+  it("pauses, sends immediate barge_in, drops playback, and reports played ms", async () => {
+    const { coordinator, settle, log } = setup({ pauseMs: 420 });
+    coordinator.interruptNow();
+    await settle();
+    expect(log).toEqual(["pause", "send:barge_in", "drop", "send:played:420"]);
+    expect(coordinator.pending).toBe(false);
+  });
+});

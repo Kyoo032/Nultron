@@ -4,6 +4,7 @@
  * The base URL and the key are passed in. This file does not read the environment.
  * A failure, an empty transcript or a wait past the limit is null. It never throws.
  */
+import { maskPii } from "@agentforge/core";
 import { log } from "../log";
 import type { Pcm, Transcriber } from "./talker";
 import { pcmDurationSeconds, wavFromPcm } from "./talker-wav";
@@ -83,7 +84,8 @@ export function createGatewayTranscriber(options: GatewayTranscriberOptions): Tr
           return null;
         }
         const json = (await response.json()) as { text?: unknown };
-        const text = typeof json.text === "string" ? cleanTranscript(json.text) : "";
+        const cleaned = typeof json.text === "string" ? cleanTranscript(json.text) : "";
+        const text = cleaned ? maskPii(cleaned) : "";
         if (!text) {
           return null;
         }

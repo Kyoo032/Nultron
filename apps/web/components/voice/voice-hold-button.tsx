@@ -5,6 +5,8 @@ import { t } from "@/lib/i18n";
 
 export type VoiceHoldButtonProps = {
   disabled: boolean;
+  /** True while held via an external shortcut such as desktop Spacebar. */
+  externalHeld?: boolean;
   onStart: () => void;
   onEnd: () => void;
 };
@@ -15,9 +17,10 @@ export type VoiceHoldButtonProps = {
  * button does not strand the turn) and by keyboard (Space or Enter held down). Anything that takes the
  * press away, a blur or a cancelled pointer, releases it, so a turn is never left open.
  */
-export function VoiceHoldButton({ disabled, onStart, onEnd }: VoiceHoldButtonProps) {
+export function VoiceHoldButton({ disabled, externalHeld = false, onStart, onEnd }: VoiceHoldButtonProps) {
   const [held, setHeld] = useState(false);
   const heldRef = useRef(false);
+  const active = held || externalHeld;
 
   function press() {
     if (disabled || heldRef.current) {
@@ -42,8 +45,8 @@ export function VoiceHoldButton({ disabled, onStart, onEnd }: VoiceHoldButtonPro
       type="button"
       className="voice-hold"
       disabled={disabled}
-      aria-pressed={held}
-      data-held={held ? "true" : "false"}
+      aria-pressed={active}
+      data-held={active ? "true" : "false"}
       data-testid="voice-hold"
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -56,18 +59,20 @@ export function VoiceHoldButton({ disabled, onStart, onEnd }: VoiceHoldButtonPro
       onKeyDown={(event) => {
         if ((event.key === " " || event.key === "Enter") && !event.repeat) {
           event.preventDefault();
+          event.stopPropagation();
           press();
         }
       }}
       onKeyUp={(event) => {
         if (event.key === " " || event.key === "Enter") {
           event.preventDefault();
+          event.stopPropagation();
           release();
         }
       }}
       onContextMenu={(event) => event.preventDefault()}
     >
-      {held ? t("voice.mode.release") : t("voice.mode.hold")}
+      {active ? t("voice.mode.release") : t("voice.mode.hold")}
     </button>
   );
 }

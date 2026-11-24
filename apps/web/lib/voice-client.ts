@@ -67,6 +67,8 @@ export type VoiceClientOptions = {
   readonly mode: VoiceMode;
   /** Everything the view needs to hear. */
   readonly emit: (action: VoiceViewAction) => void;
+  /** Smoothed 20 ms microphone RMS level (0..1) for the live audio visualizer. */
+  readonly onLevel?: (level: number) => void;
 };
 
 export class VoiceClient {
@@ -78,6 +80,8 @@ export class VoiceClient {
   private stopWatching: (() => void) | null = null;
   private ready = false;
   private hold: { releasing: boolean } | null = null;
+  private muted = false;
+  private smoothedLevel = 0;
   private everRan = false;
   /** Gives up on a socket that is still opening, so a stop during setup does not leave `connect` waiting. */
   private abortConnect: (() => void) | null = null;
@@ -265,6 +269,22 @@ export class VoiceClient {
     if (this.finished || !this.ready) {
       return;
     }
+    if (this.muted) {
+      if (this.smoothedLevel !== 0) {
+        this.smoothedLevel = 0;
+        this.options.onLevel?.(0);
+      }
+      return;
+    }
+    if (levels.length > 0 && this.options.onLevel) {
+      let next = this.smoothedLevel;
+      for (const raw of levels) {
+        const scaled = Math.max(0, Math.min(1, raw * 6));
+        next = next * 0.6 + scaled * 0.4;
+      }
+      this.smoothedLevel = next;
+      this.options.onLevel(next);
+    }
     // Hands-free: the microphone is open the whole time, and the host finds the end of a turn. A
     // cut-in is guessed from its loudness. Push-to-talk: only what is held is sent, and pressing the
     // button over the agent is the cut-in.
@@ -313,6 +333,39 @@ export class VoiceClient {
     }
   }
 
+  get isMuted(): boolean {
+    return this.muted;
+  }
+
+  /** Suppresses outgoing microphone PCM locally without dropping the WebSocket session. */
+  setMuted(muted: boolean): void {
+    if (this.finished || this.muted === muted) {
+      return;
+    }
+    this.muted = muted;
+    if (muted) {
+      this.smoothedLevel = 0;
+      this.options.onLevel?.(0);
+    }
+    this.options.emit({ type: "muted", value: muted });
+  }
+
+  /** Explicit Stop / Interrupt: stops agent playback immediately and asks the host to cut. */
+  interrupt(): void {
+    if (this.finished || !this.ready) {
+      return;
+    }
+    this.barge?.interruptNow();
+  }
+
+  /** Explicit Done / Send in hands-free mode: commits the current utterance immediately. */
+  commit(): void {
+    if (this.finished || !this.ready) {
+      return;
+    }
+    this.sendFrame({ type: "commit" });
+  }
+
   /** Push-to-talk pressed: frames go to the host until `holdEnd`. */
   holdStart(): void {
     if (this.finished || !this.ready || this.mode !== "push_to_talk" || this.hold) {
@@ -336,7 +389,9 @@ export class VoiceClient {
       return;
     }
     this.hold = null;
-    this.sendFrame({ type: "commit" });
+    if (!this.muted) {
+      this.sendFrame({ type: "commit" });
+    }
   }
 
   /** The person ended voice, or the view is going away. Tells the host, then lets everything go. */
@@ -366,6 +421,10 @@ export class VoiceClient {
     this.finished = true;
     this.hold = null;
     this.ready = false;
+    if (this.smoothedLevel !== 0) {
+      this.smoothedLevel = 0;
+      this.options.onLevel?.(0);
+    }
     if (tellHost) {
       this.sendFrame({ type: "stop" });
     }

@@ -49,6 +49,11 @@ export type VadOptions = {
   readonly floorRiseMs?: number;
   /** A steady sound this long is the room, not speech, in ms (default 1500; 0 turns the rule off). */
   readonly steadyMs?: number;
+  /**
+   * For push-to-talk streams that begin mid-syllable on frame 0: skip the 50 ms room calibration and
+   * steady-sound suppression so loud initial speech does not push the floor up and suppress detection.
+   */
+  readonly immediateOnset?: boolean;
 };
 
 export type Vad = {
@@ -65,6 +70,8 @@ export type Vad = {
   readonly lastSpeechMs: number;
   /** Milliseconds of audio fed so far. */
   readonly nowMs: number;
+  /** Toggle immediate-onset handling (e.g. when switching between hands-free and push-to-talk). */
+  setImmediateOnset(enabled: boolean): void;
   reset(): void;
 };
 
@@ -76,6 +83,7 @@ const RESOLVED_DEFAULTS = {
   releaseRatio: 0.5,
   floorRiseMs: 1_000,
   steadyMs: 1_500,
+  immediateOnset: false,
 } satisfies Required<VadOptions>;
 
 export const VAD_DEFAULTS: VadOptions = RESOLVED_DEFAULTS;
@@ -109,6 +117,7 @@ export function createVad(options: Partial<VadOptions> = {}): Vad {
   const releaseRatio = options.releaseRatio ?? RESOLVED_DEFAULTS.releaseRatio;
   const floorRise = WINDOW_MS / Math.max(WINDOW_MS, options.floorRiseMs ?? RESOLVED_DEFAULTS.floorRiseMs);
   const steadyWindows = Math.round((options.steadyMs ?? RESOLVED_DEFAULTS.steadyMs) / WINDOW_MS);
+  let immediateOnset = options.immediateOnset ?? false;
 
   /** The window being filled when a chunk ends mid-window. */
   const partial = Buffer.alloc(WINDOW_BYTES);
@@ -218,7 +227,7 @@ export function createVad(options: Partial<VadOptions> = {}): Vad {
     ringPos = (ringPos + 1) % ring.length;
     ringFill = Math.min(ring.length, ringFill + 1);
 
-    if (windows <= CALIBRATION_WINDOWS) {
+    if (!immediateOnset && windows <= CALIBRATION_WINDOWS) {
       floor = Math.min(MAX_FLOOR, windows === 1 ? level : Math.min(floor, level));
       floorSeeded = true;
       return;
@@ -256,7 +265,7 @@ export function createVad(options: Partial<VadOptions> = {}): Vad {
       learnFloor(level);
     }
 
-    if (speaking || pendingLoudMs > 0) {
+    if (!immediateOnset && (speaking || pendingLoudMs > 0)) {
       const steady = steadySound();
       if (steady) {
         floor = steady.level;
@@ -321,6 +330,9 @@ export function createVad(options: Partial<VadOptions> = {}): Vad {
     },
     get nowMs() {
       return nowMs();
+    },
+    setImmediateOnset(enabled: boolean) {
+      immediateOnset = enabled;
     },
     reset,
   };

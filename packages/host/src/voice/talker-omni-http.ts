@@ -7,6 +7,7 @@
  * The base URL and the key are passed in. This file does not read the environment or the
  * settings store. Logs are counts and timings only.
  */
+import { maskPii } from "@agentforge/core";
 import { log } from "../log";
 import { createSseParser } from "./talker-sse";
 import {
@@ -35,6 +36,7 @@ import type { VoiceLocale } from "./turns";
 export const TALKER_FIRST_BYTE_MS = 8_000;
 export const TALKER_SILENCE_MS = 10_000;
 export const HEAR_SHORT_MS = 2_000;
+export const ACK_RETRY_TTL_MS = 60_000;
 
 const HISTORY_TURNS = 12;
 const ERROR_SNIPPET_CHARS = 4_096;
@@ -66,7 +68,7 @@ type StreamEnd = { tools: ToolAcc[]; spoke: boolean };
 
 type Meter = { status: number; audioBytes: number; wordChars: number };
 
-type AckRecord = { matched: boolean; pcm: Pcm | null; heard: string };
+type AckRecord = { matched: boolean; pcm: Pcm | null; heard: string; expiresAt: number | null };
 
 type AckTrio = { readonly model: string; readonly voice: string; readonly locale: VoiceLocale };
 
@@ -280,14 +282,22 @@ function decide(tools: readonly ToolAcc[], mustAnswer: boolean, spoke: boolean):
   return { kind: "bad" };
 }
 
+function normalizeWords(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function sameWords(heard: string, sentence: string): boolean {
-  return heard.trim().replace(/\s+/g, " ") === sentence.trim().replace(/\s+/g, " ");
+  return normalizeWords(heard) === normalizeWords(sentence);
 }
 
 function historyMessages(history: readonly TalkerTurn[]): { role: TalkerTurn["role"]; content: string }[] {
   return history
     .filter((turn) => turn.text.trim().length > 0)
-    .map((turn) => ({ role: turn.role, content: turn.text }));
+    .map((turn) => ({ role: turn.role, content: maskPii(turn.text) }));
 }
 
 async function* readStream(input: {
@@ -537,12 +547,22 @@ export function createOmniHttpTalker(options: OmniHttpTalkerOptions): Talker {
     if (ackJobs.has(key)) {
       return;
     }
+    const existing = ackRecords.get(key);
+    if (existing && (existing.matched || (existing.expiresAt !== null && Date.now() < existing.expiresAt))) {
+      return;
+    }
     const generation = ackGeneration;
-    const job = runAcknowledgement({ fetchImpl, url, apiKey, model, voice, locale, limits }).then((record) => {
-      if (generation === ackGeneration) {
-        ackRecords.set(key, record);
-      }
-    });
+    const job = runAcknowledgement({ fetchImpl, url, apiKey, model, voice, locale, limits })
+      .then((record) => {
+        if (generation === ackGeneration) {
+          ackRecords.set(key, record);
+        }
+      })
+      .finally(() => {
+        if (ackJobs.get(key) === job) {
+          ackJobs.delete(key);
+        }
+      });
     ackJobs.set(key, job);
   };
 
@@ -617,7 +637,7 @@ export function createOmniHttpTalker(options: OmniHttpTalkerOptions): Talker {
               fetchImpl,
               url,
               apiKey,
-              body: answerBody({ model, voice, locale, history, pending: match, text }),
+              body: answerBody({ model, voice, locale, history, pending: match, text: maskPii(text) }),
               caller: replyOptions.signal,
               session: sessionCtrl.signal,
               limits,
@@ -758,7 +778,7 @@ function answerBody(input: {
   ];
   if (input.pending) {
     messages.push(
-      { role: "user", content: input.pending.question },
+      { role: "user", content: maskPii(input.pending.question) },
       {
         role: "assistant",
         content: null,
@@ -766,11 +786,11 @@ function answerBody(input: {
           {
             id: input.pending.callId,
             type: "function",
-            function: { name: input.pending.name, arguments: input.pending.arguments },
+            function: { name: input.pending.name, arguments: maskPii(input.pending.arguments) },
           },
         ],
       },
-      { role: "tool", tool_call_id: input.pending.callId, content: input.text },
+      { role: "tool", tool_call_id: input.pending.callId, content: maskPii(input.text) },
     );
   }
   return {
@@ -842,11 +862,11 @@ async function runAcknowledgement(input: {
     const pcm = matched && chunks.length > 0 ? Buffer.concat(chunks) : null;
     if (matched && pcm && pcm.length > 0) {
       outcome = "cached";
-      return { matched: true, pcm, heard: heard.trim() };
+      return { matched: true, pcm, heard: heard.trim(), expiresAt: null };
     }
-    return { matched: false, pcm: null, heard: heard.trim() };
+    return { matched: false, pcm: null, heard: heard.trim(), expiresAt: Date.now() + ACK_RETRY_TTL_MS };
   } catch {
-    return { matched: false, pcm: null, heard: "" };
+    return { matched: false, pcm: null, heard: "", expiresAt: Date.now() + ACK_RETRY_TTL_MS };
   } finally {
     log.info("voice_talker", {
       kind: "ack",

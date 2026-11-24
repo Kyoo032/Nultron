@@ -98,8 +98,8 @@ export type VoiceHostFrame =
 
 /** JSON frames from the browser to the host. */
 export type VoiceBrowserFrame =
-  /** The browser heard the person over the agent and paused playback locally. */
-  | { readonly type: "barge_in" }
+  /** The browser heard the person over the agent and paused playback locally. `immediate` cuts without waiting for speech. */
+  | { readonly type: "barge_in"; readonly immediate?: boolean }
   /** How many ms of the current agent reply the person actually heard. Sent after a pause or a stop. */
   | { readonly type: "played"; readonly ms: number }
   /** The turn is finished now: push-to-talk released, or a tap on done in hands-free. */
@@ -122,9 +122,10 @@ export function parseVoiceBrowserFrame(raw: string): VoiceBrowserFrame | null {
   if (!value || typeof value !== "object") {
     return null;
   }
-  const frame = value as { type?: unknown; ms?: unknown; value?: unknown };
+  const frame = value as { type?: unknown; ms?: unknown; value?: unknown; immediate?: unknown };
   switch (frame.type) {
     case "barge_in":
+      return frame.immediate === true ? { type: "barge_in", immediate: true } : { type: "barge_in" };
     case "commit":
     case "stop":
       return { type: frame.type };

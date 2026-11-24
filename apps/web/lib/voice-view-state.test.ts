@@ -337,6 +337,26 @@ describe("the mode", () => {
   });
 });
 
+describe("muted and dismiss_card", () => {
+  it("tracks muted state and clears it on open and close", () => {
+    const muted = run([{ type: "open" }, ready, { type: "muted", value: true }]);
+    expect(muted.muted).toBe(true);
+    expect(voiceViewReducer(muted, { type: "open" }).muted).toBe(false);
+    expect(voiceViewReducer(muted, { type: "close" }).muted).toBe(false);
+  });
+
+  it("dismisses an action card without ending the session", () => {
+    const withCard = run([
+      { type: "open" },
+      ready,
+      frame({ type: "card", card: { prompt: "make deck", summary: "Make deck" } }),
+    ]);
+    const dismissed = voiceViewReducer(withCard, { type: "dismiss_card" });
+    expect(dismissed.card).toBeNull();
+    expect(dismissed.phase).toBe("live");
+  });
+});
+
 describe("the mascot", () => {
   it("maps connecting to idle, listening and hearing to listening, thinking to thinking, speaking to answering", () => {
     expect(voiceMascot("live", "connecting")).toEqual({ state: "idle", busy: false });

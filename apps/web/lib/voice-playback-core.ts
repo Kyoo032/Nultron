@@ -107,6 +107,7 @@ export class PlaybackQueue {
     this.read = 0;
     this.length = 0;
     this.position = 0;
+    this.isPaused = false;
     return dropped;
   }
 
@@ -116,6 +117,7 @@ export class PlaybackQueue {
    * arrives, because a person who cuts in on that tail has still heard the turn it belongs to.
    */
   endTurn(): void {
+    this.isPaused = false;
     if (this.length === 0) {
       this.restartCount();
     } else {
