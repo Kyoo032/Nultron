@@ -4,7 +4,6 @@
  * it needs, which is what lets a node test run it.
  */
 
-import { isElectron } from "./api-client";
 import { VoiceAudio } from "./voice-audio";
 import type { VoiceClientDeps, VoiceSocketLike } from "./voice-client";
 import { openVoiceSession, voiceSocketUrl } from "./voice-session-api";
@@ -47,9 +46,7 @@ export function browserVoiceDeps(): VoiceClientDeps {
   return {
     secureContext: typeof isSecureContext === "boolean" ? isSecureContext : true,
     supported: {
-      // The packaged desktop app reaches the host over IPC from a `file:` page: there is no origin to open a
-      // socket on, so voice is not offered there and says so (`error.unsupported`).
-      webSocket: typeof WebSocket !== "undefined" && !isElectron(),
+      webSocket: typeof WebSocket !== "undefined",
       getUserMedia: typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function",
       audioWorklet:
         typeof AudioWorkletNode !== "undefined" &&

@@ -9,9 +9,10 @@
  * slower answer must not overwrite the newer one, so each refresh takes a number and only the latest
  * is applied.
  */
-import type { DesktopFolderPick } from "./desktop-bridge";
 import { NO_FOLDER, type ApproveOutcome, type FolderApi, type ProposalSummary } from "./folder-api";
 import type { FolderAction, FolderState, Outcome } from "./folder-state";
+
+export type DesktopFolderPick = { path: string } | { canceled: true };
 
 export type FolderControllerDeps = {
   readonly api: FolderApi;

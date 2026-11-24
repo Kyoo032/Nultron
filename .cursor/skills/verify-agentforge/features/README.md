@@ -57,8 +57,6 @@ Every recipe names its product and the instance it is driven on. The same pair s
 | [Code](./code.md) | both | main :3000 |
 | [Components (first-run installer)](./components.md) | both | main :3000 |
 | [Data](./data.md) | both | main :3000 |
-| [Desktop brands](./desktop-brands.md) | retired-desktop | none (Personal desktop retired 2026-10-14) |
-| [Desktop](./desktop.md) | retired-desktop | none (Personal desktop retired 2026-10-14) |
 | [Documents](./documents.md) | both | main :3000 |
 | [Edit](./edit.md) | both | main :3000 |
 | [Education](./education.md) | both | main :3000 |
@@ -142,8 +140,6 @@ Every recipe names its product and the instance it is driven on. The same pair s
 - [Edit](./edit.md) — CapCut-style timeline + agent panel (`agent-edit`), shipped in 0.14.22. Storyboard generate is still a Phase 3 placeholder and `animate_storyboard` is backend-only.
 - [Presentation](./presentations.md) — slide stage: filmstrip, nine shapes, nudge / duplicate / delete, title / heading / bullets on the slide, PPTX from a starter. The default builder is Open Slide (streamed Create, per-page `data-layout`, a local draft on a stub desk); Nultron is the engine under More. Regen is a real 503 without a key; Create is a stream (HTTP 200 plus `job.error`).
 - [Education](./education.md) — lesson on that stage, an exam sheet, and a presenter stage. Local page reading. Lesson, page and show need no gateway key; the quiz embeds its topic on a keyed desk.
-- [Desktop](./desktop.md) — **retired 2026-10-14, history only.** Electron one-window launch, splash → Chat, IPC host (no loopback HTTP). Windows NSIS exists; mac/linux are builder targets.
-- [Desktop brands](./desktop-brands.md) — **retired 2026-10-14, history only.** Packaged Kemenkeu AI / AIHub Metranet vs public Nultron. Rail `product-brand` + `product-logo` must match the installed flavor, not leftover Nultron copy.
 - [Mobile](./mobile.md) — **history only.** Docs only. No iOS/Android build, no stores, no Capacitor. A phone on LAN `:3000` is not a product surface.
 - [Build](./build.md) — **parked / verified-unreachable.** `/studio` redirects to Chat.
 - [Studio advanced](./studio-advanced.md) — **parked / verified-unreachable.** Same redirect.

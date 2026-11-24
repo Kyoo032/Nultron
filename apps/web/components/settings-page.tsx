@@ -10,7 +10,7 @@ import { SettingsResetCard } from "./settings-reset-card";
 // Phase 8: renders only where there is a ceiling to show (hosted); null on a desk.
 import { SettingsStorageCard } from "./settings-storage-card";
 import { UsagePanel, type AccountUsage } from "./usage-panel";
-import { apiFetch, checkGateway, relaunchDesktopApp } from "@/lib/api-client";
+import { apiFetch, checkGateway } from "@/lib/api-client";
 import { useMayChangeCompanyKey } from "@/lib/company-key-access";
 import { publishGate } from "@/lib/gate-state";
 import {
@@ -405,12 +405,6 @@ export function SettingsPage() {
       }
       applyPayload(answer.payload);
       applyLocale(answer.payload.locale);
-      // A refused relaunch (installing an update, already quitting, webdev) must still reach the
-      // in-app restart notice, or the language change would look like it did nothing.
-      const relaunched = await relaunchDesktopApp();
-      if (relaunched.ok) {
-        return;
-      }
       window.dispatchEvent(new Event(LOCALE_RESTART_EVENT));
     } finally {
       setLocaleBusy(false);

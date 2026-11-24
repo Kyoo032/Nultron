@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 // Isolation: separate SQLite + media root in temp. Uses the REAL generated starter files
 // and the machine's ffprobe. Skips cleanly when either is absent (CI without ffmpeg).
 const dataDir = mkdtempSync(path.join(tmpdir(), "agentforge-starter-probe-"));
-const repoStarters = path.resolve(__dirname, "../../../../apps/desktop/resources/starters");
+const repoStarters = path.resolve(__dirname, "../../../../assets/starters");
 process.env.AGENTFORGE_DATA_DIR = dataDir;
 process.env.AGENTFORGE_STARTER_MEDIA_DIR = repoStarters;
 process.env.AGENTFORGE_RUNTIME = "stub";

@@ -11,7 +11,7 @@ import {
 
 type ProcessWithResources = NodeJS.Process & { resourcesPath?: string };
 
-const DEV_RELATIVE = path.join("apps", "desktop", "resources", "examples", "videos");
+const DEV_RELATIVE = path.join("assets", "examples", "videos");
 /** Example clips are re-encoded small by scripts/video-examples.mjs; anything larger is not one we shipped. */
 export const VIDEO_EXAMPLE_MAX_BYTES = 40 * 1024 * 1024;
 export const VIDEO_EXAMPLE_MIME = "video/mp4";

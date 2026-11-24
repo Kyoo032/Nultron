@@ -22,11 +22,9 @@ const HOSTED = hostCapabilities({ AGENTFORGE_SERVER: "1" });
 const DESK = hostCapabilities({});
 
 vi.mock("@/lib/api-client", () => ({
-  isElectron: () => electron,
   apiFetch: (path: string, init?: { method?: string }) => fetched(path, init),
 }));
 
-let electron = false;
 let calls: Array<{ path: string; method: string }> = [];
 let respond: (path: string) => unknown = () => ({});
 
@@ -40,7 +38,6 @@ async function fetched(path: string, init?: { method?: string }): Promise<Respon
 }
 
 beforeEach(() => {
-  electron = false;
   calls = [];
   respond = () => ({});
   resetPingForTests();
@@ -65,23 +62,11 @@ describe("the closed default", () => {
 });
 
 describe("the desktop shell tests", () => {
-  it("needs the bridge AND the flag, because neither alone is the packaged app", () => {
-    electron = false;
+  it("reports no desktop shell or native picker on web builds", () => {
     expect(hasDesktopShell(DESK)).toBe(false);
-    electron = true;
-    expect(hasDesktopShell(DESK)).toBe(true);
-    // A packaged build pointed at a hosted host: the bridge is there, the host says no.
     expect(hasDesktopShell(HOSTED)).toBe(false);
-  });
-
-  it("treats the native picker as its own capability, not as the shell's", () => {
-    electron = true;
-    expect(hasNativeFilePicker(DESK)).toBe(true);
-    expect(hasNativeFilePicker(HOSTED)).toBe(false);
-    electron = false;
-    // Webdev: not the hosted server, and still no shell to ask. `isElectron()` alone could never
-    // tell those two apart, which is the whole reason these flags exist.
     expect(hasNativeFilePicker(DESK)).toBe(false);
+    expect(hasNativeFilePicker(HOSTED)).toBe(false);
   });
 });
 

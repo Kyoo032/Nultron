@@ -1,13 +1,3 @@
-import {
-  abortDesktopStream,
-  invokeDesktop,
-  isElectron,
-  saveDesktopBytes,
-  streamDesktop,
-  type IpcHostRequest,
-  type IpcHostResponse,
-} from "./desktop-bridge";
-import { throwIfSaveFailed } from "./desktop-save";
 import { isCatalogMutationPath, notifyCatalogChanged } from "./catalog-version";
 import { publishGate } from "./gate-state";
 import { noteGatewayResponse } from "./gateway-blocked";
@@ -19,67 +9,11 @@ import {
   type ResetResult,
   type ResetScope,
 } from "./reset-app";
-import { errorFromAbortSignal, onAbort, throwIfAborted } from "./ipc-abort";
-import { desktopMediaSrc } from "./media-src";
 import { notePlanResponse } from "./plan-block";
-import { localizeRunLimitBody, localizeRunLimitRefusal } from "./run-limit-copy";
+import { localizeRunLimitRefusal } from "./run-limit-copy";
 import { noteApiResponse } from "./session-signal";
 
-export type { IpcHostRequest, IpcHostResponse };
 export type { CancelResetResult, ResetResult, ResetScope } from "./reset-app";
-export {
-  getDesktopBrand,
-  getDesktopBrandLogo,
-  getDesktopUpdates,
-  isElectron,
-  relaunchDesktopApp,
-} from "./desktop-bridge";
-
-function parsePath(input: string): { path: string; query: Record<string, string> } {
-  const url = new URL(input, "http://agentforge.local");
-  const query: Record<string, string> = {};
-  url.searchParams.forEach((value, key) => {
-    query[key] = value;
-  });
-  return { path: url.pathname, query };
-}
-
-async function filesFromBody(body: BodyInit | null | undefined): Promise<IpcHostRequest["files"]> {
-  if (!(body instanceof FormData)) {
-    return undefined;
-  }
-  const files: NonNullable<IpcHostRequest["files"]> = [];
-  for (const [field, value] of body.entries()) {
-    if (value instanceof File) {
-      const bytes = Array.from(new Uint8Array(await value.arrayBuffer()));
-      files.push({ field, filename: value.name, mime: value.type || "application/octet-stream", bytes });
-    }
-  }
-  return files;
-}
-
-function jsonBody(body: BodyInit | null | undefined): unknown {
-  if (body == null || body instanceof FormData) {
-    return undefined;
-  }
-  if (typeof body === "string") {
-    try {
-      return JSON.parse(body);
-    } catch {
-      return body;
-    }
-  }
-  return undefined;
-}
-
-function bytesResponse(payload: Extract<IpcHostResponse, { type: "bytes" }>): Response {
-  const bytes = new Uint8Array(payload.bytes);
-  const headers = new Headers({ "Content-Type": payload.contentType });
-  if (payload.filename) {
-    headers.set("Content-Disposition", `attachment; filename="${payload.filename}"`);
-  }
-  return new Response(bytes, { status: payload.status, headers });
-}
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 /**
@@ -171,95 +105,12 @@ async function withMutatingHeaders(init: RequestInit, method: string): Promise<R
   return { ...init, headers };
 }
 
-/** One request on whichever transport this renderer has: `fetch` on the web, IPC in the packaged app. */
 async function transportFetch(input: string, init: RequestInit, method: string): Promise<Response> {
-  if (!isElectron()) {
-    const response = await fetch(input, await withMutatingHeaders(init, method));
-    // Phase 9: a 401 anywhere is the hosted host saying this session is over. Reported on a clone,
-    // so the caller's body is untouched, and a no-op unless something is listening (`session-signal`).
-    noteApiResponse(response);
-    // ...and a 403/503 anywhere may be the tenant's PLAN refusing, which is a whole-app state and
-    // not this call's error. Also on a clone, also a no-op off those two statuses. Before this, the
-    // paywall could only be raised from a job stream, so the same blocked tenant saw a full-screen
-    // explanation or a red banner depending on which button they happened to press (`plan-block`).
-    notePlanResponse(response);
-    // ...and a 403 `gateway_blocked` is the host saying this tenant has no usable key. Hosted only
-    // and on a clone, like the two above: the hosted desk opens without a key now ("Add it later"),
-    // so every pane has to hear it and show the same calm state (`gateway-blocked`).
-    noteGatewayResponse(response);
-    // ...and a 429 `too_many_runs` / 503 `server_busy` is the hosted server's run cap (SR-138). Every
-    // studio shows `error.message` off a refused call, so it is made the catalog sentence here, in
-    // the desk's language, once, instead of in each studio (`run-limit-copy`).
-    return localizeRunLimitRefusal(response);
-  }
-  throwIfAborted(init.signal);
-  const { path, query } = parsePath(input);
-  const requestId = crypto.randomUUID();
-  const payload: IpcHostRequest = {
-    requestId,
-    method,
-    path,
-    query,
-    body: jsonBody(init.body),
-    files: await filesFromBody(init.body),
-  };
-  const result = await invokeDesktop(payload);
-  throwIfAborted(init.signal);
-  if (result.type === "json") {
-    return new Response(JSON.stringify(localizeRunLimitBody(result.status, result.body)), {
-      status: result.status,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-  if (result.type === "bytes") {
-    if (result.filename) {
-      // The shell answers whether the file was written. A refusal (the disk, the size) throws here, so
-      // the button that asked can say it did not save; a closed dialog is the person's choice.
-      throwIfSaveFailed(await saveDesktopBytes(result.filename, result.bytes));
-    }
-    return bytesResponse(result);
-  }
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      const fail = () => {
-        abortDesktopStream(requestId);
-        try {
-          controller.error(errorFromAbortSignal(init.signal));
-        } catch {
-          // already closed
-        }
-      };
-      const stop = onAbort(init.signal, fail);
-      void streamDesktop(requestId, (chunk) => {
-        controller.enqueue(encoder.encode(chunk));
-      }).then(
-        () => {
-          stop();
-          try {
-            controller.close();
-          } catch {
-            // already errored
-          }
-        },
-        (error) => {
-          stop();
-          try {
-            controller.error(error);
-          } catch {
-            // already errored
-          }
-        },
-      );
-    },
-    cancel() {
-      abortDesktopStream(requestId);
-    },
-  });
-  return new Response(stream, {
-    status: result.status,
-    headers: { "Content-Type": "text/event-stream; charset=utf-8" },
-  });
+  const response = await fetch(input, await withMutatingHeaders(init, method));
+  noteApiResponse(response);
+  notePlanResponse(response);
+  noteGatewayResponse(response);
+  return localizeRunLimitRefusal(response);
 }
 
 /**
@@ -461,5 +312,5 @@ export async function cancelReset(): Promise<CancelResetResult> {
 }
 
 export function mediaSrc(url: string): string {
-  return desktopMediaSrc(url, isElectron());
+  return url;
 }

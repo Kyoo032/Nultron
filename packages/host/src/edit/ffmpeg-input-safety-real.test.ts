@@ -11,7 +11,7 @@
  * of them the whole file is skipped, so a machine without ffmpeg stays green.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -26,12 +26,6 @@ process.env.AGENTFORGE_RUNTIME = "stub";
 delete process.env.AGENTFORGE_SETTINGS_PATH;
 delete process.env.DATABASE_URL;
 delete process.env.AGENTFORGE_SERVER;
-
-const STAGED = fileURLToPath(new URL("../../../../apps/desktop/resources/ffmpeg/", import.meta.url));
-const EXE = process.platform === "win32" ? ".exe" : "";
-if (!process.env.AGENTFORGE_FFMPEG_PATH && existsSync(join(STAGED, `ffmpeg${EXE}`))) {
-  process.env.AGENTFORGE_FFMPEG_PATH = join(STAGED, `ffmpeg${EXE}`);
-}
 
 const binary = await import("./ffmpeg-binary");
 const ffmpeg = binary.resolveFfmpeg();

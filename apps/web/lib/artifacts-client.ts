@@ -1,6 +1,6 @@
 import { isBinaryArtifactMime } from "@agentforge/core/artifacts";
 import type { ArtifactMode, ArtifactRecord, ArtifactSummary } from "@agentforge/core/artifacts";
-import { apiFetch, isElectron } from "./api-client";
+import { apiFetch } from "./api-client";
 import { filenameFromDisposition } from "./download-name";
 
 export type { ArtifactMode, ArtifactRecord, ArtifactSummary };
@@ -49,15 +49,10 @@ export async function deleteArtifact(id: string): Promise<void> {
   await readJson(res, "Could not delete that artifact");
 }
 
-/** Downloads through the host so desktop gets a native save dialog. */
 export async function downloadArtifactFile(id: string, fallbackName = "artifact.md"): Promise<void> {
   const res = await apiFetch(`/api/v1/artifacts/${encodeURIComponent(id)}/file`);
   if (!res.ok) {
     throw new Error(errorMessage(await res.json().catch(() => null), "Could not download that artifact"));
-  }
-  if (isElectron()) {
-    // apiFetch already wrote the bytes through the native save dialog.
-    return;
   }
   const blob = await res.blob();
   const filename = filenameFromDisposition(res.headers.get("Content-Disposition")) ?? fallbackName;

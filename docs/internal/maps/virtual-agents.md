@@ -2,6 +2,8 @@
 
 Product: both Â· Instance: main :3000
 
+Last verified: 2026-11-24 on `chore/dfind-139-retire-desktop` (DFIND-139) for the renderer's desktop-bridge removal only: `apps/web/lib/product-brand.tsx` initializes directly from `DEFAULT_PRODUCT_BRAND` + `WEB_LOGO_SRC` and `apps/web/src/App.tsx` passes `false` to `resolveGate` without `isElectron()`. Nothing else on this page was re-read.
+
 Last verified: 2026-11-20 on `feat/team-ui`, for the team additions only: the rail gains a "Your team" account link to `/team` and a team-bot section under the virtual agents (name plus role, `agent-rail.tsx`, `agent-rail-parts.tsx`, `agent-rail.css`); `/chat?agent=tb-…` routes to `TeamBotChatPane`, which resolves the bot from `/api/v1/team` and redirects an unknown slug to the generalist (`chat-page.tsx`, `team-bot-chat-pane.tsx`); `/team` is a new chat-first route inside `DeskPane`, modes layout redirects to `/workspaces` (`App.tsx`). Unit-tested (`agent-rail.test.tsx`, shell golden re-recorded); not driven on `:3000`. Other line numbers on this page moved and were not re-anchored.
 
 Last verified: 2026-11-10 at fc855d7d (tester branch) for the two live voice routes registered in `packages/host/src/router.ts:236,372-373` only (`POST /api/v1/voice/sessions` and `POST /api/v1/voice/sessions/:id/end`, mapped by [`voice-mode.md`](voice-mode.md)). Nothing else on the page was re-read.

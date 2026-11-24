@@ -44,13 +44,12 @@ describe("the mount point in the Chat pane", () => {
 });
 
 describe("the folder components", () => {
-  it("reach the shell only through the bridge's picker, never through window", () => {
+  it("never touch window, electron, or a desktop bridge", () => {
     for (const { name, text } of folderSources) {
       expect(text, name).not.toMatch(/\bwindow\.|\bwindow\[|typeof window\b/);
       expect(text, name).not.toMatch(/from "electron"/);
+      expect(text, name).not.toContain("@/lib/desktop-bridge");
     }
-    const bridgeUsers = folderSources.filter(({ text }) => text.includes("@/lib/desktop-bridge"));
-    expect(bridgeUsers.map(({ name }) => name)).toEqual(["use-folder.ts"]);
   });
 
   it("show no raw HTML and no hard-coded English in the markup", () => {

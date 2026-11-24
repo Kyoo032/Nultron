@@ -644,33 +644,6 @@ test("the lock pins the exact versions the root package.json installs", () => {
   assert.match(dev.pyodide, /^\d+\.\d+\.\d+$/);
 });
 
-test("the installer ships the built folder as real files in resources/sandbox, outside the asar", () => {
-  const build = readRepoJson("apps", "desktop", "package.json").build;
-  assert.deepEqual(
-    build.extraResources.filter((entry) => entry.to === "sandbox"),
-    [{ from: "../../vendor/sandbox-runtime", to: "sandbox" }],
-  );
-  assert.equal(
-    build.asarUnpack.some((pattern) => pattern.includes("sandbox")),
-    false,
-  );
-  assert.equal(
-    build.files.some((pattern) => pattern.includes("sandbox")),
-    false,
-  );
-});
-
-test("every desktop build script builds the sandbox folder before electron-builder runs", () => {
-  const scripts = readRepoJson("apps", "desktop", "package.json").scripts;
-  const packing = Object.entries(scripts).filter(([, command]) =>
-    /electron-builder|pack-brand\.mjs|pack-all-brands\.mjs/.test(command),
-  );
-  assert.ok(packing.length >= 6, "expected the desktop-build family of scripts");
-  for (const [name, command] of packing) {
-    assert.match(command, /build-sandbox-runtime\.mjs/, `${name} must build the sandbox runtime first`);
-  }
-});
-
 test("the image builds the folder in the build stage and runs with it read-only at /app/sandbox", () => {
   const dockerfile = readRepoText("webapp-deploy", "Dockerfile");
   assert.match(

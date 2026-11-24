@@ -46,7 +46,7 @@ describe("every gate decision in the app carries the deferral, and the Personal 
     const calls = app.match(/resolveGate\([^;]*\);/g) ?? [];
     expect(calls).toHaveLength(2);
     for (const call of calls) {
-      expect(call).toMatch(/resolveGate\(reported, isElectron\(\), undefined, (deferral|deferralRef\.current)\)/);
+      expect(call).toMatch(/resolveGate\(reported, false, undefined, (deferral|deferralRef\.current)\)/);
     }
   });
 

@@ -4,7 +4,7 @@
  * ending or a decision re-reads the host, and each way an approval can end lands as its outcome.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { DesktopFolderPick } from "./desktop-bridge";
+import type { DesktopFolderPick } from "./folder-actions";
 import { createFolderController } from "./folder-actions";
 import type { FolderApi, FolderResult, FolderStatus, ProposalDiff, ProposalSummary } from "./folder-api";
 import { folderReducer, INITIAL_FOLDER_STATE, type FolderState } from "./folder-state";

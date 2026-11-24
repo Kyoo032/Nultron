@@ -98,23 +98,6 @@ describe("apiFetch CSRF header", () => {
     expect(headerOf(calls[1], CSRF_HEADER)).toBeNull();
     expect(headerOf(calls[1], TRANSPORT_HEADER)).toBe("web");
   });
-
-  it("leaves the Electron IPC branch alone: no fetch, no cookie read", async () => {
-    const invoke = vi.fn(async (_payload: { method: string; path: string }) => ({
-      type: "json" as const,
-      status: 200,
-      body: { ok: true },
-    }));
-    (globalThis as { window?: unknown }).window = { agentforge: { isElectron: true, invoke } };
-    stubDocument("agentforge_csrf=tok-123");
-    const calls = stubFetch();
-    const response = await apiFetch("/api/v1/settings/gateway/check", { method: "POST" });
-    expect(calls).toHaveLength(0);
-    expect(invoke).toHaveBeenCalledTimes(1);
-    expect(invoke.mock.calls[0][0]).toMatchObject({ method: "POST", path: "/api/v1/settings/gateway/check" });
-    expect(Object.keys(invoke.mock.calls[0][0])).not.toContain("headers");
-    expect(response.status).toBe(200);
-  });
 });
 
 describe("readCsrfCookie cookie names", () => {
@@ -205,20 +188,6 @@ describe("apiFetch CSRF priming", () => {
     await apiFetch("/api/v1/settings/gateway/check", { method: "POST" });
     expect(calls).toHaveLength(1);
     expect(calls[0].input).toBe("/api/v1/settings/gateway/check");
-  });
-
-  it("does not prime on the Electron IPC branch", async () => {
-    const invoke = vi.fn(async (_payload: { method: string; path: string }) => ({
-      type: "json" as const,
-      status: 200,
-      body: { ok: true },
-    }));
-    (globalThis as { window?: unknown }).window = { agentforge: { isElectron: true, invoke } };
-    stubDocument("");
-    const calls = stubFetch();
-    await apiFetch("/api/v1/settings/gateway/check", { method: "POST" });
-    expect(calls).toHaveLength(0);
-    expect(invoke).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -520,24 +489,6 @@ describe("apiFetch shares one in-flight GET", () => {
       chunks.push(new TextDecoder().decode(value));
     }
     expect(chunks.join("")).toBe("data: 1\n\ndata: 2\n\n");
-  });
-
-  it("shares one IPC call on the desktop too, and never shares a write there", async () => {
-    const invoke = vi.fn(async (_payload: { method: string; path: string }) => ({
-      type: "json" as const,
-      status: 200,
-      body: { ok: true },
-    }));
-    (globalThis as { window?: unknown }).window = { agentforge: { isElectron: true, invoke } };
-    const [a, b] = await Promise.all([apiFetch("/api/v1/workspaces"), apiFetch("/api/v1/workspaces")]);
-    expect(invoke).toHaveBeenCalledTimes(1);
-    expect(await a.json()).toEqual({ ok: true });
-    expect(await b.json()).toEqual({ ok: true });
-    await Promise.all([
-      apiFetch("/api/v1/workspaces/w1/select", { method: "POST" }),
-      apiFetch("/api/v1/workspaces/w1/select", { method: "POST" }),
-    ]);
-    expect(invoke).toHaveBeenCalledTimes(3);
   });
 });
 

@@ -1,31 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { parseCapabilities, type HostCapabilities } from "@agentforge/core/capabilities";
-import { isElectron } from "@/lib/api-client";
 import { pingOnce } from "@/lib/host-ping";
 
-/**
- * Phase 8 — what this deployment can do, as the renderer sees it.
- *
- * The host resolves the flags from its own mode and puts them on `GET /api/v1/ping`
- * (`packages/core/src/capabilities.ts`); this reads them. Until Phase 8 the renderer decided for
- * itself with `isElectron()` in nine files, and that was a different statement than it looked:
- * `isElectron()` is false on webdev as well as on the hosted server, so every rule hung on it was
- * really saying "not the packaged app". Webdev has "Start over" and the hosted server must not,
- * and no amount of `isElectron()` can tell those two apart.
- *
- * **Everything defaults to false.** `EVERYTHING_OFF` is what a consumer reads before ping has
- * answered and what it keeps if ping fails, so a surface is hidden until the host has said it
- * exists. That is the fail-closed direction: the cost of being wrong is a control that appears a
- * moment late, against a control that appears and then answers 403.
- *
- * **The flags never stand alone.** Every one of them has a refusal behind it on the host, with its
- * own error code. A hidden button is a courtesy to the person; the refusal is the control.
- *
- * **`relaunch`, `updater` and `nativeFilePicker` are ANDed with the bridge**, by their consumers.
- * The host can say a shell is *possible* on this target; only the renderer can see whether a
- * preload actually attached. Webdev is exactly that case — not the hosted server, and still no
- * shell to ask.
- */
 export const EVERYTHING_OFF: HostCapabilities = Object.freeze(parseCapabilities(null));
 
 const CapabilitiesContext = createContext<HostCapabilities>(EVERYTHING_OFF);
@@ -41,13 +17,12 @@ export function useHostCapabilities(): HostCapabilities {
  * hypothetical packaged build pointed at a hosted host, and the flag alone would offer one on
  * webdev, where there is no shell to ask and the answer is `unavailable`.
  */
-export function hasDesktopShell(capabilities: HostCapabilities): boolean {
-  return isElectron() && capabilities.relaunch;
+export function hasDesktopShell(_capabilities: HostCapabilities): boolean {
+  return false;
 }
 
-/** The same test for the native picker, which is a separate capability from the shell. */
-export function hasNativeFilePicker(capabilities: HostCapabilities): boolean {
-  return isElectron() && capabilities.nativeFilePicker;
+export function hasNativeFilePicker(_capabilities: HostCapabilities): boolean {
+  return false;
 }
 
 /**

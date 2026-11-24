@@ -16,8 +16,6 @@
       "!!**/test-results",
       "!!**/.cursor",
       "!!**/packages/db/drizzle",
-      "!!**/apps/desktop/resources",
-      "!!**/apps/desktop/host.cjs",
       "!!**/apps/web/app",
       "!!**/pnpm-lock.yaml"
     ]

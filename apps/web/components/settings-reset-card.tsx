@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { cancelReset, relaunchDesktopApp, resetApp } from "@/lib/api-client";
+import { cancelReset, resetApp } from "@/lib/api-client";
 import { hasDesktopShell, useHostCapabilities } from "@/lib/host-capabilities";
 import { useMayChangeCompanyKey } from "@/lib/company-key-access";
 import { announceGate } from "@/lib/gateway-gate";
@@ -81,16 +81,8 @@ export function SettingsResetCard({ resetPending = false }: SettingsResetCardPro
     setPending(resetPending);
   }, [resetPending]);
 
-  /** One place to read a relaunch answer, so a refusal never renders as "restarting". */
   async function requestRestart(): Promise<boolean> {
-    const relaunched = await relaunchDesktopApp({ reset: true });
-    if (relaunched.ok) {
-      setRestartReason(null);
-      setOutcome("restarting");
-      return true;
-    }
-    // Webdev has no shell to ask; the operator restarts the dev server instead.
-    setRestartReason(relaunched.reason === "unavailable" ? null : (relaunched.reason ?? null));
+    setRestartReason(null);
     setOutcome("restartNeeded");
     return false;
   }

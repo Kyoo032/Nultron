@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const manifestPath = path.join(repoRoot, "packages/core/src/edit/starter-media.json");
-const outDir = path.join(repoRoot, "apps/desktop/resources/starters");
+const outDir = path.join(repoRoot, "assets/starters");
 const checkOnly = process.argv.includes("--check");
 
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));

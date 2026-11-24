@@ -19,7 +19,6 @@ import { join } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import type { HostResult } from "@agentforge/host";
 import { downloadArtifactFile } from "@/lib/artifacts-client";
 import { createFilesApi } from "@/lib/files-api";
 
@@ -232,71 +231,5 @@ describe("in the browser, over a real socket", () => {
     stubBrowser();
     await expect(downloadArtifactFile("00000000-0000-4000-8000-000000000000")).rejects.toThrow("Artifact not found");
     expect(saved).toEqual([]);
-  });
-});
-
-describe("in the packaged app, over the IPC bridge", () => {
-  /** What `host:request` in apps/desktop/main.cjs does with the host's answer before the renderer sees it. */
-  async function ipcInvoke(payload: { method: string; path: string; query?: Record<string, string>; body?: unknown }) {
-    const result: HostResult = await host.dispatch({
-      method: payload.method,
-      path: payload.path,
-      query: payload.query ?? {},
-      params: {},
-      headers: { "x-agentforge-transport": "ipc" },
-      body: payload.body,
-    });
-    if (result.type === "bytes") {
-      return {
-        type: "bytes" as const,
-        status: result.status,
-        bytes: Array.from(result.bytes),
-        contentType: result.contentType,
-        filename: result.filename,
-      };
-    }
-    if (result.type === "json") {
-      return result;
-    }
-    throw new Error("unexpected stream");
-  }
-
-  function stubShell() {
-    const dialog: Array<{ filename: string; bytes: number[] }> = [];
-    vi.stubGlobal("window", {
-      agentforge: {
-        isElectron: true,
-        invoke: ipcInvoke,
-        stream: vi.fn(),
-        saveBytes: async (filename: string, bytes: number[]) => void dialog.push({ filename, bytes }),
-      },
-    });
-    const createUrl = vi.spyOn(URL, "createObjectURL");
-    return { dialog, createUrl };
-  }
-
-  it("the deck reaches the save dialog once, as the same .pptx", async () => {
-    const { dialog, createUrl } = stubShell();
-    await downloadArtifactFile(artifactId, "fallback.pptx");
-    expect(dialog).toHaveLength(1);
-    expect(dialog[0]?.filename).toBe("roadmap-review.pptx");
-    const bytes = Uint8Array.from(must(dialog[0]).bytes);
-    expect(slideTexts(bytes)).toHaveLength(3);
-    expect(createUrl).not.toHaveBeenCalled();
-  });
-
-  it("the desk file reaches the save dialog once, byte for byte", async () => {
-    const { dialog, createUrl } = stubShell();
-    expect(await createFilesApi().download(FILE_PATH)).toEqual({ ok: true, data: { filename: "summary.csv" } });
-    expect(dialog).toHaveLength(1);
-    expect(dialog[0]?.filename).toBe("summary.csv");
-    expect(Buffer.from(must(dialog[0]).bytes).toString("utf8")).toBe(FILE_TEXT);
-    expect(createUrl).not.toHaveBeenCalled();
-  });
-
-  it("opens no dialog for a file that is not there", async () => {
-    const { dialog } = stubShell();
-    expect(await createFilesApi().download("out/never-written.csv")).toMatchObject({ ok: false, code: "not_found" });
-    expect(dialog).toEqual([]);
   });
 });

@@ -13,15 +13,13 @@ import { imageClipAt } from "@/lib/edit-preview-media";
 import { EditRecipesPanel } from "@/components/edit-recipes-panel";
 import { EditPreview } from "@/components/edit-preview";
 import { EditTimeline } from "@/components/edit-timeline";
-import { apiFetch, isElectron } from "@/lib/api-client";
+import { apiFetch } from "@/lib/api-client";
 import { useCatalogVersion } from "@/lib/catalog-version";
 import { editInterruptedNote } from "@/lib/edit-agent-note";
 import { filenameFromDisposition } from "@/lib/download-name";
-import { pickMedia } from "@/lib/desktop-bridge";
 import { gatewayBlockedMessage, hostedGatewayBlocked, isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { isHostedBuild } from "@/lib/hosted-build";
 import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
-import { hasNativeFilePicker, useHostCapabilities } from "@/lib/host-capabilities";
 import {
   activeJobs,
   createEditProject,
@@ -65,7 +63,6 @@ type StudioModel = { id: string; label: string; provider?: string; inputModaliti
 
 export function EditStudio() {
   const { gatewayName } = useProductBrand();
-  const capabilities = useHostCapabilities();
   const emitLock = useEmitLock();
   const fileRef = useRef<HTMLInputElement>(null);
   const eventsAbort = useRef<AbortController | null>(null);
@@ -390,39 +387,7 @@ export function EditStudio() {
     await reloadProject(project.id);
   }
 
-  async function onImportClick() {
-    /*
-     * Phase 8 — the native picker is a capability now, not just a bridge check.
-     *
-     * `isElectron()` alone was almost right and said the wrong thing: it is false on webdev as
-     * well as on the hosted server, so it was really testing "is this the packaged app". What this
-     * branch actually needs is "may a path on this machine mean anything to the host", which is
-     * what `nativeFilePicker` says, and the host refuses a `sourcePath` in server mode with
-     * `local_path_disabled` whatever the renderer decides. Both halves, because neither is enough:
-     * the flag alone would offer a picker on webdev, where there is no shell to ask.
-     */
-    if (hasNativeFilePicker(capabilities) && project) {
-      try {
-        const [sourcePath] = await pickMedia();
-        if (!sourcePath) {
-          return;
-        }
-        const response = await apiFetch(`/api/v1/edit/projects/${project.id}/import`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sourcePath }),
-        });
-        if (!response.ok) {
-          setError(errorMessage(await readJson(response), t("edit.errors.import")));
-          return;
-        }
-        await reloadProject(project.id);
-        return;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : t("edit.errors.import"));
-        return;
-      }
-    }
+  function onImportClick() {
     fileRef.current?.click();
   }
 
@@ -693,11 +658,6 @@ export function EditStudio() {
       const response = await apiFetch(`/api/v1/edit/projects/${project.id}/export/${exportJobId}/file`);
       if (!response.ok) {
         setError(errorMessage(await readJson(response), t("edit.errors.exportNotReady")));
-        return;
-      }
-      if (isElectron()) {
-        // apiFetch already wrote the bytes through the native save dialog; a second, browser-style
-        // download here would open the save dialog twice.
         return;
       }
       const blob = await response.blob();

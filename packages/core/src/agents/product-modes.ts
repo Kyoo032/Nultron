@@ -48,11 +48,11 @@ export const LEGACY_PRODUCT_MODES: ProductMode[] = ["chat", "images", "videos", 
 export const FALLBACK_PRODUCT_MODES: ProductMode[] = [...WORK_PRODUCT_MODES];
 
 /**
- * The modes the FIRST desk of a fresh Personal install is created with (owner decision, Rizky,
+ * The modes the FIRST desk of a fresh OPC desk is created with (owner decision, Rizky,
  * 2026-10-21, replacing the 2026-09-29 list): Chat alone, so every person starts with one agent, the
  * default one. Every other agent is hired later from Virtual agents.
  *
- * A HARD rule, not a default. Every path that creates a first desk on a fresh Personal data dir goes
+ * A HARD rule, not a default. Every path that creates a first desk on a fresh OPC data dir goes
  * through `firstDeskModes` (`packages/db/src/ensure-local-owner.ts` is the only one), and
  * `packages/host/src/first-run-modes.test.ts` fails if a fresh data dir's first desk has any other
  * mode set. It is written out literally, not derived from the catalog, so a new catalog entry can
@@ -62,7 +62,7 @@ export const FALLBACK_PRODUCT_MODES: ProductMode[] = [...WORK_PRODUCT_MODES];
 export const FIRST_RUN_MODES: readonly ProductMode[] = Object.freeze(["chat"] satisfies ProductMode[]);
 
 /**
- * What the hosted app creates a tenant's first desk with: Chat alone, like Personal (owner decision,
+ * What the hosted app creates a tenant's first desk with: Chat alone, like a fresh desk (owner decision,
  * Rizky, 2026-10-21: every person starts with one agent). A separate constant so the two can differ
  * again by an owner's word. `ensurePortalOwner` (`packages/db/src/portal-owner.ts`) reads this;
  * `ensureLocalOwner` reads `FIRST_RUN_MODES` through `firstDeskModes(false)`.

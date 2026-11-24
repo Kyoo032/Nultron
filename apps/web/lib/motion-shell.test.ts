@@ -253,16 +253,16 @@ describe("the shell attribute", () => {
     expect(SHELL_ATTR).toBe("data-shell");
   });
 
-  it("is written once at boot, from isElectron(), before the first render", () => {
+  it("is written once at boot as browser before the first render", () => {
     const main = read("src", "main.tsx");
-    const call = main.indexOf("applyDeskShell(document.documentElement, isElectron())");
+    const call = main.indexOf("applyDeskShell(document.documentElement, false)");
     expect(call, "main.tsx must mark the shell").toBeGreaterThan(-1);
     expect(call, "before createRoot, so no loop starts under the wrong timing").toBeLessThan(
       main.indexOf("createRoot("),
     );
   });
 
-  it("never reads the desktop bridge itself: only lib/desktop-bridge.ts may", () => {
+  it("never reads window.agentforge", () => {
     const source = stripComments(read("lib", "shell-motion.ts")).replace(/\/\/.*$/gm, "");
     expect(source).not.toMatch(/window\.agentforge/);
   });

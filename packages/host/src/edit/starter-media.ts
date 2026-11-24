@@ -14,7 +14,7 @@ import { log } from "../log";
 
 type ProcessWithResources = NodeJS.Process & { resourcesPath?: string };
 
-const DEV_RELATIVE = path.join("apps", "desktop", "resources", "starters");
+const DEV_RELATIVE = path.join("assets", "starters");
 /** Bundled clips are small; anything larger is not a starter file we shipped. */
 export const STARTER_MEDIA_MAX_BYTES = 200 * 1024 * 1024;
 

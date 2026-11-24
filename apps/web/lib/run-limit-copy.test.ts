@@ -166,17 +166,3 @@ describe("a refused request through apiFetch on the web", () => {
     expect(await response.text()).toBe("<html>upstream</html>");
   });
 });
-
-describe("a refused request through apiFetch in the packaged app (IPC)", () => {
-  it.each(CASES)("hands every caller the catalog sentence for $code there too", async ({ code, status, key }) => {
-    const invoke = vi.fn(async () => ({
-      type: "json" as const,
-      status,
-      body: { error: { code, message: HOST_ENGLISH } },
-    }));
-    (globalThis as { window?: unknown }).window = { agentforge: { isElectron: true, invoke } };
-    const response = await apiFetch("/api/v1/music", { method: "POST", body: "{}" });
-    expect(response.status).toBe(status);
-    expect(await response.json()).toEqual({ error: { code, message: enCommon.runLimit[key] } });
-  });
-});

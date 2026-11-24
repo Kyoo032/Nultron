@@ -23,7 +23,7 @@ import {
   type TickerPacket,
   type WatchNewsItem,
 } from "@agentforge/core/market";
-import { apiFetch, isElectron } from "./api-client";
+import { apiFetch } from "./api-client";
 import { saveBlob } from "./artifacts-client";
 import {
   CONFIDENCE_LEVELS,
@@ -295,9 +295,6 @@ export async function downloadMarketDocx(briefing: MarketBriefing): Promise<void
   });
   if (!res.ok) {
     throw new Error(errorMessage(await res.json().catch(() => null), "Could not build the DOCX file"));
-  }
-  if (isElectron()) {
-    return;
   }
   const disposition = res.headers.get("Content-Disposition") ?? "";
   const filename = disposition.match(/filename="([^"]+)"/)?.[1] ?? "market-briefing.docx";

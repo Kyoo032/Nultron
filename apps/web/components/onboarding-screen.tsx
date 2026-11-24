@@ -7,7 +7,7 @@ import { ModeIcon, type ModeIconName } from "@/components/mode-icons";
 import { NultronMascot } from "@/components/nultron/nultron-mascot";
 import { warmMascot } from "@/components/nultron/nx-warm";
 import { OnboardingDesks } from "@/components/onboarding-desks";
-import { apiFetch, checkGateway, isElectron } from "@/lib/api-client";
+import { apiFetch, checkGateway } from "@/lib/api-client";
 import { useMayChangeCompanyKey } from "@/lib/company-key-access";
 import { fetchEditDoctor, type EditDoctor } from "@/lib/edit-client";
 import { onboardingFfmpegLaterKey } from "@/lib/ffmpeg-notice-copy";
@@ -148,7 +148,7 @@ export function OnboardingScreen({ onDone, gateway, onLater, initialStep }: Prop
     // (hosted only; a no-op elsewhere).
     publishGate(next);
     // The host said this desk may work. Show what to try, then the last button opens Chat.
-    if (resolveGate(next, isElectron()) === "app") {
+    if (resolveGate(next, false) === "app") {
       setStep("try");
       return true;
     }

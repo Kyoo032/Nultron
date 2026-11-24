@@ -67,7 +67,7 @@ A release without `.dmg` files is Windows-only. The macOS build is a preview and
 
 - The installer is not code-signed yet. If SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
 - Installing over an existing Nultron copy upgrades it in place. Your threads, settings and saved key are kept.
-- **Settings → Check for updates** asks `Kyoo032/Nultron` for new releases. That name now belongs to the Enterprise repo, so the check fails with an error. It does not find a new desktop release. To use Nultron, sign in to Nultron Enterprise from a browser.
+- **Settings → Check for updates** asks `Kyoo032/Nultron` for `latest.yml` and new releases. `Kyoo032/Nultron` is now the private source repository (retired desktop installers live on the archived `Kyoo032/Nultron-Desktop` repository), so an unauthenticated updater check answers 404 and does not find a new desktop release. To use Nultron, sign in to the Nultron web app from a browser.
 - Video editing uses ffmpeg, which is included in the installer.
 
 ## Install on macOS (preview)

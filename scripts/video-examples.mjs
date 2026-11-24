@@ -28,7 +28,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const manifestPath = path.join(repoRoot, "packages/core/src/edit/video-examples.json");
 const templatesPath = path.join(repoRoot, "packages/core/src/edit/prompt-templates.json");
-const outDir = path.join(repoRoot, "apps/desktop/resources/examples/videos");
+const outDir = path.join(repoRoot, "assets/examples/videos");
 
 const DEFAULT_HOST = "http://127.0.0.1:3000";
 const MAX_EDGE_PX = 1280;

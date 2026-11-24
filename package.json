@@ -35,16 +35,7 @@
     "videos:examples": "node scripts/video-examples.mjs",
     "videos:examples:check": "node scripts/video-examples.mjs --check",
     "sandbox:build": "node scripts/build-sandbox-runtime.mjs",
-    "sandbox:verify": "node scripts/build-sandbox-runtime.mjs --verify",
-    "desktop:dev": "pnpm --filter @agentforge/desktop desktop-dev",
-    "desktop:build": "pnpm --filter @agentforge/desktop desktop-build",
-    "desktop:release": "pnpm --filter @agentforge/desktop desktop-release",
-    "desktop:build:all": "pnpm --filter @agentforge/desktop desktop-build-all",
-    "desktop:build:mac": "pnpm --filter @agentforge/desktop desktop-build-mac",
-    "desktop:build:mac:dir": "pnpm --filter @agentforge/desktop desktop-build-mac-dir",
-    "desktop:build:mac:docker": "pnpm --filter @agentforge/desktop desktop-build-mac-docker",
-    "desktop:mac": "node apps/desktop/scripts/macos-app.mjs",
-    "desktop:build:linux": "pnpm --filter @agentforge/desktop desktop-build-linux"
+    "sandbox:verify": "node scripts/build-sandbox-runtime.mjs --verify"
   },
   "pnpm": {
     "overrides": {

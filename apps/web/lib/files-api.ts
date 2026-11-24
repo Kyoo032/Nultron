@@ -14,9 +14,8 @@
  * outcome and never throws: a dead network is `network`, a body this app cannot read is `bad_response`,
  * and a host refusal keeps the host's own code so the screen can say it in the owner's language.
  */
-import { apiFetch, isElectron } from "@/lib/api-client";
+import { apiFetch } from "@/lib/api-client";
 import { saveBlob } from "./artifacts-client";
-import { DesktopSaveError } from "./desktop-save";
 import { filenameFromDisposition, leafName } from "./download-name";
 import type { FileEntry, FileRead, FileVersion } from "./files-model";
 
@@ -33,9 +32,8 @@ export type DownloadIo = {
   readonly saveBlob: (blob: Blob, filename: string) => void;
 };
 
-/** Called, not bound: a test that mocks `api-client` without `isElectron` can still import this file. */
 const DEFAULT_DOWNLOAD_IO: DownloadIo = {
-  desktop: () => isElectron(),
+  desktop: () => false,
   saveBlob: (blob, filename) => saveBlob(blob, filename),
 };
 
@@ -168,10 +166,8 @@ export function createFilesApi(fetcher: FilesFetch = apiFetch, io: DownloadIo = 
     let res: Response;
     try {
       res = await fetcher(`${BASE}/download${query({ path })}`);
-    } catch (error) {
-      // In the packaged app the fetcher also writes the file, and it throws when the disk refused it:
-      // that is not the network, and "check the connection" would send the person the wrong way.
-      return { ok: false, code: error instanceof DesktopSaveError ? "save_failed" : "network", status: 0 };
+    } catch {
+      return { ok: false, code: "network", status: 0 };
     }
     if (!res.ok) {
       return { ok: false, code: errorCode(await res.json().catch(() => null)), status: res.status };

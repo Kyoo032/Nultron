@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { DEFAULT_PRODUCT_NAME, GATEWAY_BASE_URL, GATEWAY_NAME } from "@agentforge/core/gateway";
-import { getDesktopBrand, getDesktopBrandLogo, isElectron } from "@/lib/api-client";
 import { pingOnce } from "@/lib/host-ping";
 
 export type ProductBrand = {
@@ -133,16 +132,7 @@ export function mergePingBrand(current: ProductBrand, payload: unknown): Product
 }
 
 function preloadBrand(): ProductBrand {
-  if (!isElectron()) {
-    // Name from the shared default, mark from the web's own asset. `/api/v1/ping` answers the same
-    // name, so the ping that follows confirms it rather than replacing it -- and a tenant flavor
-    // in that ping still wins, which is the whole point of leaving the name at the default here.
-    return { ...DEFAULT_PRODUCT_BRAND, logoSrc: WEB_LOGO_SRC };
-  }
-  return {
-    ...brandFromUnknown(getDesktopBrand(), DEFAULT_PRODUCT_BRAND),
-    logoSrc: getDesktopBrandLogo() ?? "",
-  };
+  return { ...DEFAULT_PRODUCT_BRAND, logoSrc: WEB_LOGO_SRC };
 }
 
 export function ProductBrandProvider({ children }: { children: ReactNode }) {

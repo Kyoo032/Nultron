@@ -29,7 +29,6 @@ import { CustomersPage } from "@/components/customers-page";
 import { DeskPane } from "@/components/desk-pane";
 import { WorkModeKeepAlive } from "@/components/work-mode-keep-alive";
 import { OnboardingScreen } from "@/components/onboarding-screen";
-import { isElectron } from "@/lib/api-client";
 import { publishGate } from "@/lib/gate-state";
 import {
   GATE_EVENT,
@@ -123,7 +122,9 @@ function Shell({ children }: { children: ReactNode }) {
   }, [modesCacheKey]);
 
   useEffect(() => {
-    reload();
+    if (typeof location.pathname === "string") {
+      reload();
+    }
     const onRefresh = () => reload();
     window.addEventListener("agentforge-shell-refresh", onRefresh);
     return () => window.removeEventListener("agentforge-shell-refresh", onRefresh);
@@ -244,7 +245,7 @@ export function AppRoutes() {
       const reported = readGateEvent(event);
       setGateway(reported);
       publishGate(reported);
-      setGate(resolveGate(reported, isElectron(), undefined, deferralRef.current));
+      setGate(resolveGate(reported, false, undefined, deferralRef.current));
     };
     window.addEventListener(GATE_EVENT, onGate);
     return () => window.removeEventListener(GATE_EVENT, onGate);
@@ -286,7 +287,7 @@ export function AppRoutes() {
         const deferral = read.hasSession && choseLaterRef.current ? { ...read, later: true } : read;
         setKeyLater(deferral.later);
         setGateway(reported);
-        setGate(resolveGate(reported, isElectron(), undefined, deferral));
+        setGate(resolveGate(reported, false, undefined, deferral));
       })
       .catch(() => {
         if (localeEpoch === 0) {
