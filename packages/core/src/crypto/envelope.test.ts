@@ -1,3 +1,4 @@
+import { createCipheriv, randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   wrappingKeyFromSecret,
@@ -6,6 +7,7 @@ import {
   isEnvelope,
   sealPayload,
   openPayload,
+  openPayloadWithKeys,
   type EncryptedEnvelope,
 } from "./envelope";
 
@@ -124,5 +126,95 @@ describe("sealPayload / openPayload", () => {
   it("openPayload handles a primitive plaintext string", () => {
     const result = openPayload<string>("plain text", key);
     expect(result).toBe("plain text");
+  });
+
+  it("keeps exact v:1 envelope shape without kid when options are omitted", () => {
+    const sealed = sealPayload({ ok: true }, key);
+    expect(Object.keys(sealed).sort()).toEqual(["alg", "ct", "n", "tag", "v"]);
+    expect("kid" in sealed).toBe(false);
+  });
+
+  it("opens a legacy v:1 envelope constructed without aad or kid", () => {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv("aes-256-gcm", key, iv);
+    const ct = Buffer.concat([cipher.update(Buffer.from(JSON.stringify({ legacy: 42 }), "utf8")), cipher.final()]);
+    const legacy: EncryptedEnvelope = {
+      v: 1,
+      alg: "aes-256-gcm",
+      n: iv.toString("base64"),
+      ct: ct.toString("base64"),
+      tag: cipher.getAuthTag().toString("base64"),
+    };
+    expect(isEnvelope(legacy)).toBe(true);
+    expect(openPayload<{ legacy: number }>(legacy, key)).toEqual({ legacy: 42 });
+  });
+
+  it("binds GCM AAD and rejects missing or mismatched AAD", () => {
+    const sealed = sealPayload({ secret: "bound" }, key, { aad: "tenant:t1:threads" });
+    expect(openPayload<{ secret: string }>(sealed, key, { aad: "tenant:t1:threads" })).toEqual({ secret: "bound" });
+    expect(() => openPayload(sealed, key)).toThrow();
+    expect(() => openPayload(sealed, key, { aad: "tenant:t2:threads" })).toThrow();
+  });
+
+  it("records optional kid and validates kid type in isEnvelope", () => {
+    const sealed = sealPayload({ v: "k" }, key, { kid: "key-2026-11" });
+    expect(sealed.kid).toBe("key-2026-11");
+    expect(isEnvelope(sealed)).toBe(true);
+    expect(isEnvelope({ ...sealed, kid: 123 })).toBe(false);
+    expect(openPayload<{ v: string }>(sealed, key)).toEqual({ v: "k" });
+  });
+});
+
+describe("openPayloadWithKeys", () => {
+  const k1 = wrappingKeyFromSecret("rotation-key-1");
+  const k2 = wrappingKeyFromSecret("rotation-key-2");
+  const k3 = wrappingKeyFromSecret("rotation-key-3");
+
+  it("opens envelopes sealed with any key in the candidate list", () => {
+    const sealedOld = sealPayload({ msg: "old" }, k1);
+    const sealedNew = sealPayload({ msg: "new" }, k2);
+
+    expect(openPayloadWithKeys<{ msg: string }>(sealedOld, [k2, k1])).toEqual({ msg: "old" });
+    expect(openPayloadWithKeys<{ msg: string }>(sealedNew, [k2, k1])).toEqual({ msg: "new" });
+  });
+
+  it("prefers matching kid from keyRing before trying other keys", () => {
+    const sealed = sealPayload({ msg: "ring" }, k2, { kid: "k2", aad: "scope:inbox" });
+    // Even with wrong/decoy key under a different kid listed first, matching kid selects k2 first
+    const opened = openPayloadWithKeys<{ msg: string }>(sealed, [k1], {
+      aad: "scope:inbox",
+      keyRing: [
+        { kid: "k1", key: k1 },
+        { kid: "k2", key: k2 },
+      ],
+    });
+    expect(opened).toEqual({ msg: "ring" });
+  });
+
+  it("prefers matching kid from KeyRingEntry[] passed directly in keys", () => {
+    const sealed = sealPayload({ msg: "direct-ring" }, k2, { kid: "k2" });
+    // Also falls back to other candidates if matching kid key does not decrypt
+    const opened = openPayloadWithKeys<{ msg: string }>(sealed, [
+      { kid: "k1", key: k1 },
+      { kid: "k2", key: k2 },
+    ]);
+    expect(opened).toEqual({ msg: "direct-ring" });
+
+    const mislabeled = sealPayload({ msg: "fallback" }, k3, { kid: "k2" });
+    expect(
+      openPayloadWithKeys<{ msg: string }>(mislabeled, [
+        { kid: "k1", key: k1 },
+        { kid: "k2", key: k2 },
+        k3,
+      ]),
+    ).toEqual({ msg: "fallback" });
+  });
+
+  it("passes through legacy plaintext and throws when no key matches or list is empty", () => {
+    expect(openPayloadWithKeys("legacy-text", [])).toBe("legacy-text");
+    const sealed = sealPayload({ msg: "locked" }, k1, { aad: "ctx" });
+    expect(() => openPayloadWithKeys(sealed, [k2, k3], { aad: "ctx" })).toThrow();
+    expect(() => openPayloadWithKeys(sealed, [k1], { aad: "wrong-ctx" })).toThrow();
+    expect(() => openPayloadWithKeys(sealed, [])).toThrow();
   });
 });

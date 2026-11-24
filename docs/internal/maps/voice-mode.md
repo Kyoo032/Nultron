@@ -1,8 +1,8 @@
 # Map — Live voice in Chat
 
-Product: both · Instance: tester (`tester/chat-first`). Live voice is off unless `AGENTFORGE_VOICE` is on; to run it, start an isolated desk on its own port, never 3000 or 3200.
+Product: both · Instance: `main` (Nultron Enterprise, `enterprise` lane). Live voice is **ON by default** unless `AGENTFORGE_VOICE=off|0|false`; to run the live smoke eval, start an isolated desk on its own port, never 3000 or 3200.
 
-Last verified: 2026-11-24 on `fix/dfind-130-131-132-134-148` (DFIND-134): `packages/host/src/voice/talker-omni-http.ts` masks prior thread turns in `historyMessages` and delegated `answer` text, `pending.question`, and `pending.arguments` with `maskPii` before sending to the gateway (`talker-omni-http.test.ts`). Earlier: 2026-11-20 — voice delegation: the thinker runs `delegate` itself (hired modes and `tb-` desk bots), the ask's clock extends to 180 s once a delegation starts, the idle timer waits for a pending ask, the saved assistant row leads with the delegate `tool_call` part, and the mic is offered only in the orchestrator's Chat. Earlier: 2026-11-18 at 886ca55a plus the local browser mode fix. The browser voice tests cover that fix. The last live drive was on 2026-11-10 to 11 at 4fbbe0d2, through the real gateway and in Chromium with a fake microphone. The latency numbers are in the plan's [First live run](../voice-mode-plan.md#first-live-run-2026-11-10). Not verified: the hosted server, Safari, a phone, a real microphone with echo on speakers, or a live delegated run from voice. Plan: [`../voice-mode-plan.md`](../voice-mode-plan.md). Feature recipe: [`../../../.cursor/skills/verify-agentforge/features/voice.md`](../../../.cursor/skills/verify-agentforge/features/voice.md).
+Last verified: 2026-11-24 — P0 fixes (barge-in unpause in `PlaybackQueue.drop`/`endTurn`, `ask_nultron` ack->thinking transition & separate answer playback window, push-to-talk immediate-onset VAD calibration & PTT barge-in commit), voice enabled by default (`AGENTFORGE_VOICE` kill-switch + optional `AGENTFORGE_VOICE_OWNERS` allowlist in server mode), `maskPii` on transcripts & `ask_nultron` answers, interactive controls (visualizer, Mute/Unmute, Stop/Interrupt, Done/Send, Spacebar PTT, card Dismiss), read-tool `onProgress` captions, ack backoff TTL & punctuation normalization, and transient talker error retry captions. Earlier: 2026-11-20 — voice delegation. Plan: [`../voice-mode-plan.md`](../voice-mode-plan.md). Feature recipe: [`../../../.cursor/skills/verify-agentforge/features/voice.md`](../../../.cursor/skills/verify-agentforge/features/voice.md).
 
 ## Overview
 
@@ -239,11 +239,11 @@ Outbound audio is also bounded: a socket with more than 3 s of audio (144,000 by
 
 _Bare line numbers in this section are in `packages/host/src/voice/flag.ts`; a cite of any other file names it._
 
-`voiceSettingsFor(tenant, env, serverMode)` (`flag.ts:26-38`) says whether voice is offered and admitted (the settings answer, H1 and H2 all call it):
+`voiceSettingsFor(tenant, env, serverMode)` (`flag.ts`) says whether voice is offered and admitted (the settings answer, H1 and H2 all call it):
 
-- `AGENTFORGE_VOICE`: `on`, `1` or `true`, case-insensitive. Anything else, or unset, is off (`:31-33`).
-- `AGENTFORGE_VOICE_OWNERS`: **user ids**, comma-separated, case-insensitive; the tenant carries a user id and no e-mail (`flag.ts:9-10,40-46`). Off server mode the flag alone is enough. In server mode the user must also be listed; an empty or unset list enables nobody (`:34-36`).
-- `AGENTFORGE_VOICE_MODEL`: the talker model; defaults to `qwen3.5-omni-flash` (`:16,37`).
+- `AGENTFORGE_VOICE`: **ON by default**. Explicit kill-switch `off`, `0`, or `false` (case-insensitive) disables voice.
+- `AGENTFORGE_VOICE_OWNERS`: **user ids**, comma-separated, case-insensitive, server mode only (`flag.ts`). When unset or blank, all authenticated users on desks with a live key are allowed. When explicitly set, access is restricted to the listed `userId`s.
+- `AGENTFORGE_VOICE_MODEL`: the talker model; defaults to `qwen3.5-omni-flash`.
 - The talker needs the live runtime and a key on the desk (`createVoiceModels`), else H1 is `503 voice_model_unavailable`.
 
 ## Where the gateway key lives and where it must never go

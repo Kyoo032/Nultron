@@ -45,14 +45,14 @@
     "noSpecialists": "Belum ada spesialis.",
     "bots": "Bot Anda",
     "open": "Buka obrolan",
-    "letGo": "Lepaskan",
-    "lettingGo": "Melepaskan…",
-    "letGoAria": "Lepaskan {name}"
+    "letGo": "Hapus",
+    "lettingGo": "Menghapus…",
+    "letGoAria": "Hapus {name}"
   },
   "error": {
     "load": "Tidak dapat memuat tim Anda.",
     "propose": "Tidak dapat membuat usulan tim.",
     "hire": "Tidak dapat merekrut tim.",
-    "release": "Tidak dapat melepaskan mereka."
+    "release": "Gagal menghapus agen."
   }
 }

@@ -37,37 +37,38 @@ describe("prompt row classes", () => {
 });
 
 describe("the desks that share the prompt row", () => {
-  it.each([
-    "documents-studio.tsx",
-    "research-studio.tsx",
-    "images-studio.tsx",
-    "videos-studio.tsx",
-    "music-studio.tsx",
-    "data-studio.tsx",
-  ])("%s builds its row from PROMPT_ROW", (file) => {
-    const source = component(file);
-    expect(source).toContain("className={PROMPT_ROW}");
-    expect(source).toContain('from "@/lib/prompt-row"');
-  });
+  it.each(["documents-studio.tsx", "music-studio.tsx", "data-studio.tsx"])(
+    "%s builds its row from PROMPT_ROW",
+    (file) => {
+      const source = component(file);
+      expect(source).toContain("className={PROMPT_ROW}");
+      expect(source).toContain('from "@/lib/prompt-row"');
+    },
+  );
 
-  it.each(["documents-studio.tsx", "images-studio.tsx", "videos-studio.tsx", "music-studio.tsx"])(
+  it.each(["images-studio.tsx", "videos-studio.tsx", "research-studio.tsx"])(
+    "%s uses the shared minimalist studio composer layout",
+    (file) => {
+      const source = component(file);
+      expect(source).toContain('className="studio-composer"');
+      expect(source).toContain('className="studio-composer-top"');
+      expect(source).toContain('className="studio-composer-input"');
+    },
+  );
+
+  it.each(["documents-studio.tsx", "music-studio.tsx"])(
     "%s lets its submit button take its own line when the row is narrow",
     (file) => {
       expect(component(file)).toContain("PROMPT_SUBMIT");
     },
   );
 
-  it.each(["research-studio.tsx", "data-studio.tsx"])(
-    "%s groups Cancel with submit so they share that line",
-    (file) => {
-      expect(component(file)).toContain("className={PROMPT_ACTIONS}");
-    },
-  );
+  it.each(["data-studio.tsx"])("%s groups Cancel with submit so they share that line", (file) => {
+    expect(component(file)).toContain("className={PROMPT_ACTIONS}");
+  });
 
-  it("gives Documents and Research the shared select recipe, not a one-off", () => {
-    for (const file of ["documents-studio.tsx", "research-studio.tsx"]) {
-      expect(component(file)).toMatch(/className="select-field w-full"/);
-    }
+  it("gives Documents the shared select recipe, not a one-off", () => {
+    expect(component("documents-studio.tsx")).toMatch(/className="select-field w-full"/);
   });
 
   it("lets Data's model select wrap under Enhance instead of overflowing the form", () => {

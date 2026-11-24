@@ -5,7 +5,7 @@ import { loadConfig, type PortalConfig } from "./config";
 import { createLogger } from "./log";
 import { createPortalServer, HEALTH_PATH, MAX_BODY_BYTES, type PortalServer } from "./server";
 import { createTestStore, type TestStore } from "./testing/pg";
-import { startTestPortal, type PortalHarness } from "./testing/server";
+import { startTestPortal, testConfig, type PortalHarness } from "./testing/server";
 
 let harness: TestStore;
 let config: PortalConfig;
@@ -281,5 +281,69 @@ describe("a request whose target or Host header is not a URL", () => {
     );
     expect(statusLine(reply)).toBe("HTTP/1.1 200 OK");
     expect(jsonBody(reply).status).toBe("ok");
+  });
+});
+
+describe("HTTPS enforcement in production or behind a non-loopback publicUrl", () => {
+  it("rejects non-/healthz requests lacking X-Forwarded-Proto: https in production, while keeping /healthz open", async () => {
+    const prodServer = createPortalServer({
+      config: testConfig({ production: true, publicUrl: "https://portal.example.com" }),
+      store: harness.store,
+    });
+    prodServer.register({
+      method: "GET",
+      path: "/test/protected",
+      handle() {
+        return { status: 200, json: { ok: true } };
+      },
+    });
+    const { port } = await prodServer.listen();
+    const origin = `http://127.0.0.1:${port}`;
+    try {
+      expect((await fetch(`${origin}/healthz`)).status).toBe(200);
+      expect((await fetch(`${origin}/healthz`, { method: "HEAD" })).status).toBe(200);
+
+      const noProto = await fetch(`${origin}/test/protected`);
+      expect(noProto.status).toBe(403);
+      expect(await noProto.json()).toEqual({ error: "https_required" });
+
+      const httpProto = await fetch(`${origin}/test/protected`, {
+        headers: { "x-forwarded-proto": "http" },
+      });
+      expect(httpProto.status).toBe(403);
+
+      const httpsProto = await fetch(`${origin}/test/protected`, {
+        headers: { "x-forwarded-proto": "https" },
+      });
+      expect(httpsProto.status).toBe(200);
+      expect(await httpsProto.json()).toEqual({ ok: true });
+    } finally {
+      await prodServer.close();
+    }
+  });
+
+  it("enforces X-Forwarded-Proto: https when publicUrl is non-loopback even outside NODE_ENV=production", async () => {
+    const proxiedServer = createPortalServer({
+      config: testConfig({ production: false, publicUrl: "https://portal.example.com" }),
+      store: harness.store,
+    });
+    proxiedServer.register({
+      method: "GET",
+      path: "/test/proxied",
+      handle() {
+        return { status: 200, json: { ok: true } };
+      },
+    });
+    const { port } = await proxiedServer.listen();
+    const origin = `http://127.0.0.1:${port}`;
+    try {
+      expect((await fetch(`${origin}/healthz`)).status).toBe(200);
+      expect((await fetch(`${origin}/test/proxied`)).status).toBe(403);
+      expect(
+        (await fetch(`${origin}/test/proxied`, { headers: { "x-forwarded-proto": "https, http" } })).status,
+      ).toBe(200);
+    } finally {
+      await proxiedServer.close();
+    }
   });
 });

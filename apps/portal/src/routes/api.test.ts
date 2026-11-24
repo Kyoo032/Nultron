@@ -101,6 +101,7 @@ describe("POST /auth/token, grant_type=authorization_code", () => {
       "access_token",
       "device_id",
       "expires_in",
+      "gateway_endpoint",
       "org_id",
       "refresh_expires_in",
       "refresh_token",
@@ -113,6 +114,7 @@ describe("POST /auth/token, grant_type=authorization_code", () => {
     expect(body.token_type).toBe("Bearer");
     // The helper signs in a seeded MEMBER, and the role is the member's own row, never a default.
     expect(body.role).toBe("member");
+    expect(body.gateway_endpoint).toBeNull();
     expect(body.expires_in).toBe(3600);
     expect(body.tenant_id).toBe(fixture.tenant.id);
     expect(body.org_id).toBe(fixture.org.id);
@@ -220,9 +222,68 @@ describe("POST /auth/token, grant_type=refresh_token", () => {
     });
 
     expect(reply.status).toBe(200);
-    const second = reply.json<{ refresh_token: string; session_id: string }>();
+    const second = reply.json<{ refresh_token: string; session_id: string; gateway_endpoint: string | null }>();
     expect(second.refresh_token).not.toBe(first.refresh_token);
     expect(second.session_id).toBe(first.session_id);
+    expect(second.gateway_endpoint).toBeNull();
+  });
+
+  it("delivers an operator-assigned gateway_endpoint on initial mint and reflects updates on refresh", async () => {
+    const endpointA = "https://gw-a.nultron.example/v1";
+    const endpointB = "https://gw-b.nultron.example/v1";
+    const user = await portal.store.store.tx(fixture.tenant.id, (ops) =>
+      ops.users.create({
+        tenantId: fixture.tenant.id,
+        orgId: fixture.org.id,
+        email: "routed-user@api.test",
+        status: "active",
+        role: "member",
+        gatewayEndpoint: endpointA,
+      }),
+    );
+    const rawCode = randomToken();
+    await portal.store.store.tx(fixture.tenant.id, (ops) =>
+      ops.authCodes.issue({
+        tenantId: fixture.tenant.id,
+        orgId: fixture.org.id,
+        userId: user.id,
+        clientId: CLIENT_ID,
+        redirectUri: REDIRECT,
+        state: "state-endpoint-test",
+        rawCode,
+      }),
+    );
+
+    const firstReply = await exchange(rawCode);
+    expect(firstReply.status).toBe(200);
+    const first = firstReply.json<{
+      refresh_token: string;
+      device_id: string;
+      gateway_endpoint: string | null;
+    }>();
+    expect(first.gateway_endpoint).toBe(endpointA);
+
+    // Nultron admin reassigns the user to endpointB; next refresh delivers it automatically.
+    await portal.store.store.tx(fixture.tenant.id, (ops) => ops.users.setGatewayEndpoint(user.id, endpointB));
+
+    const secondReply = await createAgent(portal.origin).postJson("/auth/token", {
+      grant_type: "refresh_token",
+      refresh_token: first.refresh_token,
+      device_id: first.device_id,
+    });
+    expect(secondReply.status).toBe(200);
+    const second = secondReply.json<{ refresh_token: string; gateway_endpoint: string | null }>();
+    expect(second.gateway_endpoint).toBe(endpointB);
+
+    // Clearing the endpoint returns null (default pinned gateway) on the subsequent refresh.
+    await portal.store.store.tx(fixture.tenant.id, (ops) => ops.users.setGatewayEndpoint(user.id, null));
+    const thirdReply = await createAgent(portal.origin).postJson("/auth/token", {
+      grant_type: "refresh_token",
+      refresh_token: second.refresh_token,
+      device_id: first.device_id,
+    });
+    expect(thirdReply.status).toBe(200);
+    expect(thirdReply.json<{ gateway_endpoint: string | null }>().gateway_endpoint).toBeNull();
   });
 
   it("kills the whole chain when a spent generation is presented again", async () => {

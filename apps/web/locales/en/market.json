@@ -24,7 +24,8 @@
     "positionHelp": "What you own and at what price. The briefing may use these numbers; it invents nothing else.",
     "promptLabel": "What the briefing should cover",
     "resetPrompt": "Reset to default",
-    "lengthLimit": "Length limit (characters)"
+    "lengthLimit": "Length limit (characters)",
+    "modelLabel": "Model"
   },
   "depth": {
     "label": "Analysis",

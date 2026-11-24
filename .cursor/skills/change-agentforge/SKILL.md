@@ -7,7 +7,7 @@ description: The ordered sequence for ANY change to this repo. First check where
 
 Agent guardrail, same class as `AGENTS.md`. Not part of any product. It ships in no installer or image.
 
-Lanes: `main` is the published code (Nultron as the OPC web app, and the Enterprise base). The tester (`C:\Users\rizky\agentforge-chat`, branch `tester/chat-first`) is the staging code at every stage. Nultron Personal is retired and owes nothing. The rules are in `AGENTS.md` ("Where am I?", "Where a change goes", "Lanes"); the working form is [`release-and-sync-lanes.md`](../../../docs/internal/maps/release-and-sync-lanes.md).
+Lanes (updated 2026-11-24): `main` is the single active lane for all production updates, features, and fixes while iterating rapidly before live launch. The tester (`C:\Users\rizky\agentforge-chat`, branch `tester/chat-first`) is **paused until live** (Rizky, 2026-11-24) and owes no sync step until Rizky explicitly re-enables it. Nultron Personal is retired and owes nothing. The rules are in `AGENTS.md` ("Where am I?", "Where a change goes", "Lanes"); the working form is [`release-and-sync-lanes.md`](../../../docs/internal/maps/release-and-sync-lanes.md).
 
 pstack stays in the Cursor plugin. Call it by path, never copy it: `~/.cursor/plugins/cache/cursor-public/pstack/*/skills/how/SKILL.md` and `.../skills/blast-radius/SKILL.md`. The standard block to paste at the top of every subagent prompt is [`preamble.md`](preamble.md).
 

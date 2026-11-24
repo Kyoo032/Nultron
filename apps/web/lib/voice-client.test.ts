@@ -2,6 +2,7 @@ import type { VoiceBrowserFrame, VoiceHostFrame, VoiceMode } from "@agentforge/c
 import { describe, expect, it } from "vitest";
 import type { VoiceAudioLike } from "./voice-audio";
 import { SOCKET_OPEN_TIMEOUT_MS, type VoiceClientDeps, VoiceClient, type VoiceSocketLike } from "./voice-client";
+import { PlaybackQueue } from "./voice-playback-core";
 import type { OpenVoiceSessionResult } from "./voice-session-api";
 import type { VoiceViewAction } from "./voice-view-state";
 
@@ -130,6 +131,7 @@ function harness(
   const actions: VoiceViewAction[] = [];
   const timers: Timer[] = [];
   const log = { audioCreated: 0, sessionRequests: [] as Array<{ threadId: string; mode: VoiceMode }>, path: "" };
+  const levelsSeen: number[] = [];
   const watch = { run: null as (() => void) | null, stopped: false };
   const deps: VoiceClientDeps = {
     secureContext: options.secureContext ?? true,
@@ -169,6 +171,7 @@ function harness(
     mode: options.mode ?? "hands_free",
     ensureThread: options.ensureThread ?? (async () => "thread-1"),
     emit: (action) => actions.push(action),
+    onLevel: (level) => levelsSeen.push(level),
   });
   const settle = async () => {
     for (let i = 0; i < 20; i += 1) {
@@ -184,7 +187,7 @@ function harness(
     host({ type: "ready", sessionId: SESSION.sessionId, threadId: SESSION.threadId, endsAt: 1 });
   };
   const host = (frame: VoiceHostFrame) => socket.receive(JSON.stringify(frame));
-  return { client, audio, socket, actions, timers, log, watch, deps, settle, goLive, host };
+  return { client, audio, socket, actions, timers, log, levelsSeen, watch, deps, settle, goLive, host };
 }
 
 const failed = (actions: VoiceViewAction[]) => actions.filter((action) => action.type === "failed");
@@ -730,5 +733,111 @@ describe("cutting in, hands-free", () => {
     wait?.run();
     await settle();
     expect(audio.resumes).toBe(1);
+  });
+
+  it("multi-turn barge-in with PlaybackQueue unpauses on drop() and renders subsequent agent audio", async () => {
+    const queue = new PlaybackQueue();
+    const h = harness();
+    h.audio.pushAgentAudio = (pcm) => {
+      const i16 = new Int16Array(pcm);
+      const f32 = Float32Array.from(i16, (v) => v / 32768);
+      queue.enqueue(f32);
+    };
+    h.audio.agentAudioPlaying = () => queue.playing;
+    h.audio.pausePlayback = async () => {
+      h.audio.pauses += 1;
+      queue.pause();
+      return Math.round(queue.playedMs);
+    };
+    h.audio.resumePlayback = () => {
+      h.audio.resumes += 1;
+      queue.resume();
+    };
+    h.audio.dropPlayback = async () => {
+      h.audio.drops += 1;
+      queue.drop();
+      return Math.round(queue.playedMs);
+    };
+    h.audio.endAgentTurn = () => {
+      h.audio.endTurns += 1;
+      queue.endTurn();
+    };
+
+    await h.goLive();
+    const tone1 = new Int16Array(2400).fill(5000).buffer;
+    h.socket.receive(tone1);
+    expect(queue.playing).toBe(true);
+    queue.render(new Float32Array(240));
+
+    // User barges in -> pause() -> host stop_audio -> drop().
+    for (let i = 0; i < 40; i += 1) h.audio.onCapture?.([], [0.002]);
+    for (let i = 0; i < 10; i += 1) h.audio.onCapture?.([], [0.2]);
+    await h.settle();
+    h.host({ type: "stop_audio" });
+    await h.settle();
+    h.host({ type: "state", value: "listening" });
+    expect(queue.paused).toBe(false);
+
+    // Turn 2: agent sends audio again -> must play and NOT stay muted!
+    const tone2 = new Int16Array(1200).fill(7000).buffer;
+    h.socket.receive(tone2);
+    expect(h.audio.agentAudioPlaying()).toBe(true);
+    const out = new Float32Array(128);
+    expect(queue.render(out)).toBe(128);
+    expect(out[0]).toBeGreaterThan(0);
+  });
+});
+
+describe("interactive controls and visualizer levels", () => {
+  it("forwards smoothed 20 ms mic levels in both hands-free and push-to-talk", async () => {
+    const hf = harness({ mode: "hands_free" });
+    await hf.goLive();
+    hf.audio.onCapture?.([new ArrayBuffer(1920)], [0.1]);
+    expect(hf.levelsSeen.at(-1)).toBeGreaterThan(0);
+
+    const ptt = harness({ mode: "push_to_talk" });
+    await ptt.goLive();
+    ptt.audio.onCapture?.([new ArrayBuffer(1920)], [0.1]);
+    expect(ptt.levelsSeen.at(-1)).toBeGreaterThan(0);
+    // Still does not send binary frames unless holding.
+    expect(ptt.socket.binary()).toHaveLength(0);
+  });
+
+  it("suppresses outgoing mic PCM and barge detection locally when muted without dropping the socket", async () => {
+    const { client, goLive, audio, socket, actions, levelsSeen, settle } = harness();
+    await goLive();
+    audio.playing = true;
+    client.setMuted(true);
+    expect(actions.at(-1)).toEqual({ type: "muted", value: true });
+
+    for (let i = 0; i < 10; i += 1) {
+      audio.onCapture?.([new ArrayBuffer(1920)], [0.2]);
+    }
+    await settle();
+    expect(socket.binary()).toHaveLength(0);
+    expect(audio.pauses).toBe(0);
+    expect(levelsSeen.at(-1)).toBe(0);
+
+    client.setMuted(false);
+    audio.onCapture?.([new ArrayBuffer(1920)], [0.1]);
+    expect(socket.binary()).toHaveLength(1);
+    expect(socket.closedWith).toBeNull();
+  });
+
+  it("interrupt() drops playback and sends immediate barge_in + played, and commit() sends commit", async () => {
+    const { client, goLive, audio, socket, settle } = harness();
+    await goLive();
+    audio.playing = true;
+    client.interrupt();
+    await settle();
+    expect(audio.pauses).toBe(1);
+    expect(audio.drops).toBe(1);
+    expect(socket.frames()).toEqual([
+      { type: "barge_in", immediate: true },
+      { type: "played", ms: 500 },
+    ]);
+
+    client.commit();
+    expect(socket.frames().at(-1)).toEqual({ type: "commit" });
   });
 });

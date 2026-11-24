@@ -190,7 +190,6 @@ export async function listPastSessionsForAgent(
       ),
     )
     .orderBy(desc(threads.createdAt));
-
   const named = rows
     .map((row) => ({ ...row, title: openThreadTitle(row.title) }))
     .filter((row) => !isDefaultThreadTitle(row.title))
@@ -216,7 +215,7 @@ export async function listPastSessionsForAgent(
       previewSource && previewSource.length > PREVIEW_MAX
         ? `${previewSource.slice(0, PREVIEW_MAX - 1).trimEnd()}…`
         : previewSource;
-    summaries.push({ ...row, preview });
+    summaries.push({ id: row.id, title: row.title, createdAt: row.createdAt, preview });
   }
   return summaries;
 }

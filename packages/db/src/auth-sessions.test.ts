@@ -25,6 +25,7 @@ describe("auth_sessions", () => {
       "revoked_at",
       "portal_checked_at",
       "refresh_sealed",
+      "gateway_endpoint",
     ]);
     sqlite.close();
   });
@@ -44,6 +45,7 @@ describe("auth_sessions", () => {
       "revoked_at",
       "portal_checked_at",
       "refresh_sealed",
+      "gateway_endpoint",
     ]);
     expect(config.indexes.map((index) => index.config.name).sort()).toEqual([
       "auth_sessions_expires_idx",

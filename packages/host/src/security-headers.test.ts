@@ -10,6 +10,10 @@ import {
 } from "./security-headers";
 
 const caddyfile = readFileSync(fileURLToPath(new URL("../../../webapp-deploy/Caddyfile", import.meta.url)), "utf8");
+const securityCaddy = readFileSync(
+  fileURLToPath(new URL("../../../webapp-deploy/k8s/base/caddy/security.caddy", import.meta.url)),
+  "utf8",
+);
 
 function sink() {
   const written: Record<string, string> = {};
@@ -21,9 +25,9 @@ function sink() {
   };
 }
 
-/** `Header-Name "value"` in the Caddyfile's `header { … }` block. */
+/** `Header-Name "value"` or `?Header-Name "value"` in the Caddyfile's `header { … }` block. */
 function caddyHeader(name: string): string | null {
-  const match = caddyfile.match(new RegExp(`^\\s*${name}\\s+"([^"]*)"\\s*$`, "m"));
+  const match = caddyfile.match(new RegExp(`^\\s*\\??${name}\\s+"([^"]*)"\\s*$`, "m"));
   return match ? match[1] : null;
 }
 
@@ -205,5 +209,12 @@ describe("the app's headers and webapp-deploy/Caddyfile do not drift apart", () 
   it("still has the proxy stripping the two identity headers", () => {
     expect(caddyfile).toMatch(/^\s*-Server\s*$/m);
     expect(caddyfile).toMatch(/^\s*-X-Powered-By\s*$/m);
+  });
+
+  it("sets Content-Security-Policy as default-if-absent (?Content-Security-Policy) so artifact sandbox CSP is preserved (SR-132)", () => {
+    expect(caddyfile).toMatch(/^\s*\?Content-Security-Policy\s+"/m);
+    expect(securityCaddy).toMatch(/^\s*\?Content-Security-Policy\s+"/m);
+    expect(caddyfile).not.toMatch(/^\s*Content-Security-Policy\s+"/m);
+    expect(securityCaddy).not.toMatch(/^\s*Content-Security-Policy\s+"/m);
   });
 });

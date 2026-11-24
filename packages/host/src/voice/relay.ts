@@ -4,7 +4,7 @@
  * so a test can move it.
  */
 import type { VoiceEndReason, VoiceHostFrame, VoiceMode, VoiceState } from "@agentforge/core/voice";
-import type { ToolCallPart } from "@agentforge/core";
+import { maskPii, type ToolCallPart } from "@agentforge/core";
 import {
   VOICE_LIMITS,
   VOICE_MAX_AUDIO_FRAME_BYTES,
@@ -20,7 +20,7 @@ import { voiceSessions } from "./sessions";
 import type { TalkerEvent, TalkerSession, TalkerUsage } from "./talker";
 import { TalkerError } from "./talker";
 import { TURN_TIMING, judgeBargeIn, judgeTurnEnd, trimToHeard } from "./turns";
-import { createVad, type Vad } from "./vad";
+import { createVad, VAD_DEFAULTS, type Vad } from "./vad";
 import type { VoiceSession } from "./sessions";
 import { recordVoiceReplyUsage, recordVoiceSeconds } from "./metering";
 import { voiceWiring } from "./wiring";
@@ -66,8 +66,37 @@ function tail(buffer: Buffer, maxBytes: number): Buffer {
   return Buffer.from(buffer.subarray(start));
 }
 
+const ENERGY_WINDOW_BYTES = pcmBytesForMs(10);
+
+/** True when any 10 ms window (or the whole buffer if shorter) has AC RMS above the VAD base threshold. */
+function hasVoiceEnergy(pcm: Buffer): boolean {
+  const sampleCountTotal = Math.floor(pcm.length / 2);
+  if (sampleCountTotal === 0) return false;
+  const checkWindow = (offset: number, samples: number): boolean => {
+    let sum = 0;
+    let sumSq = 0;
+    for (let i = 0; i < samples; i += 1) {
+      const sample = pcm.readInt16LE(offset + i * 2) / 32768;
+      sum += sample;
+      sumSq += sample * sample;
+    }
+    const mean = sum / samples;
+    const variance = sumSq / samples - mean * mean;
+    const rms = variance > 0 ? Math.sqrt(variance) : 0;
+    return rms > VAD_DEFAULTS.threshold;
+  };
+  if (pcm.length < ENERGY_WINDOW_BYTES) {
+    return checkWindow(0, sampleCountTotal);
+  }
+  const windowSamples = ENERGY_WINDOW_BYTES / 2;
+  for (let offset = 0; offset + ENERGY_WINDOW_BYTES <= pcm.length; offset += ENERGY_WINDOW_BYTES) {
+    if (checkWindow(offset, windowSamples)) return true;
+  }
+  return false;
+}
+
 export class VoiceRelay {
-  private readonly vad: Vad = createVad();
+  private readonly vad: Vad;
   private talkerSession: TalkerSession | null = null;
   private mode: VoiceMode;
   private started = false;
@@ -87,9 +116,11 @@ export class VoiceRelay {
 
   private utterance: Buffer | null = null;
   private rolling: Buffer = Buffer.alloc(0);
+  private pttBuffer: Buffer = Buffer.alloc(0);
   private heardSpeech = false;
   private released = false;
   private forceRelease = false;
+  private commitPending = false;
   private replyLive = false;
   private replyMustAnswer = false;
   private sawEvent = false;
@@ -117,6 +148,8 @@ export class VoiceRelay {
   private lastSpeechAt: number | null = null;
   private firstForwardedAt: number | null = null;
   private forwardedAudioBytes = 0;
+  private answerFirstForwardedAt: number | null = null;
+  private answerForwardedAudioBytes = 0;
   /** Of `forwardedAudioBytes`, the acknowledgement. It plays first and is not part of `assistantText`. */
   private ackBytes = 0;
   private pendingUsage: TalkerUsage | null = null;
@@ -139,6 +172,7 @@ export class VoiceRelay {
   private interruptPromise: Promise<void> | null = null;
   private overlapActive = false;
   private overlapPcm: Buffer = Buffer.alloc(0);
+  private overlapRaw: Buffer = Buffer.alloc(0);
   /** Where the speech over the reply began, in the detector's own time. Null until it has started. */
   private overlapStartMs: number | null = null;
   private judging = false;
@@ -147,6 +181,7 @@ export class VoiceRelay {
 
   private idleCancel: (() => void) | null = null;
   private playbackCancel: (() => void) | null = null;
+  private ackThinkingCancel: (() => void) | null = null;
   private bargeCancel: (() => void) | null = null;
   private playedCancel: (() => void) | null = null;
   private playedWaiter: ((ms: number | null) => void) | null = null;
@@ -159,6 +194,7 @@ export class VoiceRelay {
     private readonly session: VoiceSession,
   ) {
     this.mode = session.mode;
+    this.vad = createVad(this.mode === "push_to_talk" ? { immediateOnset: true } : {});
     this.ws.on("message", (data, isBinary) => {
       if (this.shut) return;
       if (!this.started) {
@@ -215,6 +251,7 @@ export class VoiceRelay {
     this.abortWork(awaitingWords);
     this.idleCancel?.();
     this.playbackCancel?.();
+    this.ackThinkingCancel?.();
     this.bargeCancel?.();
     this.playedCancel?.();
     if (this.playedWaiter) {
@@ -266,6 +303,10 @@ export class VoiceRelay {
     if (frame.type === "mode") {
       this.mode = frame.value;
       this.session.mode = frame.value;
+      this.vad.setImmediateOnset(this.mode === "push_to_talk");
+      if (this.mode !== "push_to_talk") {
+        this.pttBuffer = Buffer.alloc(0);
+      }
       return;
     }
     if (frame.type === "commit") {
@@ -273,7 +314,7 @@ export class VoiceRelay {
       return;
     }
     if (frame.type === "barge_in") {
-      this.onBargeFrame();
+      this.onBargeFrame(frame.immediate === true);
       return;
     }
     if (frame.type === "played" && this.playedWaiter) {
@@ -333,7 +374,11 @@ export class VoiceRelay {
     }
     if (!this.released) {
       if (this.utterance) this.utterance = Buffer.concat([this.utterance, copy]);
-      else this.rolling = tail(Buffer.concat([this.rolling, copy]), pcmBytesForMs(PRE_ROLL_MS));
+      else if (this.mode === "push_to_talk") {
+        this.pttBuffer = tail(Buffer.concat([this.pttBuffer, copy]), pcmBytesForMs(VOICE_LIMITS.maxUtteranceMs));
+      } else this.rolling = tail(Buffer.concat([this.rolling, copy]), pcmBytesForMs(PRE_ROLL_MS));
+    } else if (this.overlapActive && this.mode === "push_to_talk") {
+      this.overlapRaw = tail(Buffer.concat([this.overlapRaw, copy]), pcmBytesForMs(VOICE_LIMITS.maxUtteranceMs));
     }
     const events = this.vad.push(copy);
     for (const event of events) {
@@ -348,10 +393,11 @@ export class VoiceRelay {
         return;
       }
     }
+    const activeBuffer = this.utterance ?? (this.mode === "push_to_talk" ? this.pttBuffer : null);
     if (
       !this.released &&
-      this.utterance &&
-      pcmDurationMs(this.utterance.length) >= VOICE_LIMITS.maxUtteranceMs
+      activeBuffer &&
+      pcmDurationMs(activeBuffer.length) >= VOICE_LIMITS.maxUtteranceMs
     ) {
       this.onCommit();
       return;
@@ -364,7 +410,12 @@ export class VoiceRelay {
     this.noteActivity();
     if (!this.released) {
       if (!this.utterance) {
-        this.utterance = this.rolling;
+        if (this.mode === "push_to_talk" && this.pttBuffer.length > 0) {
+          this.utterance = this.pttBuffer;
+          this.pttBuffer = Buffer.alloc(0);
+        } else {
+          this.utterance = this.rolling;
+        }
         this.rolling = Buffer.alloc(0);
       }
       if (this.replyLive) this.abortEarly();
@@ -416,7 +467,40 @@ export class VoiceRelay {
   }
 
   private onCommit(): void {
-    if (this.shut || this.released || !this.heardSpeech) return;
+    if (this.shut) return;
+    if (this.interrupting) {
+      // Releasing Hold during waitPlayed(): queue the commit until doInterrupt() lands on the new turn.
+      this.commitPending = true;
+      return;
+    }
+    if (this.released) {
+      if (this.mode === "push_to_talk" && (this.overlapActive || this.judging)) {
+        // Releasing Hold after barging in over agent audio (<700 ms or before/during judgeShort):
+        // interrupt immediately and commit the overlap speech instead of swallowing the turn.
+        this.commitPending = true;
+        this.bargeCancel?.();
+        this.bargeCancel = null;
+        this.hearAbort?.abort();
+        this.hearAbort = null;
+        this.judging = false;
+        void this.interrupt();
+      }
+      return;
+    }
+    if (!this.heardSpeech) {
+      if (this.mode === "push_to_talk" && this.pttBuffer.length > 0 && hasVoiceEnergy(this.pttBuffer)) {
+        this.utterance = this.pttBuffer;
+        this.pttBuffer = Buffer.alloc(0);
+        this.rolling = Buffer.alloc(0);
+        this.heardSpeech = true;
+        this.heldForWait = false;
+        this.beginTurnIds();
+        this.setState("hearing");
+      } else {
+        this.pttBuffer = Buffer.alloc(0);
+        return;
+      }
+    }
     this.forceRelease = true;
     this.replyMustAnswer = true;
     if (!this.replyLive) this.startReply(true);
@@ -533,6 +617,7 @@ export class VoiceRelay {
   private flush(): void {
     if (this.released) return;
     this.released = true;
+    this.vad.reset();
     this.setState("thinking");
     const events = this.buffered.splice(0);
     for (const event of events) {
@@ -587,6 +672,22 @@ export class VoiceRelay {
     if (ack) {
       this.send({ type: "caption", role: "assistant", id: this.ackId, text: ack.text, final: true });
       this.forwardPcm(ack.pcm, false);
+      const ackMs = pcmDurationMs(ack.pcm.length);
+      const askTurn = this.turn;
+      this.ackThinkingCancel?.();
+      this.ackThinkingCancel = voiceWiring().clock.after(ackMs, () => {
+        this.ackThinkingCancel = null;
+        if (
+          !this.shut &&
+          !this.interrupting &&
+          !this.saved &&
+          this.released &&
+          this.turn === askTurn &&
+          this.answerFirstForwardedAt === null
+        ) {
+          this.setState("thinking");
+        }
+      });
     }
     const ac = new AbortController();
     this.askAbort = ac;
@@ -602,13 +703,14 @@ export class VoiceRelay {
         question,
         locale: this.session.locale,
         signal: ac.signal,
-        onProgress: (label) => {
+        onProgress: (label, kind) => {
           progressSeq += 1;
+          const text = kind === "tool" ? label : askCopy(this.session.locale).delegating(label);
           this.send({
             type: "caption",
             role: "assistant",
             id: `${this.ackId}-d${progressSeq}`,
-            text: askCopy(this.session.locale).delegating(label),
+            text,
             final: true,
           });
         },
@@ -633,7 +735,7 @@ export class VoiceRelay {
     this.diverted = false;
     this.replyFinished = false;
     this.turnToolCalls = result.kind === "answer" ? result.toolCalls : [];
-    this.pendingAnswer = { callId, text: result.text };
+    this.pendingAnswer = { callId, text: maskPii(result.text) };
     this.startReply(true);
   }
 
@@ -706,20 +808,40 @@ export class VoiceRelay {
         }
         this.setState("speaking");
       }
-      if (fromTalker && this.talkerFirstAudioAt === null) {
-        this.talkerFirstAudioAt = voiceWiring().clock.now();
+      if (fromTalker) {
+        this.answerForwardedAudioBytes += chunk.length;
+        if (this.answerFirstForwardedAt === null) {
+          this.answerFirstForwardedAt = voiceWiring().clock.now();
+          this.ackThinkingCancel?.();
+          this.ackThinkingCancel = null;
+          this.setState("speaking");
+        }
+        if (this.talkerFirstAudioAt === null) {
+          this.talkerFirstAudioAt = this.answerFirstForwardedAt;
+        }
       }
       offset = end;
     }
     this.schedulePlayback();
   }
 
+  private playbackEndMs(): number | null {
+    const ackEnd =
+      this.firstForwardedAt === null ? null : this.firstForwardedAt + pcmDurationMs(this.forwardedAudioBytes);
+    const answerEnd =
+      this.answerFirstForwardedAt === null
+        ? null
+        : this.answerFirstForwardedAt + pcmDurationMs(this.answerForwardedAudioBytes);
+    if (ackEnd === null) return answerEnd;
+    if (answerEnd === null) return ackEnd;
+    return Math.max(ackEnd, answerEnd);
+  }
+
   private schedulePlayback(): void {
     if (!this.replyFinished || this.saved || this.interrupting || this.shut) return;
     this.playbackCancel?.();
-    const total = pcmDurationMs(this.forwardedAudioBytes);
-    const start = this.firstForwardedAt ?? voiceWiring().clock.now();
-    const delay = Math.max(0, start + total - voiceWiring().clock.now());
+    const endAt = this.playbackEndMs();
+    const delay = endAt === null ? 0 : Math.max(0, endAt - voiceWiring().clock.now());
     this.playbackCancel = voiceWiring().clock.after(delay, () => {
       this.playbackElapsed = true;
       this.tryFinalize();
@@ -729,8 +851,8 @@ export class VoiceRelay {
   private tryFinalize(): void {
     if (this.saved || this.shut || this.interrupting || !this.replyFinished || this.userText === null) return;
     if (!this.playbackElapsed) {
-      if (this.firstForwardedAt === null) this.playbackElapsed = true;
-      else if (voiceWiring().clock.now() >= this.firstForwardedAt + pcmDurationMs(this.forwardedAudioBytes)) {
+      const endAt = this.playbackEndMs();
+      if (endAt === null || voiceWiring().clock.now() >= endAt) {
         this.playbackElapsed = true;
       }
     }
@@ -792,12 +914,18 @@ export class VoiceRelay {
     this.talkerSession?.remember({ user: user || null, assistant, interrupted: true });
   }
 
-  private onBargeFrame(): void {
+  private onBargeFrame(immediate = false): void {
     if (!this.released || this.interrupting || this.shut) return;
+    if (immediate) {
+      this.clearOverlap();
+      void this.interrupt();
+      return;
+    }
     this.armOverlap();
     this.bargeCancel?.();
     this.bargeCancel = voiceWiring().clock.after(BARGE_SILENCE_MS, () => {
       if (this.overlapStartMs === null && !this.vad.speaking && this.overlapActive && !this.interrupting && !this.shut) {
+        if (this.mode === "push_to_talk" && this.commitPending) return;
         this.clearOverlap();
         this.send({ type: "resume_audio" });
       }
@@ -808,6 +936,7 @@ export class VoiceRelay {
     if (this.overlapActive) return;
     this.overlapActive = true;
     this.overlapPcm = Buffer.alloc(0);
+    this.overlapRaw = Buffer.alloc(0);
     this.overlapStartMs = null;
   }
 
@@ -824,6 +953,7 @@ export class VoiceRelay {
   private clearOverlap(): void {
     this.overlapActive = false;
     this.overlapPcm = Buffer.alloc(0);
+    this.overlapRaw = Buffer.alloc(0);
     this.overlapStartMs = null;
     this.bargeCancel?.();
     this.bargeCancel = null;
@@ -834,6 +964,10 @@ export class VoiceRelay {
     const speechMs = this.overlapSpeechMs();
     if (speechMs >= TURN_TIMING.interruptAfterMs) {
       void this.interrupt();
+      return;
+    }
+    if (this.mode === "push_to_talk") {
+      // In PTT, releasing the Hold button (commit) decides interruption; do not treat held audio as a backchannel.
       return;
     }
     this.judging = true;
@@ -872,6 +1006,8 @@ export class VoiceRelay {
   private async doInterrupt(): Promise<void> {
     this.playbackCancel?.();
     this.playbackCancel = null;
+    this.ackThinkingCancel?.();
+    this.ackThinkingCancel = null;
     this.replyFinished = false;
     this.send({ type: "stop_audio" });
     // The person's words may still be on their way: the transcriber hears the whole utterance in 3 to 5 s and a
@@ -905,7 +1041,14 @@ export class VoiceRelay {
       final: true,
       interrupted: true,
     });
-    const overlap = Buffer.from(this.overlapPcm);
+    const overlap = Buffer.from(
+      this.overlapPcm.length > 0
+        ? this.overlapPcm
+        : this.mode === "push_to_talk" && this.commitPending && hasVoiceEnergy(this.overlapRaw)
+          ? this.overlapRaw
+          : Buffer.alloc(0),
+    );
+    const pendingCommit = this.commitPending;
     const metrics = this.metricsFrame();
     if (words !== null && this.userText === null) {
       // The reply stays cut and the person is heard at once; the turn is saved, and its caption and `saved` sent,
@@ -948,6 +1091,9 @@ export class VoiceRelay {
     }
     const queued = this.queuedAudio.splice(0);
     for (const chunk of queued) this.feed(chunk);
+    if (pendingCommit) {
+      this.onCommit();
+    }
   }
 
   /** One save at a time, in the order the turns were asked to be saved. */
@@ -1034,6 +1180,16 @@ export class VoiceRelay {
     this.replyAbort?.abort();
     const code = error instanceof TalkerError ? error.code : "failed";
     log.warn("voice_reply_failed", { voiceId: this.session.id, code });
+    if (this.errors < FAILURES_BEFORE_END) {
+      const retryId = this.idsReady ? `${this.assistantId}-err${this.errors}` : `err-${this.turn}-${this.errors}`;
+      this.send({
+        type: "caption",
+        role: "assistant",
+        id: retryId,
+        text: askCopy(this.session.locale).transientError,
+        final: true,
+      });
+    }
     this.backToListening(true);
     if (this.errors >= FAILURES_BEFORE_END) this.requestEnd("error");
   }
@@ -1080,9 +1236,11 @@ export class VoiceRelay {
   private resetTurn(): void {
     this.utterance = null;
     this.rolling = Buffer.alloc(0);
+    this.pttBuffer = Buffer.alloc(0);
     this.heardSpeech = false;
     this.released = false;
     this.forceRelease = false;
+    this.commitPending = false;
     this.replyLive = false;
     this.replyMustAnswer = false;
     this.sawEvent = false;
@@ -1100,6 +1258,8 @@ export class VoiceRelay {
     this.talkerFirstAudioAt = null;
     this.firstForwardedAt = null;
     this.forwardedAudioBytes = 0;
+    this.answerFirstForwardedAt = null;
+    this.answerForwardedAudioBytes = 0;
     this.ackBytes = 0;
     this.pendingUsage = null;
     this.replyFinished = false;
@@ -1110,11 +1270,14 @@ export class VoiceRelay {
     this.transcribeStarted = false;
     this.overlapActive = false;
     this.overlapPcm = Buffer.alloc(0);
+    this.overlapRaw = Buffer.alloc(0);
     this.overlapStartMs = null;
     this.judging = false;
     this.recent = Buffer.alloc(0);
     this.playbackCancel?.();
     this.playbackCancel = null;
+    this.ackThinkingCancel?.();
+    this.ackThinkingCancel = null;
     this.bargeCancel?.();
     this.bargeCancel = null;
   }

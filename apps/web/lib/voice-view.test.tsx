@@ -238,6 +238,43 @@ describe.each(LOCALES)("the voice view (%s)", (locale) => {
     expect(open("unsupported")).not.toContain('data-testid="voice-reconnect"');
     expect(open("insecure")).not.toContain('data-testid="voice-reconnect"');
   });
+
+  it("renders visualizer, mute/unmute, stop, done, and dismiss controls in their right states", () => {
+    applyLocale(locale);
+    const listening = render(liveIn("listening"), { micLevel: 0.42 });
+    expect(listening).toContain('data-testid="voice-visualizer"');
+    expect(listening).toContain('data-testid="voice-bars"');
+    expect(listening).toContain("--voice-level:0.42");
+    expect(listening).toContain('data-testid="voice-mute"');
+    expect(listening).toContain(t("voice.controls.mute"));
+    expect(listening).not.toContain('data-testid="voice-interrupt"');
+    expect(listening).not.toContain('data-testid="voice-commit"');
+
+    const mutedHtml = render(liveIn("listening"), { muted: true, micLevel: 0.9 });
+    expect(mutedHtml).toContain('data-muted="true"');
+    expect(mutedHtml).toContain(t("voice.controls.unmute"));
+    expect(mutedHtml).toContain(t("voice.state.muted"));
+    expect(mutedHtml).toContain("--voice-level:0");
+
+    const hearingHf = render(liveIn("hearing"));
+    expect(hearingHf).toContain('data-testid="voice-commit"');
+    expect(hearingHf).toContain(t("voice.controls.done"));
+
+    const hearingPtt = render(voiceViewReducer(liveIn("hearing"), { type: "mode", value: "push_to_talk" }));
+    expect(hearingPtt).not.toContain('data-testid="voice-commit"');
+    expect(hearingPtt).toContain('data-testid="voice-ptt-hint"');
+    expect(hearingPtt).toContain(t("voice.hint.spaceHold"));
+
+    const speaking = render(liveIn("speaking"));
+    expect(speaking).toContain('data-testid="voice-interrupt"');
+    expect(speaking).toContain(t("voice.controls.stop"));
+
+    const withCard = render(
+      liveIn("listening", [frame({ type: "card", card: { prompt: "make deck", summary: "Make deck" } })]),
+    );
+    expect(withCard).toContain('data-testid="voice-card-dismiss"');
+    expect(withCard).toContain(t("voice.card.dismiss"));
+  });
 });
 
 describe.each(LOCALES)("the mic in the composer (%s)", (locale) => {

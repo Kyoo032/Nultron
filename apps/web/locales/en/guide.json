@@ -21,8 +21,8 @@
     },
     "workspaces": {
       "title": "Hire more agents any time",
-      "bodyMore": "Want more agents, like {tools}? Open Virtual agents and choose Hire. You can let one go whenever you like.",
-      "bodyAll": "Every agent is already on this desk. To have fewer, open Virtual agents and choose Let go on the ones you do not need."
+      "bodyMore": "Want more agents, like {tools}? Open Virtual agents and choose Hire. You can delete one whenever you like.",
+      "bodyAll": "Every agent is already on this desk. To have fewer, open Virtual agents and choose Delete on the ones you do not need."
     },
     "chat": {
       "title": "Ask Chat anything",

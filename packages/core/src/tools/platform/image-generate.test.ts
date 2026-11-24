@@ -216,4 +216,15 @@ describe("imageGenerateTool model choice", () => {
     await run({ model: "studio-picked-model" });
     expect(sentModel(fetchMock)).toBe("studio-picked-model");
   });
+
+  it("masks PII in the outbound generation prompt before calling the gateway", async () => {
+    const fetchMock = stubGateway();
+    await run({ prompt: "Poster for Kirim ke Rina Wijaya at alex.rivera@example.com" });
+    const body = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)) as {
+      prompt?: string;
+    };
+    expect(body.prompt).toBe("Poster for Kirim ke [name] at [email]");
+    expect(body.prompt).not.toContain("alex.rivera@example.com");
+    expect(body.prompt).not.toContain("Rina Wijaya");
+  });
 });

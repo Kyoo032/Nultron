@@ -1,3 +1,13 @@
+/**
+ * Indonesian identifiers for the shared PII scanner.
+ *
+ * One rule shapes every detector in this file: **money is never masked.** A Finance prompt is mostly
+ * long digit runs — a rupiah total is routinely 10 to 16 digits — so a detector may only fire when
+ * the text carries something an amount cannot have: a NIK's embedded birth date, an NPWP's dotted
+ * shape, the leading `0` of an `08xx` phone, a bank-style structure, or a label/bank cue beside
+ * the number.
+ */
+
 export type IdPiiKind = "nik" | "npwp" | "account" | "phone";
 
 export type IdPiiMatch = { kind: IdPiiKind; match: string; index: number };
@@ -29,6 +39,7 @@ export function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+/** Luhn checksum — shared with the card detector so unlabelled account detection never steals a PAN. */
 export function passesLuhn(digits: string): boolean {
   if (!/^\d{13,19}$/.test(digits)) {
     return false;
@@ -125,6 +136,11 @@ const NIK_LABELLED_RE = /\b(?:nik|no\.?\s*ktp|nomor\s*ktp|ktp)\b\s*(?:no\.?|nomo
 
 const NPWP_LABELLED_RE = /\bnpwp\b\s*(?:no\.?|nomor)?\s*[:#=-]?\s*(\d[\d\s.-]{13,26})/gi;
 
+/**
+ * Recognized bank names that may sit between an account cue and the digits ("Rekening BCA 1234567890",
+ * "No. Rek Mandiri: 1370004567890"). The generic word "Bank" is deliberately omitted so
+ * "Rekening Bank: 1250000000" (a ledger line) and "Accounts payable 450000000" stay untouched.
+ */
 const BANK_NAME_PART =
   "(?:BCA|BRI|BNI|Mandiri|BSI|CIMB(?:\\s+Niaga)?|Permata|Danamon|OCBC(?:\\s+NISP)?|BTN|Panin|Maybank|Mega|UOB|HSBC|Citibank|Jago|SeaBank|Jenius|Blu)";
 

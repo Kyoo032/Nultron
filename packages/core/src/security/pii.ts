@@ -33,14 +33,22 @@ const CARD_CANDIDATE_RE = /\b(?:\d[ -]*?){13,19}\b/g;
 /** Long ID-like numbers: SSN / national-id style with separators. Bare digit runs are quantities. */
 const ID_RE = /\b(?:\d{3}[-\s]\d{2}[-\s]\d{4}|\d{2}[-\s]\d{2}[-\s]\d{2}[-\s]\d{2,4})\b/g;
 
+/**
+ * Common non-person capitalized words (days, months, Indonesian/English places, banks, orgs,
+ * finance/document headers, product names, common function words). Any token here stops
+ * context-cued person-name collection so prose, headers, and finance tables stay intact.
+ */
 const NAME_STOPLIST: ReadonlySet<string> = new Set([
+  // Days & months (EN + ID)
   "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
   "senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "minggu", "ahad",
   "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
   "januari", "februari", "maret", "mei", "juni", "juli", "agustus", "oktober", "desember",
   "jan", "feb", "mar", "apr", "jun", "jul", "aug", "agu", "agt", "sep", "sept", "oct", "okt", "nov", "nop", "dec", "des",
+  // Honorifics & titles
   "bapak", "bpk", "ibu", "pak", "bu", "sdr", "sdri", "tn", "ny", "nn", "yth",
   "mr", "mrs", "ms", "miss", "dr", "prof", "ir", "haji", "hajjah",
+  // Places, cities, regions, countries
   "indonesia", "jakarta", "bandung", "surabaya", "medan", "semarang", "yogyakarta", "jogja",
   "makassar", "palembang", "tangerang", "depok", "bekasi", "bogor", "malang", "bali", "denpasar",
   "batam", "pekanbaru", "padang", "balikpapan", "samarinda", "banjarmasin", "pontianak", "manado",
@@ -49,14 +57,16 @@ const NAME_STOPLIST: ReadonlySet<string> = new Set([
   "philippines", "japan", "tokyo", "china", "beijing", "shanghai", "korea", "seoul", "india",
   "australia", "sydney", "melbourne", "united", "states", "america", "new", "york", "san",
   "francisco", "london", "europe", "asia", "barat", "timur", "utara", "selatan", "tengah", "pusat",
+  // Banks, legal entities, orgs, brands, products
   "bank", "bca", "bri", "bni", "mandiri", "bsi", "cimb", "niaga", "danamon", "ocbc", "nisp",
   "btn", "panin", "maybank", "uob", "hsbc", "citibank", "jago", "seabank", "jenius", "blu",
   "gopay", "ovo", "dana", "shopeepay", "linkaja", "qris", "ojk", "kemenkeu", "djp", "bpjs",
   "pt", "cv", "tbk", "ud", "yayasan", "koperasi", "perusahaan", "persero", "inc", "ltd", "llc",
   "corp", "gmbh", "group", "holdings", "ventures", "capital", "partners",
-  "nultron", "hypey", "agentforge", "toko", "token", "enterprise", "personal", "desktop", "web", "api", "sdk",
+  "nultron", "agentforge", "toko", "token", "enterprise", "personal", "desktop", "web", "api", "sdk",
   "openai", "anthropic", "google", "deepmind", "gemini", "claude", "gpt", "deepseek", "qwen",
   "minimax", "kimi", "seedance", "suno", "tavily", "brave", "metranet", "aihub", "weknora",
+  // Finance, document, business, tech & common nouns/adjectives
   "revenue", "total", "subtotal", "summary", "ringkasan", "laporan", "report", "draft", "memo",
   "brief", "notes", "note", "catatan", "dossier", "finance", "keuangan", "akuntansi", "accounting",
   "budget", "anggaran", "cashflow", "arus", "kas", "saldo", "balance", "amount", "jumlah", "nilai",
@@ -80,8 +90,7 @@ const NAME_STOPLIST: ReadonlySet<string> = new Set([
   "jasa", "harga", "price", "diskon", "discount", "promo", "order", "pesanan", "shipping",
   "pengiriman", "address", "alamat", "email", "phone", "telepon", "nomor", "number", "kode",
   "code", "id", "section", "bagian", "chapter", "bab", "page", "halaman", "slide", "slides",
-  "deck", "presentation", "presentations", "presentasi", "spreadsheets", "education",
-  "research", "riset", "market", "pasar", "legal", "hukum",
+  "deck", "presentation", "presentasi", "research", "riset", "market", "pasar", "legal", "hukum",
   "meeting", "rapat", "minutes", "notulen", "knowledge", "pengetahuan", "chat", "obrolan",
   "images", "gambar", "videos", "video", "music", "musik", "edit", "studio", "workspace",
   "workspaces", "settings", "pengaturan", "portal", "server", "app", "system", "platform",
@@ -131,6 +140,7 @@ const NAME_CUE_ONLY_RE = new RegExp(
   "gi",
 );
 
+/** Case-sensitive: each token must genuinely open with an uppercase letter followed by lowercase. */
 const TITLE_NAME_SPAN_RE =
   /^([A-Z][a-z'’-]{1,24}(?:[ \t]+(?:[A-Z]\.?|[A-Z][a-z'’-]{1,24})){0,2}[ \t]+[A-Z][a-z'’-]{1,24})(?![A-Za-z])/;
 
@@ -144,6 +154,7 @@ function extractSafePersonName(rawSpan: string): string | null {
     }
     kept.push(token);
   }
+  // Require at least two tokens and at least two multi-letter words (no trailing initial-only span).
   while (kept.length > 0) {
     const last = kept[kept.length - 1];
     if (!last || last.replace(/\./g, "").length >= 2) {
@@ -405,7 +416,6 @@ const SKIP_JSON_MASK_KEYS: ReadonlySet<string> = new Set([
   "artifactId",
   "toolKey",
   "sourceId",
-  "source_id",
 ]);
 
 const STANDALONE_LINK_RE = /^(?:https?:\/\/|\/api\/|data:)\S+$/i;
@@ -434,6 +444,10 @@ function maskPiiJsonWalk(value: unknown, key: string | undefined, seen: WeakSet<
   return out;
 }
 
+/**
+ * Recursively masks PII in string values of a JSON-shaped tool output while keeping technical
+ * references (`url`, `href`, `path`, `id`, `mediaId`, `artifactId`, `toolKey`, `/api/...`, `http(s)://...`) intact.
+ */
 export function maskPiiInJson<T>(value: T): T {
   return maskPiiJsonWalk(value, undefined, new WeakSet()) as T;
 }

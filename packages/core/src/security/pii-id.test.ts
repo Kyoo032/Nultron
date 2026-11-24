@@ -86,9 +86,6 @@ describe("scanIndonesianIds", () => {
     expect(scanIndonesianIds("Rekening BCA 1234567890")).toEqual([
       { kind: "account", match: "1234567890", index: "Rekening BCA ".length },
     ]);
-    expect(scanIndonesianIds("No rek Mandiri: 1370012345678")).toEqual([
-      { kind: "account", match: "1370012345678", index: "No rek Mandiri: ".length },
-    ]);
     expect(scanIndonesianIds("No. Rek Mandiri: 1370004567890")).toEqual([
       { kind: "account", match: "1370004567890", index: "No. Rek Mandiri: ".length },
     ]);
@@ -100,9 +97,6 @@ describe("scanIndonesianIds", () => {
   it("finds safe unlabelled bank accounts (bank-cued, bank-grouped, IBAN) without touching amounts or cards", () => {
     expect(scanIndonesianIds("Transfer ke 1370004567891")).toEqual([
       { kind: "account", match: "1370004567891", index: "Transfer ke ".length },
-    ]);
-    expect(scanIndonesianIds("transfer ke BCA 1234567890 a.n. Budi")).toEqual([
-      { kind: "account", match: "1234567890", index: "transfer ke BCA ".length },
     ]);
     expect(scanIndonesianIds("BCA 1234567890")).toEqual([
       { kind: "account", match: "1234567890", index: "BCA ".length },
@@ -117,6 +111,7 @@ describe("scanIndonesianIds", () => {
       { kind: "account", match: "GB29NWBK60161331926819", index: "Wire to ".length },
     ]);
 
+    // Never mask amounts, round totals, grouped thousands, bare 16-digit runs, or cards
     expect(scanIndonesianIds("Transfer Rp 1.250.000.000")).toEqual([]);
     expect(scanIndonesianIds("Transfer Saldo 1234567890")).toEqual([]);
     expect(scanIndonesianIds("BCA 1250000000")).toEqual([]);

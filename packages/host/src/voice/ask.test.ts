@@ -145,7 +145,7 @@ async function ask1(
     signal?: AbortSignal;
     timeoutMs?: number;
     delegateTimeoutMs?: number;
-    onProgress?: (label: string) => void;
+    onProgress?: (label: string, kind?: "delegate" | "tool") => void;
   } = {},
 ) {
   return ask(
@@ -318,13 +318,17 @@ describe("what the model is given", () => {
     expect(names.filter((name) => !allowed.has(name))).toEqual([]);
   });
 
-  it("runs a read tool and answers from its result", async () => {
+  it("runs a read tool, emits onProgress status, and answers from its result", async () => {
+    const progress: Array<{ label: string; kind?: string }> = [];
     script = [calls("knowledge_search", { query: "revenue" }), says("Nothing in the notes yet.")];
     const threadId = await newThread();
-    const result = await ask1(threadId, "What do my notes say about revenue?");
+    const result = await ask1(threadId, "What do my notes say about revenue?", {
+      onProgress: (label, kind) => progress.push({ label, kind }),
+    });
     expect(result).toEqual({ kind: "answer", text: "Nothing in the notes yet.", toolCalls: [] });
     expect(seen).toHaveLength(2);
     expect(messagesOf(seen[1] as Captured).some((message) => message.role === "tool")).toBe(true);
+    expect(progress).toEqual([{ label: ASK_COPY.en.toolStatus("knowledge_search"), kind: "tool" }]);
   });
 
   it("never runs a write tool a model asks for anyway", async () => {

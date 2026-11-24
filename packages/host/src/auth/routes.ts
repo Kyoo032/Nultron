@@ -289,6 +289,9 @@ export async function requireSessionFor(
     if (!checked.ok) {
       throw authError(checked.reason, 401, checked.message);
     }
+    if (checked.gatewayEndpoint !== undefined && checked.gatewayEndpoint !== session.gatewayEndpoint) {
+      return { ...session, gatewayEndpoint: checked.gatewayEndpoint };
+    }
   }
   return session;
 }
@@ -542,6 +545,7 @@ export function createAuthRoutes(deps: AuthRouteDeps): AuthRoutes {
       tenantId: tokens.tenantId,
       userId: tokens.userId,
       orgId: tokens.orgId,
+      gatewayEndpoint: tokens.gatewayEndpoint,
       now,
     });
     // The row and its sealed refresh token in one insert; the access token only in process memory.

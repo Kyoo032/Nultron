@@ -28,11 +28,10 @@ const GUIDE_SOURCES: Record<string, string> = {
 };
 
 describe("the guide is wired into the app", () => {
-  it("is offered when first-run setup ends, and at no other moment", () => {
+  it("does not hijack first-run onboarding with an auto-launched modal tour; replay lives in Settings", () => {
     const onboarding = app.slice(app.indexOf("<OnboardingScreen"), app.indexOf("</PlanBlockBoundary>", app.indexOf("<OnboardingScreen")));
-    expect(onboarding).toContain("offerGuideAfterOnboarding()");
     expect(onboarding).toContain('setGate("app")');
-    expect(app.match(/offerGuideAfterOnboarding\(\)/g)).toHaveLength(1);
+    expect(onboarding).not.toContain("offerGuideAfterOnboarding()");
     expect(app.match(/dispatchGuide|replayGuide/g)).toBeNull();
   });
 

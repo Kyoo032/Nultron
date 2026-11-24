@@ -33,6 +33,7 @@ import {
   listAccounts,
   parseAccountArgs,
   resetPassword,
+  setAccountEndpoint,
   setAccountRole,
   type AccountCommand,
   type AccountDeps,
@@ -41,6 +42,7 @@ import {
   type EnableRefusal,
   type ListRefusal,
   type PersonRefusal,
+  type SetEndpointRefusal,
   type SetRoleRefusal,
 } from "../src/accounts";
 import { migrateAsOwner } from "../src/boot";
@@ -91,6 +93,10 @@ const CREATE_REFUSALS: Readonly<Record<CreateAccountRefusal, Refusal>> = {
     message: "That person already exists with a different role. Create without --role, then change it with set-role.",
   },
   seat_cap_reached: SEAT_CAP,
+  invalid_gateway_endpoint: {
+    code: 2,
+    message: "--gateway-endpoint must be a valid HTTPS URL without credentials, query string, or fragment.",
+  },
 };
 
 const PERSON_REFUSALS: Readonly<Record<PersonRefusal, Refusal>> = {
@@ -123,6 +129,16 @@ const ROLE_REFUSALS: Readonly<Record<SetRoleRefusal, Refusal>> = {
   user_disabled: { code: 4, message: "That person is disabled. Enable them first." },
   same_role: { code: 4, message: "That person already has that role." },
   last_owner: LAST_OWNER,
+};
+
+const ENDPOINT_REFUSALS: Readonly<Record<SetEndpointRefusal, Refusal>> = {
+  ...PERSON_REFUSALS,
+  user_disabled: { code: 4, message: "That person is disabled. Enable them first." },
+  same_endpoint: { code: 4, message: "That person already has that gateway endpoint." },
+  invalid_gateway_endpoint: {
+    code: 2,
+    message: "--gateway-endpoint must be a valid HTTPS URL without credentials, query string, or fragment.",
+  },
 };
 
 function say(text: string): void {
@@ -181,6 +197,18 @@ async function run(command: AccountCommand, deps: AccountDeps): Promise<void> {
         );
       } else {
         refuse(ROLE_REFUSALS[result.reason]);
+      }
+      return;
+    }
+    case "set-endpoint": {
+      const result = await setAccountEndpoint(deps, command);
+      if (result.ok) {
+        say(
+          `${result.username} (${result.email}): endpoint ${result.from ?? "default"} -> ${result.to ?? "default"}. ` +
+            "It reaches the host in the person's next token.",
+        );
+      } else {
+        refuse(ENDPOINT_REFUSALS[result.reason]);
       }
       return;
     }

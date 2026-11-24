@@ -23,6 +23,9 @@ export {
   isPackagedRuntime,
   gatewayUrlOverride,
   gatewayUrlOverrideAllowed,
+  normalizeAssignedGatewayEndpoint,
+  registerAssignedGatewayEndpointReader,
+  assignedGatewayEndpoint,
 } from "./gateway/pinned";
 export type { GatewayGateStatus, GatewayGatePayload } from "./gateway/gate-types";
 export { RESET_CONFIRM_WORD, TENANT_ERASE_CONFIRM_WORD } from "./gateway/reset-types";
@@ -207,6 +210,8 @@ export {
   PII_MASK,
 } from "./security/pii";
 export type { PiiKind, PiiFinding } from "./security/pii";
+export { createPiiVault, PII_VAULT_HKDF_INFO } from "./security/pii-vault";
+export type { PiiVault, PiiVaultAad, PiiVaultMaskResult, PiiVaultOptions } from "./security/pii-vault";
 export { ID_PROVINCE_CODES, isNikDigits, isNpwpDigits, scanIndonesianIds } from "./security/pii-id";
 export type { IdPiiKind, IdPiiMatch } from "./security/pii-id";
 export { thinToolOutput } from "./security/tool-thin";

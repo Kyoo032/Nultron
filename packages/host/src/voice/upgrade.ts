@@ -12,6 +12,7 @@ import { VOICE_MAX_AUDIO_FRAME_BYTES, VOICE_STREAM_PATH_PATTERN } from "@agentfo
 import { WebSocketServer } from "ws";
 import { hostPortalCheck, hostSessionStore, requireSessionFor, type PortalSessionCheck, type SessionStore } from "../auth";
 import { sessionCookieName } from "../auth/session";
+import { withAssignedGatewayEndpoint } from "../gateway-endpoint-scope";
 import { requireGatewayAllowedFor } from "../gateway-gate";
 import {
   FILTERED_EVENT,
@@ -188,6 +189,7 @@ async function accept(
           tenantId: record.tenantId,
           orgId: record.orgId,
           userId: record.userId,
+          ...(record.gatewayEndpoint ? { gatewayEndpoint: record.gatewayEndpoint } : {}),
         };
       } catch (error) {
         refuse(socket, { status: 401, code: error instanceof ApiError ? error.code : "session_invalid" }, context);
@@ -213,14 +215,16 @@ async function accept(
       return;
     }
     try {
-      requireGatewayAllowedFor(tenant);
+      withAssignedGatewayEndpoint(tenant.gatewayEndpoint ?? null, () => requireGatewayAllowedFor(tenant));
     } catch {
       refuse(socket, { status: 403, code: "gateway_blocked" }, context);
       return;
     }
     sockets.handleUpgrade(req, socket, head, (ws) => {
-      const relay = new VoiceRelay(ws, voice);
-      void relay.start();
+      withAssignedGatewayEndpoint(tenant.gatewayEndpoint ?? null, () => {
+        const relay = new VoiceRelay(ws, voice);
+        void relay.start();
+      });
     });
   } catch {
     refuse(socket, { status: 401, code: "session_invalid" }, context);

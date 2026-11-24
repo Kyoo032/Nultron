@@ -200,7 +200,16 @@ describe("smtpTransportOptions", () => {
     expect(options.socketTimeout).toBe(8_000);
   });
 
-  it("hands the same timeouts to the nodemailer transport the portal builds", () => {
+  it("hands the same timeouts and TLSv1.2 minimum to the nodemailer transport the portal builds", () => {
+    const options = smtpTransportOptions({
+      ...SMTP,
+      host: "smtp.example.com",
+      port: 587,
+      requireTls: true,
+      ignoreTls: false,
+    });
+    expect(options.tls).toEqual({ minVersion: "TLSv1.2", rejectUnauthorized: true });
+
     const transport = createSmtpTransport({
       ...SMTP,
       host: "smtp.example.com",
@@ -212,6 +221,7 @@ describe("smtpTransportOptions", () => {
       connectionTimeout: 4_000,
       greetingTimeout: 4_000,
       socketTimeout: 8_000,
+      tls: { minVersion: "TLSv1.2", rejectUnauthorized: true },
     });
   });
 });

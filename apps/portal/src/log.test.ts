@@ -94,4 +94,16 @@ describe("createLogger", () => {
     expect(lines).toHaveLength(1);
     expect(lines[0].includes("\n")).toBe(false);
   });
+
+  it("scrubs emails, phones, NIKs, NPWPs, and cards from logged strings", () => {
+    const { lines, logger } = capture();
+    logger.warn("invite_failed", {
+      detail:
+        "alex.rivera@example.com phone 081234567890 intl +1 (415) 555-2671 NIK 3273010101900001 NPWP 09.254.294.3-407.000 card 4111 1111 1111 1111",
+    });
+    const record = JSON.parse(lines[0]) as Record<string, unknown>;
+    expect(record.detail).toBe("[email] phone [phone] intl [phone] NIK [nik] NPWP [npwp] card [card]");
+    expect(lines[0]).not.toContain("alex.rivera@example.com");
+    expect(lines[0]).not.toContain("3273010101900001");
+  });
 });

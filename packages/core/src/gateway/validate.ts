@@ -1,6 +1,7 @@
+import { resolvedGatewayBaseUrl } from "../gateway";
 import { isNetworkUnreachableError } from "../models/probe";
 import { redactSecrets } from "../security/redact";
-import { pinnedGatewayBaseUrl } from "./pinned";
+import { normalizeAssignedGatewayEndpoint } from "./pinned";
 
 /** One key-validation request. Same budget as the model probe: the app must boot offline. */
 export const GATEWAY_VALIDATE_TIMEOUT_MS = 5_000;
@@ -27,11 +28,13 @@ function safeMessage(detail: string, apiKey: string): string {
 }
 
 /**
- * Ask the pinned gateway whether this key is live. `401`/`403` is a verdict (invalid key), a
- * network failure is not (the caller may fall back to offline grace).
+ * Ask the user's resolved gateway (operator-assigned endpoint if set, otherwise the pinned
+ * gateway) whether this key is live. `401`/`403` is a verdict (invalid key), a network failure is
+ * not (the caller may fall back to offline grace).
  */
 export async function validateGatewayKey(input: {
   apiKey: string;
+  baseUrl?: string | null;
   fetch?: typeof fetch;
 }): Promise<GatewayKeyValidation> {
   const apiKey = input.apiKey?.trim() ?? "";
@@ -39,7 +42,9 @@ export async function validateGatewayKey(input: {
     return { status: "invalid_key", httpStatus: 0 };
   }
   const fetchFn = input.fetch ?? fetch;
-  const url = `${pinnedGatewayBaseUrl()}/models`;
+  const base =
+    (input.baseUrl ? normalizeAssignedGatewayEndpoint(input.baseUrl) : null) ?? resolvedGatewayBaseUrl();
+  const url = `${base}/models`;
   let response: Response;
   try {
     response = await fetchFn(url, {

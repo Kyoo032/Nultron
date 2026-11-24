@@ -15,14 +15,16 @@
 #      script uses `.backup` instead, which does the same thing.
 #   2. tar of /data EXCLUDING components/ (re-downloadable, and baked into the image)
 #      and logs/ (diagnostics, and spec L1 keeps them out of backups).
-#   3. openssl enc -aes-256-cbc -pbkdf2 with BACKUP_KEY from the environment.
+#   3. Authenticated AES-256-GCM encryption via aead-crypt.mjs with BACKUP_KEY from the environment.
 #   4. The portal's Postgres (accounts, sessions): pg_dump -Fc, encrypted the same way, as a second
 #      object beside the archive. Skipped when there is no portal-db container.
 #   5. Upload each to the COS backup bucket with coscli, or tccli cos, or - if neither is
 #      installed - leave it in the local dir and say so loudly.
 set -eu
-. "$(dirname "$0")/_common.sh"
-. "$(dirname "$0")/_heartbeat.sh"
+SCRIPT_DIR="$(dirname "$0")"
+. "$SCRIPT_DIR/_common.sh"
+. "$SCRIPT_DIR/_heartbeat.sh"
+AEAD_CRYPT="$SCRIPT_DIR/aead-crypt.mjs"
 
 HEARTBEAT_URL="${BACKUP_HEARTBEAT_URL:-}"
 trap '_rc=$?; trap - EXIT; heartbeat_ping "$HEARTBEAT_URL" "$_rc"; exit "$_rc"' EXIT
@@ -40,8 +42,12 @@ if [ -z "$BACKUP_KEY" ]; then
 fi
 export BACKUP_KEY
 
-command -v openssl >/dev/null 2>&1 || {
-	echo "error: openssl is not installed on this host" >&2
+command -v node >/dev/null 2>&1 || {
+	echo "error: node is not installed on this host" >&2
+	exit 1
+}
+[ -f "$AEAD_CRYPT" ] || {
+	echo "error: missing $AEAD_CRYPT" >&2
 	exit 1
 }
 
@@ -91,7 +97,7 @@ umask 077
 dc exec -T app tar -czf - -C /data \
 	--exclude=./components --exclude=./logs \
 	--exclude=./.master-key . |
-	openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:BACKUP_KEY -out "$OUT"
+	node "$AEAD_CRYPT" encrypt --out "$OUT"
 
 [ -s "$OUT" ] || {
 	echo "error: the encrypted archive is empty" >&2
@@ -109,7 +115,7 @@ dc exec -T app sh -c 'rm -rf "${AGENTFORGE_DATA_DIR:-/data}/.backup-staging"'
 
 if [ "$(setting BACKUP_VERIFY 1)" = "1" ]; then
 	echo "==> verifying (decrypt + list)"
-	openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_KEY -in "$OUT" |
+	node "$AEAD_CRYPT" decrypt --in "$OUT" |
 		tar -tzf - | grep -q . || {
 		echo "error: the encrypted archive did not decrypt and untar cleanly" >&2
 		exit 1
@@ -129,7 +135,7 @@ if [ "$(setting BACKUP_PORTAL 1)" = "1" ] && [ -n "$(dc ps -q portal-db)" ]; the
 	PORTAL_OUT="$OUT_DIR/nultron-portal-$STAMP.dump.enc"
 	echo "==> portal database (pg_dump -Fc) and encrypting -> $PORTAL_OUT"
 	dc exec -T portal-db pg_dump -U portal -d tokotoken_portal -Fc |
-		openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:BACKUP_KEY -out "$PORTAL_OUT"
+		node "$AEAD_CRYPT" encrypt --out "$PORTAL_OUT"
 	[ -s "$PORTAL_OUT" ] || {
 		echo "error: the encrypted portal dump is empty" >&2
 		rm -f "$PORTAL_OUT"
@@ -137,7 +143,7 @@ if [ "$(setting BACKUP_PORTAL 1)" = "1" ] && [ -n "$(dc ps -q portal-db)" ]; the
 	}
 	if [ "$(setting BACKUP_VERIFY 1)" = "1" ]; then
 		echo "==> verifying the portal dump (decrypt + pg_restore --list)"
-		openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_KEY -in "$PORTAL_OUT" |
+		node "$AEAD_CRYPT" decrypt --in "$PORTAL_OUT" |
 			dc exec -T portal-db pg_restore --list >/dev/null || {
 			echo "error: the encrypted portal dump did not decrypt and list cleanly" >&2
 			exit 1

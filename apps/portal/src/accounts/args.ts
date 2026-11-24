@@ -1,4 +1,5 @@
 /** Argument parsing for `pnpm --filter @agentforge/portal account`. Its own file so the operations stay testable. */
+import { InvalidGatewayEndpointError, normaliseGatewayEndpoint } from "../gateway-endpoint";
 import { EMAIL_SHAPE, MAX_INVITE_EMAIL_LENGTH } from "../invites/args";
 import { isValidUsername, normaliseUsername } from "../password/policy";
 
@@ -22,7 +23,7 @@ person at first sign-in.
 
 Commands:
   create          Make a person who signs in with a username and a password.
-                    --username <name>  --email <address>  [--role owner|admin|member]  [--name <display name>]
+                    --username <name>  --email <address>  [--role owner|admin|member]  [--name <display name>]  [--gateway-endpoint <url>]
                   Prints a generated initial password ONCE. The person must choose their own before a
                   session is issued. Refused when the org has no seat left. For an active person who has
                   no password yet (the owner "seed" made), it attaches the credential to them and ends
@@ -37,9 +38,11 @@ Commands:
                     --username <name> | --email <address>
   set-role        Change an active person's role. Refused for the last owner.
                     --username <name> | --email <address>  --role owner|admin|member
-  list            Everyone in the org: username, address, role, status, password state, last password
-                  seen, whether the account is locked, and how many times it was locked in the last 24
-                  hours. Prints no password and no hash.
+  set-endpoint    Assign or clear a person's API gateway endpoint (Nultron admin only).
+                    --username <name> | --email <address>  (--gateway-endpoint <url> | --clear)
+  list            Everyone in the org: username, address, role, status, endpoint, password state, last
+                  password seen, whether the account is locked, and how many times it was locked in the
+                  last 24 hours. Prints no password and no hash.
 
 Options for every command:
   --tenant <slug>    Tenant slug                                   (default: ${DEFAULT_TENANT})
@@ -49,7 +52,7 @@ Usernames are 3 to 32 characters of a-z 0-9 . _ - and start with a letter or dig
 and never contain @, so the sign-in form can take a username or an address in one field.`;
 
 /** Flags that take no value. Everything else wants one. */
-const BARE_FLAGS: ReadonlySet<string> = new Set([]);
+const BARE_FLAGS: ReadonlySet<string> = new Set(["clear"]);
 
 interface Common {
   readonly tenantSlug: string;
@@ -70,16 +73,27 @@ export type AccountCommand =
       /** `null` when `--role` was not given: a new person is a `member`, and an existing one keeps theirs. */
       readonly role: AccountRole | null;
       readonly displayName: string | null;
+      /** Operator-assigned gateway base URL, or `null` for the default pinned gateway. */
+      readonly gatewayEndpoint: string | null;
     })
   | (Common & { readonly command: "reset-password"; readonly person: PersonRef })
   | (Common & { readonly command: "disable"; readonly person: PersonRef })
   | (Common & { readonly command: "enable"; readonly person: PersonRef })
   | (Common & { readonly command: "set-role"; readonly person: PersonRef; readonly role: AccountRole })
+  | (Common & {
+      readonly command: "set-endpoint";
+      readonly person: PersonRef;
+      /** Target gateway base URL, or `null` when `--clear` resets to the default pinned gateway. */
+      readonly gatewayEndpoint: string | null;
+    })
   | (Common & { readonly command: "list" });
 
-function collect(argv: readonly string[]): { readonly words: string[]; readonly values: Map<string, string> } {
+function collect(
+  argv: readonly string[],
+): { readonly words: string[]; readonly values: Map<string, string>; readonly flags: Set<string> } {
   const words: string[] = [];
   const values = new Map<string, string>();
+  const flags = new Set<string>();
   let pending: string | null = null;
 
   for (const token of argv) {
@@ -93,6 +107,7 @@ function collect(argv: readonly string[]): { readonly words: string[]; readonly 
       }
       const [name, inline] = token.slice(2).split("=", 2);
       if (BARE_FLAGS.has(name)) {
+        flags.add(name);
         continue;
       }
       if (inline !== undefined) {
@@ -112,7 +127,7 @@ function collect(argv: readonly string[]): { readonly words: string[]; readonly 
   if (pending !== null) {
     throw new AccountArgsError(`--${pending} needs a value.\n\n${ACCOUNT_USAGE}`);
   }
-  return { words, values };
+  return { words, values, flags };
 }
 
 function readEmail(raw: string | undefined): string {
@@ -164,8 +179,22 @@ function readPerson(values: Map<string, string>): PersonRef {
     : { by: "email", email: readEmail(email) };
 }
 
+function readGatewayEndpoint(raw: string | undefined): string | null {
+  if (raw === undefined) {
+    return null;
+  }
+  try {
+    return normaliseGatewayEndpoint(raw);
+  } catch (error) {
+    if (error instanceof InvalidGatewayEndpointError) {
+      throw new AccountArgsError(`${error.message}\n\n${ACCOUNT_USAGE}`);
+    }
+    throw error;
+  }
+}
+
 export function parseAccountArgs(argv: readonly string[]): AccountCommand {
-  const { words, values } = collect(argv);
+  const { words, values, flags } = collect(argv);
   if (words.length !== 1) {
     throw new AccountArgsError(
       words.length === 0 ? `Say which command.\n\n${ACCOUNT_USAGE}` : `One command at a time.\n\n${ACCOUNT_USAGE}`,
@@ -192,6 +221,7 @@ export function parseAccountArgs(argv: readonly string[]): AccountCommand {
         email: readEmail(values.get("email")),
         role: readRole(values.get("role")),
         displayName: displayName ? displayName.slice(0, 120) : null,
+        gatewayEndpoint: readGatewayEndpoint(values.get("gateway-endpoint")),
       });
     }
     case "reset-password":
@@ -205,6 +235,21 @@ export function parseAccountArgs(argv: readonly string[]): AccountCommand {
         person: readPerson(values),
         role: requireRole(values.get("role")),
       });
+    case "set-endpoint": {
+      const hasUrl = values.has("gateway-endpoint");
+      const hasClear = flags.has("clear");
+      if (hasUrl === hasClear) {
+        throw new AccountArgsError(
+          `Pass exactly one of --gateway-endpoint <url> or --clear.\n\n${ACCOUNT_USAGE}`,
+        );
+      }
+      return Object.freeze({
+        ...common,
+        command,
+        person: readPerson(values),
+        gatewayEndpoint: hasClear ? null : readGatewayEndpoint(values.get("gateway-endpoint")),
+      });
+    }
     case "list":
       return Object.freeze({ ...common, command });
     default:

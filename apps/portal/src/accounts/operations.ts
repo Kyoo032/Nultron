@@ -24,6 +24,7 @@
  *     browser session and every host session they hold, on the next request.
  */
 import { normaliseEmail } from "../crypto";
+import { InvalidGatewayEndpointError, normaliseGatewayEndpoint } from "../gateway-endpoint";
 import { changeMemberRole, type ChangeRoleRefusal } from "../invites/role";
 import type { PasswordHasher } from "../password/hash";
 import { generateInitialPassword } from "../password/generate";
@@ -124,6 +125,8 @@ export interface CreateAccountInput {
   /** `null`: a new person is a `member`, and an existing one keeps the role they have. */
   readonly role: AccountRole | null;
   readonly displayName: string | null;
+  /** Operator-assigned API gateway base URL, or `null` / omitted for the default pinned gateway. */
+  readonly gatewayEndpoint?: string | null;
 }
 
 export type CreateAccountRefusal =
@@ -140,7 +143,8 @@ export type CreateAccountRefusal =
   | "user_invited"
   /** `--role` named a role other than the one an existing person holds: `set-role` changes it. */
   | "role_mismatch"
-  | "seat_cap_reached";
+  | "seat_cap_reached"
+  | "invalid_gateway_endpoint";
 
 export interface CreatedAccount {
   readonly ok: true;
@@ -152,6 +156,8 @@ export interface CreatedAccount {
   readonly orgSlug: string;
   readonly userId: string;
   readonly role: UserRole;
+  /** Operator-assigned gateway endpoint, or `null` when using the default pinned gateway. */
+  readonly gatewayEndpoint: string | null;
   /** True when the person already existed (the owner `seed` makes) and only gained a credential. */
   readonly attached: boolean;
 }
@@ -162,6 +168,17 @@ export async function createAccount(deps: AccountDeps, input: CreateAccountInput
   const tenantId = await deps.store.resolve.bySlug(input.tenantSlug);
   if (!tenantId) {
     return { ok: false, reason: "unknown_tenant" };
+  }
+  let gatewayEndpoint: string | null = null;
+  if (input.gatewayEndpoint !== undefined && input.gatewayEndpoint !== null) {
+    try {
+      gatewayEndpoint = normaliseGatewayEndpoint(input.gatewayEndpoint);
+    } catch (error) {
+      if (error instanceof InvalidGatewayEndpointError) {
+        return { ok: false, reason: "invalid_gateway_endpoint" };
+      }
+      throw error;
+    }
   }
   const email = normaliseEmail(input.email);
   // Hashed before the transaction opens: a derivation inside it would hold a pooled connection for
@@ -198,7 +215,7 @@ export async function createAccount(deps: AccountDeps, input: CreateAccountInput
       throw new RollBack("username_taken");
     }
 
-    const user =
+    let user =
       existing ??
       (await ops.users.create({
         tenantId,
@@ -209,7 +226,12 @@ export async function createAccount(deps: AccountDeps, input: CreateAccountInput
         // anybody who is not active.
         status: "active",
         role: input.role ?? "member",
+        gatewayEndpoint,
       }));
+
+    if (existing && gatewayEndpoint !== null && existing.gatewayEndpoint !== gatewayEndpoint) {
+      user = (await ops.users.setGatewayEndpoint(existing.id, gatewayEndpoint)) ?? user;
+    }
 
     const credential = await ops.credentials.create({
       userId: user.id,
@@ -237,6 +259,7 @@ export async function createAccount(deps: AccountDeps, input: CreateAccountInput
       username: input.username,
       role: user.role,
       org_slug: org.slug,
+      gateway_endpoint: user.gatewayEndpoint,
       attached: existing !== null,
       must_change: true,
       ...(existing === null ? {} : { sessions_ended: sessionsEnded }),
@@ -250,6 +273,7 @@ export async function createAccount(deps: AccountDeps, input: CreateAccountInput
       orgSlug: org.slug,
       userId: user.id,
       role: user.role,
+      gatewayEndpoint: user.gatewayEndpoint,
       attached: existing !== null,
     };
   });
@@ -456,6 +480,80 @@ export async function setAccountRole(
 }
 
 // ---------------------------------------------------------------------------
+// set-endpoint (Nultron admin only)
+// ---------------------------------------------------------------------------
+
+export type SetEndpointRefusal =
+  | PersonRefusal
+  | "user_disabled"
+  | "same_endpoint"
+  | "invalid_gateway_endpoint";
+
+export interface EndpointChanged {
+  readonly ok: true;
+  readonly username: string;
+  readonly email: string;
+  readonly userId: string;
+  readonly from: string | null;
+  readonly to: string | null;
+}
+
+/**
+ * Assign or clear a person's API gateway endpoint (operator/admin only).
+ * The new endpoint reaches the host in the person's next token (on sign-in or refresh), where the
+ * host re-validates their gateway key against the newly assigned endpoint.
+ */
+export async function setAccountEndpoint(
+  deps: AccountDeps,
+  input: PersonInput & { readonly gatewayEndpoint: string | null },
+): Promise<EndpointChanged | Refusal<SetEndpointRefusal>> {
+  const tenantId = await deps.store.resolve.bySlug(input.tenantSlug);
+  if (!tenantId) {
+    return { ok: false, reason: "unknown_tenant" };
+  }
+  let target: string | null = null;
+  if (input.gatewayEndpoint !== null) {
+    try {
+      target = normaliseGatewayEndpoint(input.gatewayEndpoint);
+    } catch (error) {
+      if (error instanceof InvalidGatewayEndpointError) {
+        return { ok: false, reason: "invalid_gateway_endpoint" };
+      }
+      throw error;
+    }
+  }
+  return inTenant<EndpointChanged, SetEndpointRefusal>(deps.store, tenantId, async (ops) => {
+    const account = await findPerson(ops, tenantId, input.person);
+    if (!account) {
+      throw new RollBack("not_found");
+    }
+    const { user, credential } = account;
+    if (user.status === "disabled") {
+      throw new RollBack("user_disabled");
+    }
+    if (user.gatewayEndpoint === target) {
+      throw new RollBack("same_endpoint");
+    }
+    await ops.users.setGatewayEndpoint(user.id, target);
+    await audit(
+      ops,
+      user,
+      "account.gateway_endpoint_updated",
+      { user_id: user.id, username: credential.username, gateway_endpoint: target },
+      { gateway_endpoint: user.gatewayEndpoint },
+    );
+    return {
+      ok: true as const,
+      username: credential.username,
+      email: user.email,
+      userId: user.id,
+      from: user.gatewayEndpoint,
+      to: target,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // list
 // ---------------------------------------------------------------------------
 
@@ -526,13 +624,24 @@ export function formatList(result: Extract<ListResult, { readonly ok: true }>): 
       user.email,
       user.role,
       user.status,
+      user.gatewayEndpoint ?? "default",
       credential === null ? "no password" : credential.mustChange ? "must change" : "chosen",
       credential?.lastSignInAt ?? "never",
       locked && lockedUntil ? `until ${lockedUntil.toISOString()}` : "-",
       String(result.locksLast24h.get(user.id) ?? 0),
     ];
   });
-  const header = ["username", "e-mail", "role", "status", "password", "last password seen", "locked", "locks 24h"];
+  const header = [
+    "username",
+    "e-mail",
+    "role",
+    "status",
+    "endpoint",
+    "password",
+    "last password seen",
+    "locked",
+    "locks 24h",
+  ];
   const widths = header.map((title, column) => Math.max(title.length, ...rows.map((row) => row[column].length)));
   const line = (cells: readonly string[]) =>
     cells
@@ -554,6 +663,7 @@ export function formatCreated(result: CreatedAccount): string {
     `username   ${result.username}`,
     `address    ${result.email}`,
     `tenant     ${result.tenantSlug}   org ${result.orgSlug}   role ${result.role}`,
+    `endpoint   ${result.gatewayEndpoint ?? "default"}`,
     `person     ${result.attached ? "existing, now has a password" : "created"}; active, and must choose a new password at first sign-in`,
     "",
     `password   ${result.password}`,

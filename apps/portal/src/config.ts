@@ -148,6 +148,14 @@ function readPort(env: Env, name: string, fallback: number, problems: string[]):
 
 type DsnVariable = "PORTAL_DATABASE_URL" | "PORTAL_MIGRATE_DATABASE_URL";
 
+const REQUIRED_POSTGRES_SSLMODES = new Set(["require", "verify-ca", "verify-full"]);
+const COMPOSE_LOCAL_DB_HOST = "portal-db";
+
+interface PostgresDsnCheckOptions {
+  readonly production: boolean;
+  readonly allowInsecureLocal: boolean;
+}
+
 /**
  * The only accepted shape is a Postgres DSN. A sqlite path or a bare file name used to be a
  * tempting shortcut here; it is refused with the reason rather than silently treated as a host,
@@ -155,7 +163,12 @@ type DsnVariable = "PORTAL_DATABASE_URL" | "PORTAL_MIGRATE_DATABASE_URL";
  *
  * `""` when `raw` is not usable; the reason is in `problems`, under the variable's own name.
  */
-function checkPostgresDsn(name: DsnVariable, raw: string, problems: string[]): string {
+function checkPostgresDsn(
+  name: DsnVariable,
+  raw: string,
+  problems: string[],
+  options: PostgresDsnCheckOptions = { production: false, allowInsecureLocal: false },
+): string {
   let parsed: URL;
   try {
     parsed = new URL(raw);
@@ -179,10 +192,29 @@ function checkPostgresDsn(name: DsnVariable, raw: string, problems: string[]): s
     problems.push(`${name} must name a database, e.g. …:5433/tokotoken_portal`);
     return "";
   }
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, "");
+  const isComposeLocal = hostname.toLowerCase() === COMPOSE_LOCAL_DB_HOST;
+  if (options.production && !isLoopbackHost(hostname) && !options.allowInsecureLocal) {
+    const sslmode = parsed.searchParams.get("sslmode")?.trim().toLowerCase() ?? "";
+    if (isComposeLocal) {
+      if (sslmode !== "" && !REQUIRED_POSTGRES_SSLMODES.has(sslmode)) {
+        problems.push(
+          `${name} cannot use sslmode=${JSON.stringify(sslmode)} in production without PORTAL_DB_ALLOW_INSECURE_LOCAL=1`,
+        );
+        return "";
+      }
+    } else if (!REQUIRED_POSTGRES_SSLMODES.has(sslmode)) {
+      problems.push(
+        `${name} must require TLS in production for non-loopback host ${JSON.stringify(hostname)} ` +
+          `(set ?sslmode=require, verify-ca, or verify-full; got ${sslmode ? JSON.stringify(sslmode) : "none"})`,
+      );
+      return "";
+    }
+  }
   return raw;
 }
 
-function readDatabaseUrl(env: Env, problems: string[]): string {
+function readDatabaseUrl(env: Env, options: PostgresDsnCheckOptions, problems: string[]): string {
   const raw = env.PORTAL_DATABASE_URL?.trim();
   if (!raw) {
     problems.push(
@@ -192,7 +224,7 @@ function readDatabaseUrl(env: Env, problems: string[]): string {
     );
     return "";
   }
-  return checkPostgresDsn("PORTAL_DATABASE_URL", raw, problems);
+  return checkPostgresDsn("PORTAL_DATABASE_URL", raw, problems, options);
 }
 
 /**
@@ -201,10 +233,15 @@ function readDatabaseUrl(env: Env, problems: string[]): string {
  * DSN is privileged). In production there is no fallback. Migrations need the schema owner, and
  * the server connection must not be it.
  */
-function readMigrateDatabaseUrl(env: Env, production: boolean, databaseUrl: string, problems: string[]): string {
+function readMigrateDatabaseUrl(
+  env: Env,
+  options: PostgresDsnCheckOptions,
+  databaseUrl: string,
+  problems: string[],
+): string {
   const raw = env.PORTAL_MIGRATE_DATABASE_URL?.trim();
   if (!raw) {
-    if (production) {
+    if (options.production) {
       problems.push(
         "PORTAL_MIGRATE_DATABASE_URL is required in production: migrations run as the schema " +
           "owner, and PORTAL_DATABASE_URL must be a plain member of portal_app (portal_app_login), " +
@@ -213,7 +250,7 @@ function readMigrateDatabaseUrl(env: Env, production: boolean, databaseUrl: stri
     }
     return databaseUrl;
   }
-  return checkPostgresDsn("PORTAL_MIGRATE_DATABASE_URL", raw, problems);
+  return checkPostgresDsn("PORTAL_MIGRATE_DATABASE_URL", raw, problems, options);
 }
 
 /** base64url, base64 or hex, decoding to exactly 32 bytes — an Ed25519 seed. */
@@ -366,7 +403,9 @@ function readPublicUrl(env: Env, production: boolean, problems: string[]): strin
 export function loadConfig(env: Env = process.env): PortalConfig {
   const problems: string[] = [];
   const production = env.NODE_ENV?.trim() === "production";
-  const databaseUrl = readDatabaseUrl(env, problems);
+  const allowInsecureLocal = readFlag(env, "PORTAL_DB_ALLOW_INSECURE_LOCAL", problems);
+  const dsnOptions: PostgresDsnCheckOptions = { production, allowInsecureLocal };
+  const databaseUrl = readDatabaseUrl(env, dsnOptions, problems);
   const signInMode = readSignInMode(env, problems);
 
   const config: PortalConfig = {
@@ -376,7 +415,7 @@ export function loadConfig(env: Env = process.env): PortalConfig {
     port: readPort(env, "PORTAL_PORT", DEFAULT_PORT, problems),
     dataDir: readDataDir(env, problems),
     databaseUrl,
-    migrateDatabaseUrl: readMigrateDatabaseUrl(env, production, databaseUrl, problems),
+    migrateDatabaseUrl: readMigrateDatabaseUrl(env, dsnOptions, databaseUrl, problems),
     signingKey: readSigningKey(env, production, problems),
     devOutbox: readFlag(env, "PORTAL_DEV_OUTBOX", problems),
     allowManualOtp: readFlag(env, "PORTAL_ALLOW_MANUAL_OTP", problems),
