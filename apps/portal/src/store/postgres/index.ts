@@ -55,10 +55,32 @@ export interface OpenPostgresStoreOptions {
 
 const systemClock: Clock = { now: () => new Date() };
 
+const TLS_SSLMODES = new Set(["require", "verify-ca", "verify-full"]);
+
+/**
+ * Resolve `pg.Pool` TLS options from the DSN's `sslmode` query parameter.
+ * Always enforces `minVersion: "TLSv1.2"` and `rejectUnauthorized: true` whenever TLS is requested
+ * so certificate verification is never silently disabled.
+ */
+export function postgresSslOptions(databaseUrl: string): pg.PoolConfig["ssl"] {
+  let sslmode = "";
+  try {
+    sslmode = new URL(databaseUrl).searchParams.get("sslmode")?.trim().toLowerCase() ?? "";
+  } catch {
+    return undefined;
+  }
+  if (!TLS_SSLMODES.has(sslmode)) {
+    return undefined;
+  }
+  return Object.freeze({ minVersion: "TLSv1.2" as const, rejectUnauthorized: true });
+}
+
 export function openPostgresStore(options: OpenPostgresStoreOptions): PortalStore {
   const clock = options.clock ?? systemClock;
+  const ssl = postgresSslOptions(options.databaseUrl);
   const pool = new Pool({
     connectionString: options.databaseUrl,
+    ...(ssl ? { ssl } : {}),
     max: options.maxConnections ?? 8,
     connectionTimeoutMillis: options.connectionTimeoutMs ?? 10_000,
   });

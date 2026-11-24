@@ -13,6 +13,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { PortalConfig } from "./config";
 import { errorBody } from "./flows/reasons";
 import { log as defaultLog, type Logger } from "./log";
+import { isLoopbackHost } from "./security/cookies";
 import type { Clock, PortalStore } from "./store/types";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
@@ -77,6 +78,7 @@ export const MAX_BODY_BYTES = 64 * 1024;
 
 const NOT_FOUND: PortalResponse = { status: 404, json: { error: "not_found" } };
 const METHOD_NOT_ALLOWED: PortalResponse = { status: 405, json: { error: "method_not_allowed" } };
+const HTTPS_REQUIRED: PortalResponse = { status: 403, json: { error: "https_required" } };
 /** A 5xx says nothing about what broke — no path, no SQL, no stack. */
 const INTERNAL: PortalResponse = { status: 500, json: { error: "internal_error" } };
 /**
@@ -115,6 +117,23 @@ class BodyTooLargeError extends Error {
 }
 
 export const HEALTH_PATH = "/healthz";
+
+function isNonLoopbackPublicUrl(publicUrl: string | null): boolean {
+  if (!publicUrl) {
+    return false;
+  }
+  try {
+    return !isLoopbackHost(new URL(publicUrl).hostname);
+  } catch {
+    return false;
+  }
+}
+
+function forwardedProto(headers: IncomingMessage["headers"]): string {
+  const raw = headers["x-forwarded-proto"];
+  const first = Array.isArray(raw) ? raw[0] : raw;
+  return first?.split(",")[0]?.trim().toLowerCase() ?? "";
+}
 
 function healthRoute(): PortalRoute {
   return {
@@ -192,6 +211,7 @@ export function createPortalServer(options: CreatePortalServerOptions): PortalSe
   });
 
   const routes: PortalRoute[] = [healthRoute(), ...(options.routes ?? [])];
+  const requireHttps = options.config.production || isNonLoopbackPublicUrl(options.config.publicUrl);
 
   const answer = async (incoming: IncomingMessage, response: ServerResponse, method: string): Promise<void> => {
     try {
@@ -203,6 +223,11 @@ export function createPortalServer(options: CreatePortalServerOptions): PortalSe
         return;
       }
       const path = url.pathname;
+      const isLiveness = path === HEALTH_PATH && (method === "GET" || method === "HEAD");
+      if (requireHttps && !isLiveness && forwardedProto(incoming.headers) !== "https") {
+        send(response, HTTPS_REQUIRED);
+        return;
+      }
       const matches = routes.filter((route) => route.path === path);
       if (matches.length === 0) {
         send(response, NOT_FOUND);

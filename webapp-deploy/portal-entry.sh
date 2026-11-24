@@ -37,9 +37,22 @@ host="${PORTAL_DB_HOST:-portal-db}"
 port="${PORTAL_DB_PORT:-5432}"
 owner="${PORTAL_DB_OWNER:-portal}"
 name="${PORTAL_DB_NAME:-tokotoken_portal}"
+sslmode="${PORTAL_DATABASE_SSLMODE:-}"
+query=""
+if [ -n "$sslmode" ]; then
+	case "$sslmode" in
+	require|verify-ca|verify-full|prefer|allow|disable)
+		query="?sslmode=${sslmode}"
+		;;
+	*)
+		echo "portal-entry: PORTAL_DATABASE_SSLMODE must be one of require, verify-ca, verify-full, prefer, allow, disable" >&2
+		exit 1
+		;;
+	esac
+fi
 
-PORTAL_MIGRATE_DATABASE_URL="postgres://${owner}:${PORTAL_POSTGRES_PASSWORD}@${host}:${port}/${name}"
-PORTAL_DATABASE_URL="postgres://portal_app_login:${PORTAL_APP_DB_PASSWORD}@${host}:${port}/${name}"
+PORTAL_MIGRATE_DATABASE_URL="postgres://${owner}:${PORTAL_POSTGRES_PASSWORD}@${host}:${port}/${name}${query}"
+PORTAL_DATABASE_URL="postgres://portal_app_login:${PORTAL_APP_DB_PASSWORD}@${host}:${port}/${name}${query}"
 export PORTAL_MIGRATE_DATABASE_URL PORTAL_DATABASE_URL
 
 exec "$@"

@@ -427,10 +427,310 @@ describe("rotating the session refresh tokens sealed on auth_sessions", () => {
     try {
       putSession(S1, "refresh-one", OLD_KEY);
       const result = rotateWrapKey({ from: OLD_KEY, to: NEW_KEY });
-      expect(result.sessionTokens).toBe(1);
+    expect(result.sessionTokens).toBe(1);
       expect(openRefresh(S1, storedFor(S1) as string, wrap(NEW_KEY))).not.toBeNull();
     } finally {
       delete process.env.AGENTFORGE_SERVER;
+    }
+  });
+});
+
+describe("rotating every encrypted database store and desk file object", () => {
+  let sqlite: Database.Database;
+  let deskMediaRoot: string;
+
+  beforeEach(() => {
+    sqlite = new Database(":memory:");
+    ensureSchema(sqlite);
+    stateStore.registerTenantStateSql(sqlite as unknown as Parameters<typeof stateStore.registerTenantStateSql>[0]);
+    deskMediaRoot = mkdtempSync(path.join(tmpdir(), "agentforge-rotate-media-"));
+    process.env.MEDIA_ROOT = deskMediaRoot;
+  });
+
+  afterAll(() => {
+    delete process.env.MEDIA_ROOT;
+  });
+
+  function sealStr(value: unknown, secret: string): string {
+    return JSON.stringify(encryptJson(value, wrappingKeyFromSecret(secret)));
+  }
+
+  function openStr<T>(raw: string, secret: string): T {
+    return decryptJson<T>(JSON.parse(raw), wrappingKeyFromSecret(secret));
+  }
+
+  function seedAllStores(keySecret: string, options: { corruptTable?: "artifacts" | "desk_files" } = {}): {
+    deskObjectKey: string;
+    deskObjectPath: string;
+  } {
+    const now = Date.now();
+    sqlite
+      .prepare("INSERT INTO tenants (id, slug, name, status, created_at) VALUES (?, ?, ?, ?, ?)")
+      .run(A, A, A, "active", now);
+    sqlite
+      .prepare("INSERT INTO tenant_state (tenant_id, key, value, updated_at) VALUES (?, 'settings', ?, ?)")
+      .run(A, sealed(payloadFor("desk-a", "sk-alpha-key-0000"), keySecret), now);
+    sqlite
+      .prepare("INSERT INTO organizations (id, tenant_id, name, slug, industry_pack, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .run("org-1", A, "Org 1", "org-1", "general", now);
+    sqlite
+      .prepare("INSERT INTO workspaces (id, organization_id, name, slug, created_at) VALUES (?, ?, ?, ?, ?)")
+      .run("ws-1", "org-1", "Desk 1", "ws-1", now);
+    sqlite
+      .prepare(
+        "INSERT INTO agents (id, organization_id, workspace_id, name, slug, created_by_user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run("agent-1", "org-1", "ws-1", "Chat", "chat", "user-1", now, now);
+    sqlite
+      .prepare(
+        "INSERT INTO agent_versions (id, agent_id, organization_id, version, system_prompt, model, input_modalities, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run("ver-1", "agent-1", "org-1", 1, sealStr("secret system prompt", keySecret), "gpt-4o", '["text"]', now);
+    sqlite
+      .prepare(
+        "INSERT INTO agent_versions (id, agent_id, organization_id, version, system_prompt, model, input_modalities, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run("ver-legacy", "agent-1", "org-1", 2, "legacy plaintext prompt", "gpt-4o", '["text"]', now);
+    sqlite
+      .prepare(
+        "INSERT INTO threads (id, organization_id, workspace_id, agent_id, user_id, title, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run("thread-1", "org-1", "ws-1", "agent-1", "user-1", sealStr("Encrypted thread title", keySecret), now);
+    sqlite
+      .prepare(
+        "INSERT INTO threads (id, organization_id, workspace_id, agent_id, user_id, title, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run("thread-legacy", "org-1", "ws-1", "agent-1", "user-1", "Legacy plaintext title", now);
+    sqlite
+      .prepare("INSERT INTO messages (id, organization_id, thread_id, role, content, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .run("msg-1", "org-1", "thread-1", "user", sealStr([{ type: "text", text: "secret message" }], keySecret), now);
+    sqlite
+      .prepare(
+        "INSERT INTO runs (id, organization_id, thread_id, agent_version_id, modality, status, started_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run("run-1", "org-1", "thread-1", "ver-1", "text", "completed", now);
+    sqlite
+      .prepare("INSERT INTO tool_invocations (id, organization_id, run_id, tool_key, input, output, status) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(
+        "tool-1",
+        "org-1",
+        "run-1",
+        "web_search",
+        sealStr({ query: "confidential" }, keySecret),
+        sealStr({ hits: ["classified"] }, keySecret),
+        "ok",
+      );
+    sqlite
+      .prepare(
+        "INSERT INTO artifacts (id, workspace_id, mode, kind, title, mime, body, meta, size_bytes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(
+        "art-1",
+        "ws-1",
+        "documents",
+        "draft",
+        "Memo",
+        "text/markdown",
+        options.corruptTable === "artifacts" ? sealStr("bad", NEW_KEY) : sealStr("# Secret artifact body", keySecret),
+        "{}",
+        20,
+        now,
+        now,
+      );
+    sqlite
+      .prepare(
+        "INSERT INTO channel_endpoints (id, organization_id, workspace_id, kind, external_id, status, created_at, updated_at) VALUES (?, ?, ?, 'whatsapp', '10001', 'active', ?, ?)",
+      )
+      .run("ep-1", "org-1", "ws-1", now, now);
+    sqlite
+      .prepare(
+        `INSERT INTO customer_conversations
+           (id, organization_id, workspace_id, endpoint_id, kind, contact_id, contact_name, state, unread_count,
+            last_message_at, last_message_preview, last_message_direction, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'whatsapp', ?, ?, 'needs_you', 1, ?, ?, 'in', ?, ?)`,
+      )
+      .run(
+        "conv-1",
+        "org-1",
+        "ws-1",
+        "ep-1",
+        "628120001",
+        sealStr("Customer Dewi", keySecret),
+        now,
+        sealStr("Customer preview", keySecret),
+        now,
+        now,
+      );
+    sqlite
+      .prepare(
+        `INSERT INTO customer_messages
+           (id, workspace_id, conversation_id, direction, sent_by, kind, external_id, text, created_at)
+         VALUES (?, ?, ?, 'in', 'customer', 'text', 'wamid.1', ?, ?)`,
+      )
+      .run("cmsg-1", "ws-1", "conv-1", sealStr("Customer secret text", keySecret), now);
+    sqlite
+      .prepare(
+        `INSERT INTO desk_files (id, workspace_id, path, head_version, bytes, mime, sha256, created_at, updated_at)
+         VALUES (?, ?, 'notes/secret.md', 1, 15, 'text/markdown', 'abc', ?, ?)`,
+      )
+      .run("df-1", "ws-1", now, now);
+    const deskObjectKey = `tenants/${A}/desk-files/df-1/1`;
+    sqlite
+      .prepare(
+        `INSERT INTO desk_file_versions (file_id, version, object_key, bytes, sha256, author_kind, author_id, mode, created_at)
+         VALUES (?, 1, ?, 15, 'abc', 'user', 'user-1', NULL, ?)`,
+      )
+      .run("df-1", deskObjectKey, now);
+    // Also a version row with missing object on disk to ensure missing files don't abort rotation
+    sqlite
+      .prepare(
+        `INSERT INTO desk_files (id, workspace_id, path, head_version, bytes, mime, sha256, created_at, updated_at)
+         VALUES (?, ?, 'notes/missing.md', 1, 5, 'text/markdown', 'def', ?, ?)`,
+      )
+      .run("df-missing", "ws-1", now, now);
+    sqlite
+      .prepare(
+        `INSERT INTO desk_file_versions (file_id, version, object_key, bytes, sha256, author_kind, author_id, mode, created_at)
+         VALUES (?, 1, ?, 5, 'def', 'user', 'user-1', NULL, ?)`,
+      )
+      .run("df-missing", `tenants/${A}/desk-files/df-missing/1`, now);
+
+    const deskObjectPath = path.join(deskMediaRoot, ...deskObjectKey.split("/"));
+    mkdirSync(path.dirname(deskObjectPath), { recursive: true });
+    writeFileSync(
+      deskObjectPath,
+      options.corruptTable === "desk_files" ? sealStr("wrong", NEW_KEY) : sealStr("Secret desk file content", keySecret),
+      "utf8",
+    );
+    return { deskObjectKey, deskObjectPath };
+  }
+
+  it("rotates and verifies every encrypted store while preserving legacy plaintext rows", () => {
+    const { deskObjectPath } = seedAllStores(OLD_KEY);
+    try {
+      const result = rotateWrapKey({ from: OLD_KEY, to: NEW_KEY, backend: stateStore.dbTenantStateBackend });
+
+      expect(result.encryptedStores).toEqual({
+        messages: 1,
+        toolInvocations: 1,
+        agentVersions: 1,
+        artifacts: 1,
+        threads: 1,
+        customerConversations: 1,
+        customerMessages: 1,
+        deskFiles: 1,
+      });
+
+      const msg = sqlite.prepare("SELECT content FROM messages WHERE id = 'msg-1'").get() as { content: string };
+      expect(openStr(msg.content, NEW_KEY)).toEqual([{ type: "text", text: "secret message" }]);
+      expect(() => openStr(msg.content, OLD_KEY)).toThrow();
+
+      const tool = sqlite.prepare("SELECT input, output FROM tool_invocations WHERE id = 'tool-1'").get() as {
+        input: string;
+        output: string;
+      };
+      expect(openStr(tool.input, NEW_KEY)).toEqual({ query: "confidential" });
+      expect(openStr(tool.output, NEW_KEY)).toEqual({ hits: ["classified"] });
+
+      const ver = sqlite.prepare("SELECT system_prompt FROM agent_versions WHERE id = 'ver-1'").get() as {
+        system_prompt: string;
+      };
+      expect(openStr(ver.system_prompt, NEW_KEY)).toBe("secret system prompt");
+      const verLegacy = sqlite.prepare("SELECT system_prompt FROM agent_versions WHERE id = 'ver-legacy'").get() as {
+        system_prompt: string;
+      };
+      expect(verLegacy.system_prompt).toBe("legacy plaintext prompt");
+
+      const art = sqlite.prepare("SELECT body FROM artifacts WHERE id = 'art-1'").get() as { body: string };
+      expect(openStr(art.body, NEW_KEY)).toBe("# Secret artifact body");
+
+      const thr = sqlite.prepare("SELECT title FROM threads WHERE id = 'thread-1'").get() as { title: string };
+      expect(openStr(thr.title, NEW_KEY)).toBe("Encrypted thread title");
+      const thrLegacy = sqlite.prepare("SELECT title FROM threads WHERE id = 'thread-legacy'").get() as {
+        title: string;
+      };
+      expect(thrLegacy.title).toBe("Legacy plaintext title");
+
+      const conv = sqlite
+        .prepare("SELECT contact_name, last_message_preview FROM customer_conversations WHERE id = 'conv-1'")
+        .get() as { contact_name: string; last_message_preview: string };
+      expect(openStr(conv.contact_name, NEW_KEY)).toBe("Customer Dewi");
+      expect(openStr(conv.last_message_preview, NEW_KEY)).toBe("Customer preview");
+
+      const cmsg = sqlite.prepare("SELECT text FROM customer_messages WHERE id = 'cmsg-1'").get() as { text: string };
+      expect(openStr(cmsg.text, NEW_KEY)).toBe("Customer secret text");
+
+      const deskBody = readFileSync(deskObjectPath, "utf8");
+      expect(openStr(deskBody, NEW_KEY)).toBe("Secret desk file content");
+      expect(() => openStr(deskBody, OLD_KEY)).toThrow();
+    } finally {
+      rmSync(deskMediaRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("writes NOTHING across any store when one artifact or desk file fails to open with oldKey", () => {
+    const { deskObjectPath } = seedAllStores(OLD_KEY, { corruptTable: "artifacts" });
+    try {
+      const msgBefore = (sqlite.prepare("SELECT content FROM messages WHERE id = 'msg-1'").get() as { content: string })
+        .content;
+      const deskBefore = readFileSync(deskObjectPath, "utf8");
+
+      expect(() =>
+        rotateWrapKey({ from: OLD_KEY, to: NEW_KEY, backend: stateStore.dbTenantStateBackend }),
+      ).toThrow(WrapKeyRotationError);
+
+      const msgAfter = (sqlite.prepare("SELECT content FROM messages WHERE id = 'msg-1'").get() as { content: string })
+        .content;
+      expect(msgAfter).toBe(msgBefore);
+      expect(readFileSync(deskObjectPath, "utf8")).toBe(deskBefore);
+    } finally {
+      rmSync(deskMediaRoot, { recursive: true, force: true });
+    }
+
+    // Also when a desk file fails to decrypt, nothing in SQLite is mutated
+    sqlite = new Database(":memory:");
+    ensureSchema(sqlite);
+    stateStore.registerTenantStateSql(sqlite as unknown as Parameters<typeof stateStore.registerTenantStateSql>[0]);
+    deskMediaRoot = mkdtempSync(path.join(tmpdir(), "agentforge-rotate-media2-"));
+    process.env.MEDIA_ROOT = deskMediaRoot;
+    seedAllStores(OLD_KEY, { corruptTable: "desk_files" });
+    try {
+      const msgBefore = (sqlite.prepare("SELECT content FROM messages WHERE id = 'msg-1'").get() as { content: string })
+        .content;
+      expect(() =>
+        rotateWrapKey({ from: OLD_KEY, to: NEW_KEY, backend: stateStore.dbTenantStateBackend }),
+      ).toThrow(WrapKeyRotationError);
+      const msgAfter = (sqlite.prepare("SELECT content FROM messages WHERE id = 'msg-1'").get() as { content: string })
+        .content;
+      expect(msgAfter).toBe(msgBefore);
+    } finally {
+      rmSync(deskMediaRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("supports --dry-run without modifying any store or desk file", () => {
+    const { deskObjectPath } = seedAllStores(OLD_KEY);
+    try {
+      const msgBefore = (sqlite.prepare("SELECT content FROM messages WHERE id = 'msg-1'").get() as { content: string })
+        .content;
+      const deskBefore = readFileSync(deskObjectPath, "utf8");
+
+      const result = rotateWrapKey({
+        from: OLD_KEY,
+        to: NEW_KEY,
+        dryRun: true,
+        backend: stateStore.dbTenantStateBackend,
+      });
+
+      expect(result.dryRun).toBe(true);
+      expect(result.encryptedStores.messages).toBe(1);
+      expect(result.encryptedStores.deskFiles).toBe(1);
+      expect((sqlite.prepare("SELECT content FROM messages WHERE id = 'msg-1'").get() as { content: string }).content).toBe(
+        msgBefore,
+      );
+      expect(readFileSync(deskObjectPath, "utf8")).toBe(deskBefore);
+    } finally {
+      rmSync(deskMediaRoot, { recursive: true, force: true });
     }
   });
 });

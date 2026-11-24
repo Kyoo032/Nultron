@@ -10,9 +10,11 @@
  * folder being copied correctly is not a control.
  *
  * DUPLICATION IS THE POINT, AND IT IS SAFE. Caddy's `header` directive REPLACES a header rather than
- * appending to it, so on the real deployment the proxy's value wins and nothing is sent twice. Here
- * the app is the floor and the proxy is the ceiling. To stop the two drifting apart,
- * `security-headers.test.ts` reads the Caddyfile and fails if the two policies stop agreeing.
+ * appending to it, so on the real deployment the proxy's value wins and nothing is sent twice
+ * (with `?Content-Security-Policy` in Caddyfile so SR-132 artifact `Content-Security-Policy: sandbox`
+ * responses are preserved rather than overwritten). Here the app is the floor and the proxy is the
+ * ceiling. To stop the two drifting apart, `security-headers.test.ts` reads the Caddyfile and fails
+ * if the two policies stop agreeing.
  *
  * SERVER MODE ONLY. Webdev serves Vite's own inline module preloads and the desktop shell loads from
  * a custom protocol; a CSP written for the built bundle would break both. Off server mode this file

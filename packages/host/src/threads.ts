@@ -1,9 +1,9 @@
-import { and, asc, desc, eq, ne, notInArray } from "drizzle-orm";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { agents, db, messages, runs, threads, toolInvocations } from "@agentforge/db";
 import type { ContentPart, InputModality, TenantContext } from "@agentforge/core";
-import { ApiError, DEFAULT_CHAT_SLUG, isDefaultChatAgent, openPayload, sealPayload } from "@agentforge/core";
+import { ApiError, DEFAULT_CHAT_SLUG, isDefaultChatAgent, isEnvelope, openPayload, sealPayload } from "@agentforge/core";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
-import { DEFAULT_THREAD_TITLES, defaultThreadTitle, isDefaultThreadTitle, titleFromParts } from "./thread-title";
+import { defaultThreadTitle, isDefaultThreadTitle, titleFromParts } from "./thread-title";
 import { localeForRun } from "./run-context";
 import { deleteSourceByOrigin } from "./knowledge";
 import { removeGraphForThread } from "./knowledge-graph-prune";
@@ -33,7 +33,31 @@ function openJson(value: unknown): unknown {
   }
 }
 
+function sealTitle(value: string): string {
+  return JSON.stringify(sealPayload(value, getLocalVaultKey()));
+}
+
+function openTitle(stored: string): string {
+  let candidate: unknown = stored;
+  try {
+    candidate = JSON.parse(stored);
+  } catch {
+    return stored;
+  }
+  if (!isEnvelope(candidate)) {
+    return stored;
+  }
+  const key = getLocalVaultKey();
+  try {
+    const opened = openPayload<unknown>(candidate, key);
+    return typeof opened === "string" ? opened : stored;
+  } catch {
+    return stored;
+  }
+}
+
 export async function createThread(tenant: TenantContext, agentId: string, title?: string) {
+  const plainTitle = title ?? defaultThreadTitle(localeForRun());
   const [row] = await db
     .insert(threads)
     .values({
@@ -41,10 +65,10 @@ export async function createThread(tenant: TenantContext, agentId: string, title
       workspaceId: tenant.workspaceId,
       agentId,
       userId: tenant.userId,
-      title: title ?? defaultThreadTitle(localeForRun()),
+      title: sealTitle(plainTitle),
     })
     .returning();
-  return row;
+  return row ? { ...row, title: openTitle(row.title) } : row;
 }
 
 export async function getThread(tenant: TenantContext, threadId: string) {
@@ -61,11 +85,12 @@ export async function getThread(tenant: TenantContext, threadId: string) {
       ),
     )
     .limit(1);
-  return rows[0] ?? null;
+  const row = rows[0];
+  return row ? { ...row, title: openTitle(row.title) } : null;
 }
 
 export async function listThreads(tenant: TenantContext, agentId: string) {
-  return db
+  const rows = await db
     .select()
     .from(threads)
     .where(
@@ -76,6 +101,7 @@ export async function listThreads(tenant: TenantContext, agentId: string) {
       ),
     )
     .orderBy(desc(threads.createdAt));
+  return rows.map((row) => ({ ...row, title: openTitle(row.title) }));
 }
 
 export type WorkspaceThreadScope = "chat" | "agent" | "all";
@@ -116,10 +142,11 @@ export async function listWorkspaceThreads(
     .orderBy(desc(threads.createdAt))
     .limit(limit);
 
+  const opened = rows.map((row) => ({ ...row, title: openTitle(row.title) }));
   if (scope === "agent" && !options.agentId) {
-    return rows.filter((row) => !isDefaultChatAgent({ slug: row.agentSlug }));
+    return opened.filter((row) => !isDefaultChatAgent({ slug: row.agentSlug }));
   }
-  return rows;
+  return opened;
 }
 
 export async function deleteThread(tenant: TenantContext, threadId: string): Promise<boolean> {
@@ -179,14 +206,16 @@ export async function listPastSessionsForAgent(
         eq(threads.agentId, agentId),
         eq(threads.userId, tenant.userId),
         ne(threads.id, excludeThreadId),
-        notInArray(threads.title, [...DEFAULT_THREAD_TITLES]),
       ),
     )
-    .orderBy(desc(threads.createdAt))
-    .limit(limit);
+    .orderBy(desc(threads.createdAt));
 
   const summaries: PastSessionSummary[] = [];
   for (const row of rows) {
+    const title = openTitle(row.title);
+    if (isDefaultThreadTitle(title)) {
+      continue;
+    }
     const [firstUser] = await db
       .select({ content: messages.content })
       .from(messages)
@@ -205,7 +234,10 @@ export async function listPastSessionsForAgent(
       previewSource && previewSource.length > PREVIEW_MAX
         ? `${previewSource.slice(0, PREVIEW_MAX - 1).trimEnd()}…`
         : previewSource;
-    summaries.push({ ...row, preview });
+    summaries.push({ id: row.id, title, createdAt: row.createdAt, preview });
+    if (summaries.length >= limit) {
+      break;
+    }
   }
   return summaries;
 }
@@ -251,7 +283,7 @@ export async function setThreadTitleFromParts(tenant: TenantContext, threadId: s
   }
   await db
     .update(threads)
-    .set({ title })
+    .set({ title: sealTitle(title) })
     .where(and(eq(threads.organizationId, tenant.organizationId), eq(threads.id, threadId)));
 }
 

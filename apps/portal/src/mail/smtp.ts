@@ -53,6 +53,7 @@ export interface SmtpTransportOptions {
   readonly secure: boolean;
   readonly requireTLS: boolean;
   readonly ignoreTLS: boolean;
+  readonly tls: { readonly minVersion: "TLSv1.2"; readonly rejectUnauthorized: true };
   readonly connectionTimeout: number;
   readonly greetingTimeout: number;
   readonly socketTimeout: number;
@@ -80,6 +81,7 @@ export function smtpTransportOptions(smtp: SmtpConfig): SmtpTransportOptions {
     // Only ever true for a loopback sandbox: Mailpit speaks plain SMTP on 1025 and offers no
     // STARTTLS, so `requireTLS` there would refuse every development send.
     ignoreTLS: smtp.ignoreTls,
+    tls: Object.freeze({ minVersion: "TLSv1.2" as const, rejectUnauthorized: true }),
     connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
     greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
     socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
