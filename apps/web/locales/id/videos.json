@@ -24,7 +24,7 @@
     "empty": "Belum ada gambar tersimpan. Buat atau unggah satu dulu, lalu pilih di sini.",
     "optionAlt": "Gambar tersimpan",
     "chosen": "Gambar tersimpan dipakai sebagai gambar diam",
-    "remove": "Lepas",
+    "remove": "Hapus",
     "unusable": "Gambar tersimpan ini tidak bisa dipakai di sini. Pilih yang lain, atau tempel URL."
   },
   "promptPlaceholder": "Kamera bergerak maju perlahan ke arah cangkir keramik saat cahaya jendela bergeser melintasi meja",
@@ -35,7 +35,7 @@
   "emptyTitle": "Belum ada apa pun",
   "emptyBody": "Buat video untuk mengisi galeri ini.",
   "download": "Unduh",
-  "seconds": "{n}s",
+  "seconds": "{n} dtk",
   "examplesHeading": "Mulai dari template",
   "examplesHint": "Klik salah satu kartu untuk memuat brief lengkapnya. Ganti detail contohnya, lalu buat videonya.",
   "clipsHeading": "Contoh klip",
@@ -127,6 +127,6 @@
   "unverified": "Sebagian nilai untuk model ini berasal dari API vendor, bukan dari gateway, dan belum diperiksa di sini.",
   "modelLabel": "Model",
   "referenceImage": "Gambar referensi",
-  "templatesToggle": "Templat & contoh",
+  "templatesToggle": "Template & contoh",
   "templatesClose": "Tutup"
 }

@@ -21,8 +21,8 @@
     },
     "workspaces": {
       "title": "Rekrut agen lain kapan saja",
-      "bodyMore": "Ingin agen lain, seperti {tools}? Buka Agen virtual lalu pilih Rekrut. Anda bisa melepasnya kapan saja.",
-      "bodyAll": "Semua agen sudah ada di meja kerja ini. Untuk menguranginya, buka Agen virtual lalu pilih Lepas pada agen yang tidak diperlukan."
+      "bodyMore": "Ingin agen lain, seperti {tools}? Buka Agen virtual lalu pilih Rekrut. Anda bisa menghapusnya kapan saja.",
+      "bodyAll": "Semua agen sudah ada di meja kerja ini. Untuk menguranginya, buka Agen virtual lalu pilih Hapus pada agen yang tidak diperlukan."
     },
     "chat": {
       "title": "Tanyakan apa saja ke Chat",
