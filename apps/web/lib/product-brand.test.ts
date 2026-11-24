@@ -81,15 +81,6 @@ describe("brandFromUnknown", () => {
       gatewayBaseUrl: "https://aihub.metranet.co.id/v1",
     });
   });
-
-  it("unwraps an IPC { body } envelope", () => {
-    expect(
-      brandFromUnknown(
-        { body: { productName: "AIHub Metranet", gatewayName: "AIHub" } },
-        DEFAULT_PRODUCT_BRAND,
-      ).productName,
-    ).toBe("AIHub Metranet");
-  });
 });
 
 describe("mergePingBrand", () => {

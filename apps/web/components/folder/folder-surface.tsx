@@ -22,11 +22,9 @@ type ViewProps = {
   state: FolderState;
   capabilities: HostCapabilities;
   controller: FolderController;
-  /** Whether the shell can open a folder dialog. Left out, the capability flag alone decides. */
   picker?: boolean;
 };
 
-/** The pieces, given state: nothing here reads the host, the bridge or a hook. */
 export function FolderSurfaceView({ state, capabilities, controller, picker = true }: ViewProps) {
   const status = state.status;
   if (!status?.available) {

@@ -10,10 +10,6 @@
  *
  * Unknown is never an administrator: a signed-in person whose role this screen cannot read does not see
  * the key controls either, the same fail-closed reading the Erase account button has.
- *
- * Personal is held to the byte. `personal-settings-page.golden.json` is the markup `SettingsPage`
- * rendered on a desk BEFORE this change, in English and in Indonesian; the page as it is today must
- * render it unchanged, because a desk has no session and no role to read.
  */
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";

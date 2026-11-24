@@ -4,21 +4,6 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { applyDeskShell, deskShell, SHELL_ATTR } from "./shell-motion";
 
-/**
- * Two shells, two timings (owner, 2026-10-05: "smooth the Nultron animation").
- *
- * The packaged Personal app runs Chromium without the GPU, so its ambient loops (the shapes' bob and turn,
- * the dot grid's drift) and its busy indicators are stepped, a few frames a second. A browser (webdev, the
- * hosted Enterprise app) has the GPU and runs them smooth. `main.tsx` writes `data-shell` on <html> once,
- * and `html[data-shell="desktop"]` in `app/globals.css` hands the stepped values back as tokens.
- *
- * None of it shows in a screenshot. What has to hold:
- *  - a browser's defaults are smooth and a little quicker than the stepped cycles;
- *  - the desktop shell resolves to EXACTLY what the stepped desk shipped with (Personal is unchanged);
- *  - the frame strips (a clip, a four-frame loop) are pictures and step in both shells;
- *  - the attribute is written before the first render, from `isElectron()`, never from `window.agentforge`.
- */
-
 const webRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (...parts: string[]) => readFileSync(join(webRoot, ...parts), "utf8").replace(/\r\n/g, "\n");
 const stripComments = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, "");

@@ -1,7 +1,3 @@
-// node --test scripts/build-sandbox-runtime.test.mjs
-// The pure parts of scripts/build-sandbox-runtime.mjs: lockfile trimming, manifest building and diffing, the
-// refusal of a download whose sha256 differs, and the contracts between the lock, package.json, the installer
-// config and the Dockerfile. Nothing here touches the network or needs the built folder.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";

@@ -1,19 +1,8 @@
-/**
- * Phase 8 — the capability flags in the renderer, actually rendered.
- *
- * `packages/core/src/capabilities.test.ts` owns the flags themselves: what each one is on each
- * target, and that an unknown payload reads as all-false. What it cannot prove is the half that
- * matters to a person looking at the screen — that the Electron-only controls are not on the page
- * on a hosted server, and that they still are on the desk. A flag nobody reads hides nothing.
- *
- * `renderToStaticMarkup` runs each card for real against the real `t()` and the real catalogs, so
- * a hidden control is genuinely absent from the markup rather than merely styled away.
- */
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { hostCapabilities, parseCapabilities } from "@agentforge/core/capabilities";
-import { EVERYTHING_OFF, hasDesktopShell, hasNativeFilePicker, HostCapabilitiesFixture } from "./host-capabilities";
+import { EVERYTHING_OFF, HostCapabilitiesFixture } from "./host-capabilities";
 import { pingOnce, resetPingForTests } from "./host-ping";
 import { applyLocale, resetLocaleForTests } from "./i18n";
 import { SESSIONS_OFF, SessionFixture, type SessionRole, type SessionSnapshot } from "./session";
@@ -58,15 +47,6 @@ describe("the closed default", () => {
     // The same object `parseCapabilities` builds for a host that said nothing: a surface stays
     // hidden until the host has said it exists, which is the fail-closed direction.
     expect(EVERYTHING_OFF).toEqual(parseCapabilities(undefined));
-  });
-});
-
-describe("the desktop shell tests", () => {
-  it("reports no desktop shell or native picker on web builds", () => {
-    expect(hasDesktopShell(DESK)).toBe(false);
-    expect(hasDesktopShell(HOSTED)).toBe(false);
-    expect(hasNativeFilePicker(DESK)).toBe(false);
-    expect(hasNativeFilePicker(HOSTED)).toBe(false);
   });
 });
 

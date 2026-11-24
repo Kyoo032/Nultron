@@ -144,10 +144,7 @@ export function OnboardingScreen({ onDone, gateway, onLater, initialStep }: Prop
   function applyGate(next: GatewayGatePayload | null): boolean {
     setGate(next);
     setError(null);
-    // The panes the desk mounts next must not start from the closed gate the boot read published
-    // (hosted only; a no-op elsewhere).
     publishGate(next);
-    // The host said this desk may work. Show what to try, then the last button opens Chat.
     if (resolveGate(next, false) === "app") {
       setStep("try");
       return true;

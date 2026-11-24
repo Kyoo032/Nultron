@@ -364,7 +364,6 @@ export function PresentationsStudio() {
     }
   }
 
-  // The local error (save, download, regenerate) and the stream's own error share one banner.
   const shownError = error ?? job.error?.message ?? null;
   const showingOpenSlide = engine === "open-slide";
   const hasDeck = showingOpenSlide ? openDeck !== null : outline !== null;

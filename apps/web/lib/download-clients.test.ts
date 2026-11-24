@@ -1,15 +1,3 @@
-/**
- * The two download calls the Chat buttons make, on each transport this renderer has.
- *
- * - the deck card calls `downloadArtifactFile` (artifacts-client), and a desk file calls `download`
- *   on the files API;
- * - on the web both fetch bytes and save a blob through an anchor;
- * - in the packaged app `apiFetch` crosses the IPC bridge, the shell answers `{ type: "bytes" }`, and
- *   `apiFetch` itself hands the bytes to `window.agentforge.saveBytes` (the native save dialog). The
- *   caller must then do nothing more, or the person gets a second dialog for the same file.
- *
- * The shell's own half (`host:save-bytes` in apps/desktop/main.cjs) is not run here.
- */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { downloadArtifactFile } from "./artifacts-client";
 import { createFilesApi, type FilesFetch } from "./files-api";
@@ -43,7 +31,7 @@ function sink() {
   const saved: Array<{ blob: Blob; filename: string }> = [];
   return {
     saved,
-    io: { desktop: () => false, saveBlob: (blob: Blob, filename: string) => void saved.push({ blob, filename }) },
+    io: { saveBlob: (blob: Blob, filename: string) => void saved.push({ blob, filename }) },
   };
 }
 
@@ -91,16 +79,6 @@ describe("a desk file, on the web", () => {
       throw new TypeError("fetch failed");
     }, io);
     expect(await down.download("a.md")).toEqual({ ok: false, code: "network", status: 0 });
-    expect(saved).toEqual([]);
-  });
-
-  it("does not save a second copy on the desktop, where apiFetch has already written the file", async () => {
-    const { saved, io } = sink();
-    const outcome = await createFilesApi(async () => file("x", 'attachment; filename="a.md"'), {
-      ...io,
-      desktop: () => true,
-    }).download("a.md");
-    expect(outcome).toEqual({ ok: true, data: { filename: "a.md" } });
     expect(saved).toEqual([]);
   });
 });

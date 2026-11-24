@@ -1,15 +1,4 @@
 #!/usr/bin/env node
-/**
- * Generate the bundled Edit starter media into apps/desktop/resources/starters/.
- *
- * The manifest (packages/core/src/edit/starter-media.json) is the single source of truth:
- * every entry's `generate` block is rendered here with ffmpeg lavfi sources, deterministically,
- * so the files never need to be downloaded. Swap any file for real footage of the same
- * duration and aspect and the starter picks it up unchanged.
- *
- * Usage (repo root): node scripts/edit-starters.mjs [--check]
- *   --check  only verify that every manifest file exists; exit 1 if any is missing.
- */
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";

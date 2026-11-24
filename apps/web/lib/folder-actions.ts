@@ -12,14 +12,13 @@
 import { NO_FOLDER, type ApproveOutcome, type FolderApi, type ProposalSummary } from "./folder-api";
 import type { FolderAction, FolderState, Outcome } from "./folder-state";
 
-export type DesktopFolderPick = { path: string } | { canceled: true };
+export type FolderPick = { path: string } | { canceled: true };
 
 export type FolderControllerDeps = {
   readonly api: FolderApi;
   readonly dispatch: (action: FolderAction) => void;
   readonly getState: () => FolderState;
-  /** The shell's folder dialog; `null` when this shell has none. */
-  readonly pickFolder: () => Promise<DesktopFolderPick | null>;
+  readonly pickFolder: () => Promise<FolderPick | null>;
 };
 
 export type FolderController = {

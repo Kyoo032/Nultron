@@ -121,14 +121,20 @@ function Shell({ children }: { children: ReactNode }) {
       });
   }, [modesCacheKey]);
 
+  const lastTriggerRef = useRef<{ path: string; reload: () => void } | null>(null);
+
   useEffect(() => {
-    if (typeof location.pathname === "string") {
+    if (lastTriggerRef.current?.path !== location.pathname || lastTriggerRef.current.reload !== reload) {
+      lastTriggerRef.current = { path: location.pathname, reload };
       reload();
     }
+  }, [reload, location.pathname]);
+
+  useEffect(() => {
     const onRefresh = () => reload();
     window.addEventListener("agentforge-shell-refresh", onRefresh);
     return () => window.removeEventListener("agentforge-shell-refresh", onRefresh);
-  }, [reload, location.pathname]);
+  }, [reload]);
 
   return (
     <WorkspaceScope.Provider value={{ id: workspaceId, name: workspaceName }}>
@@ -252,11 +258,6 @@ export function AppRoutes() {
   }, []);
 
   useEffect(() => {
-    // Phase 9: the boot order is ping → session → settings. A signed-out visitor to the hosted
-    // deployment never makes this call: it answers `401 session_required` (the gate exempts only
-    // ping and components), the `.catch` below would read that as `"onboarding"`, and they would be
-    // shown a form asking for the operator's gateway key. Off a hosted deployment `view` is "app"
-    // as soon as ping answers, so webdev and the desktop reach this exactly as they always did.
     if (view !== "app") {
       return;
     }

@@ -41,24 +41,10 @@ export const DEFAULT_PRODUCT_BRAND: ProductBrand = {
  */
 export const WEB_LOGO_SRC = "/brand/logo.png";
 
-/**
- * True when the rail, the desk switcher and the sign-in screen draw the mark that ships with the
- * renderer (`BrandMark`, size-tuned for 24 and 32 px) rather than `logoSrc`. That is the default
- * brand on the web (its `logoSrc` is `WEB_LOGO_SRC`, which is the same tile) and the default brand
- * in the packaged desktop, whose preload also hands over the logo as a data URL. A flavor with its
- * own name and its own logo (`branding/kemenkeu`, `branding/metranet`) keeps drawing that logo.
- */
 export function usesBundledMark(brand: ProductBrand): boolean {
   return brand.logoSrc === WEB_LOGO_SRC || brand.productName === DEFAULT_PRODUCT_NAME;
 }
 
-/**
- * True when the product still carries the public name, so its wordmark (the rail header's "Nultron")
- * may take the Nultron IP colours (`.wordmark-nultron`, the `--nultron-*` tokens). The decision is the
- * NAME and not the logo: a hosted tenant that renames the product keeps the bundled mark
- * (`usesBundledMark`) but must not see its own name in another brand's colours, and a desktop flavor
- * (`kemenkeu`, `metranet`) keeps its plain name and its own logo.
- */
 export function usesNultronWordmark(brand: ProductBrand): boolean {
   return brand.productName === DEFAULT_PRODUCT_NAME;
 }
@@ -82,24 +68,21 @@ export function brandFromUnknown(payload: unknown, fallback: ProductBrand): Prod
     return fallback;
   }
   const record = payload as Record<string, unknown>;
-  const nested =
-    record.body && typeof record.body === "object" ? (record.body as Record<string, unknown>) : record;
   const productName =
-    typeof nested.productName === "string" && nested.productName.trim()
-      ? nested.productName.trim()
+    typeof record.productName === "string" && record.productName.trim()
+      ? record.productName.trim()
       : fallback.productName;
   const gatewayName =
-    typeof nested.gatewayName === "string" && nested.gatewayName.trim()
-      ? nested.gatewayName.trim()
+    typeof record.gatewayName === "string" && record.gatewayName.trim()
+      ? record.gatewayName.trim()
       : fallback.gatewayName;
   const gatewayBaseUrl =
-    typeof nested.gatewayBaseUrl === "string" && nested.gatewayBaseUrl.trim()
-      ? nested.gatewayBaseUrl.trim()
+    typeof record.gatewayBaseUrl === "string" && record.gatewayBaseUrl.trim()
+      ? record.gatewayBaseUrl.trim()
       : fallback.gatewayBaseUrl;
-  // Only a payload that names a character sets one; without it the character follows the product name.
   const assistantName =
-    typeof nested.assistantName === "string" && nested.assistantName.trim()
-      ? nested.assistantName.trim()
+    typeof record.assistantName === "string" && record.assistantName.trim()
+      ? record.assistantName.trim()
       : fallback.assistantName;
   return {
     ...fallback,
@@ -118,7 +101,6 @@ export function mergePingBrand(current: ProductBrand, payload: unknown): Product
   const keepPreloadGateway =
     current.gatewayName !== DEFAULT_PRODUCT_BRAND.gatewayName &&
     next.gatewayName === DEFAULT_PRODUCT_BRAND.gatewayName;
-  // A flavor the preload named keeps its own character too: the ping's is the default product's.
   const { assistantName: pingAssistant, ...rest } = next;
   const assistantName = keepPreloadName ? current.assistantName : pingAssistant;
   return {
@@ -143,14 +125,10 @@ export function ProductBrandProvider({ children }: { children: ReactNode }) {
   }, [brand.productName]);
 
   useEffect(() => {
-    // Phase 8: one shared `/api/v1/ping`, because the capabilities provider reads the same payload.
-    // Two fetches would race to mint the CSRF cookie and one of them would lose its token.
     void pingOnce().then((payload) => {
       if (payload !== null) {
         setBrand((current) => mergePingBrand(current, payload));
       }
-      // A null payload is a failed ping: the packaged preload already supplied the flavor and
-      // webdev keeps the defaults, exactly as the old `.catch` left them.
     });
   }, []);
 

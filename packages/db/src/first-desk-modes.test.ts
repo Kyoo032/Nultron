@@ -1,12 +1,3 @@
-/**
- * The first desk of a fresh install, Personal or hosted, is Chat alone (owner decision, Rizky,
- * 2026-10-21, replacing 2026-09-29's list), and nothing else. This file holds the structural half of that
- * hard rule; `packages/host/src/first-run-modes.test.ts` holds the half that goes through the real
- * first-run path on a real data dir, including Start over.
- *
- * The expected list is spelled out here on purpose. A test that read `FIRST_RUN_MODES` back would
- * pass whatever the constant said.
- */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";

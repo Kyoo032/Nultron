@@ -23,16 +23,6 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
  */
 const TRANSPORT_HEADER = "x-agentforge-transport";
 
-/**
- * Double-submit CSRF pair (docs/internal/web-security-spec.md A2). The host mints the token on the
- * first `/api` GET as a cookie this code can read; echoing it in the header proves the call came from
- * a page on our own origin, because a cross-site page cannot read the cookie.
- *
- * Two names, one token: the hosted HTTPS server mints the `__Host-` prefixed cookie, which a browser
- * accepts only over TLS and lets no other host or path overwrite, while webdev and the desktop mint
- * the plain name, because a `__Host-` cookie is rejected over plain http. This reads whichever is
- * there, prefixed first.
- */
 const CSRF_COOKIE_SECURE = "__Host-agentforge_csrf";
 const CSRF_COOKIE = "agentforge_csrf";
 const CSRF_HEADER = "x-agentforge-csrf";
@@ -113,27 +103,6 @@ async function transportFetch(input: string, init: RequestInit, method: string):
   return localizeRunLimitRefusal(response);
 }
 
-/**
- * Plain GETs that are on the wire right now, by URL (path and query).
- *
- * A cold boot asks for the same read from many places at once: the shell, the composer, the usage
- * chip and three hooks all want `/api/v1/settings`, and measured on the packaged app that was seven
- * identical round trips. Callers that arrive while one is in flight share it; the entry is dropped
- * the moment it settles, so a read that starts later always asks again. Nothing is cached.
- *
- * What is shared is deliberately narrow:
- *  - only a GET with no option but its method. A signal would let one caller's abort cancel the
- *    request for the others, and headers or credentials can change the answer.
- *  - only a read that is less than `JOIN_WINDOW_MS` old. Neither transport has a timeout, and one
- *    request that hangs must not hold up every later identical read until a write clears the map.
- *  - a write drops every entry when it starts and again when it is over, so a read that began before
- *    a save can never answer a read that begins after it. A streamed write is over when its body ends,
- *    not when its headers arrive: the host saves the result at the end of the stream.
- *  - an event stream has exactly one reader, so the caller that asked first keeps it and a joiner
- *    makes a request of its own.
- * Every other caller gets its own body: a clone for all but the last, which takes the original, so
- * no branch of the body is left unread. A failure reaches all of them.
- */
 type InflightRead = { response: Promise<Response>; joiners: number; startedAt: number };
 
 const JOIN_WINDOW_MS = 2_000;

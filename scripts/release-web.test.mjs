@@ -1,16 +1,3 @@
-/**
- * Tests for scripts/release-web.mjs, the Enterprise release to Kyoo032/Nultron-Releases.
- *
- * Node's own runner, like scripts/review-proxy.test.mjs: repo tooling outside every workspace
- * package, so no vitest config collects it. `node --test "scripts/*.test.mjs"` runs it.
- *
- * Nothing here calls gh, docker or the network. Every release-web case drives `main` against a temp
- * repo root, a fake git (which "clones" by making a directory), and recording docker / tar / gh stubs.
- * The desktop cases at the end run apps/desktop/scripts/release-desktop.mjs --dry-run in a child
- * process, against a temp dist/. That script refuses off main, so the child is a copy in a temp repo on main
- * (desktopReleaseFixture): the same code, not this checkout's branch. Its git calls run in that temp repo only.
- */
-
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
@@ -947,8 +934,6 @@ test("a docs/internal path is caught in any letter case, with either separator, 
     assert.equal(sharedMarks.isInternalDocsPath(path), false, path);
   }
 });
-
-// ---------- the company sites in the bundle ----------
 
 test("readSiteFiles maps webapp-deploy/sites to sites/, drops comments from Caddy files only, and sorts", () => {
   const bundle = fakeSiteBundle();

@@ -1,22 +1,4 @@
 #!/usr/bin/env node
-/**
- * Read-only: is this Nultron instance worth driving?
- * Usage:
- *   node .cursor/skills/verify-agentforge/scripts/doctor.mjs
- *       → local webdev at http://127.0.0.1:3000
- *   node .cursor/skills/verify-agentforge/scripts/doctor.mjs --desktop
- *       → packaged IPC host from Electron userData host-status.json:
- *         Windows: %APPDATA%/Nultron|Kemenkeu AI|AIHub Metranet/host-status.json
- *                  (legacy: %APPDATA%/@agentforge/desktop/host-status.json)
- *         Linux:   $XDG_CONFIG_HOME/Nultron|Kemenkeu AI|AIHub Metranet/host-status.json
- *                  or ~/.config/<same>/host-status.json
- *         macOS:   ~/Library/Application Support/Nultron|Kemenkeu AI|AIHub Metranet/host-status.json
- *   node …/doctor.mjs --base http://127.0.0.1:PORT
- *   PORT=3200 node …/doctor.mjs
- *   AGENTFORGE_VERIFY_URL=http://127.0.0.1:PORT node …/doctor.mjs
- *       → explicit loopback for **webdev only** (ignored with --desktop).
- *         Precedence: --base, then PORT, then AGENTFORGE_VERIFY_URL, then :3000.
- */
 const WEBDEV_URL = "http://127.0.0.1:3000";
 const desktopFlag = process.argv.includes("--desktop");
 

@@ -22,18 +22,11 @@ import type { FileEntry, FileRead, FileVersion } from "./files-model";
 /** The slice of `apiFetch` these calls use, so a test can hand it a stub. */
 export type FilesFetch = (input: string, init?: RequestInit) => Promise<Response>;
 
-/**
- * How a finished download reaches the person. In the packaged app `apiFetch` has already written the
- * bytes through the native save dialog, so there is nothing left to do (a second save would open a
- * second dialog); on the web the blob is saved through an anchor. Injected so a test can watch both.
- */
 export type DownloadIo = {
-  readonly desktop: () => boolean;
   readonly saveBlob: (blob: Blob, filename: string) => void;
 };
 
 const DEFAULT_DOWNLOAD_IO: DownloadIo = {
-  desktop: () => false,
   saveBlob: (blob, filename) => saveBlob(blob, filename),
 };
 
@@ -173,9 +166,6 @@ export function createFilesApi(fetcher: FilesFetch = apiFetch, io: DownloadIo = 
       return { ok: false, code: errorCode(await res.json().catch(() => null)), status: res.status };
     }
     const filename = filenameFromDisposition(res.headers.get("Content-Disposition")) ?? leafName(path);
-    if (io.desktop()) {
-      return { ok: true, data: { filename } };
-    }
     try {
       io.saveBlob(await res.blob(), filename);
     } catch {

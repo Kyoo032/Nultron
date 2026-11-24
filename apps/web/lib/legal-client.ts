@@ -16,7 +16,6 @@ import { saveBlob } from "./artifacts-client";
 /** Mirrors the host message for a non-docx upload (contract §3). */
 export const LEGAL_DOCX_ONLY_MESSAGE =
   "Only .docx files are accepted in v1. Convert PDF or other formats to .docx first.";
-/** Per-file cap that matches the desktop IPC envelope (contract §3). */
 export const LEGAL_FILE_MAX_BYTES = 25 * 1024 * 1024;
 export const LEGAL_ACCEPT = ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 

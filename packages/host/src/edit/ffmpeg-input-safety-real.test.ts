@@ -1,15 +1,3 @@
-/**
- * The input whitelist, the format gate and the timeouts against a REAL ffmpeg and ffprobe (SR-135).
- *
- * `ffmpeg/input-safety.test.ts` and `ffmpeg/run-input-safety.test.ts` hold the logic with a stub. This file runs
- * the bundled programs on tiny files it generates itself and answers the three questions a stub cannot:
- * does an ordinary mp4, mov, webm, mp3, wav and m4a still import, extract and render with the whitelist on; is a
- * playlist or concat script refused; and does the whitelist really keep ffmpeg from opening an address.
- *
- * The programs are found, in order, through AGENTFORGE_FFMPEG_PATH, the staged copy in
- * `apps/desktop/resources/ffmpeg/` (`node apps/desktop/scripts/stage-ffmpeg.mjs --target <t>`), then PATH. With none
- * of them the whole file is skipped, so a machine without ffmpeg stays green.
- */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import http from "node:http";

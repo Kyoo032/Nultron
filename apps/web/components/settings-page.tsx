@@ -7,7 +7,6 @@ import { AccountSessionRow } from "./account-session-row";
 import { SettingsGuideCard } from "./settings-guide-card";
 import { availabilityFrom, SettingsModelsCard, type ModelAvailabilityWire } from "./settings-models-card";
 import { SettingsResetCard } from "./settings-reset-card";
-// Phase 8: renders only where there is a ceiling to show (hosted); null on a desk.
 import { SettingsStorageCard } from "./settings-storage-card";
 import { UsagePanel, type AccountUsage } from "./usage-panel";
 import { apiFetch, checkGateway } from "@/lib/api-client";

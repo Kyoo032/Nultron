@@ -1,11 +1,3 @@
-/**
- * Where "Add it later" is wired, held by grep (the renderer has no DOM test setup, and the boot
- * effects in `App.tsx` do not run under a static render).
- *
- * It is a Nultron Enterprise feature and must stay one. These cases hold the seams that keep the
- * Personal app out of it: the one place the callback is handed to the screen, the one place the host
- * is told, and the host route that is the only door in.
- */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

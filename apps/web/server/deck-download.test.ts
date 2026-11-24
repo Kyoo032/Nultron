@@ -1,16 +1,3 @@
-/**
- * Both Download buttons in Chat, clicked against the real host.
- *
- * `lib/download-clients.test.ts` proves the client calls against stubs. This runs the very same client
- * functions (`downloadArtifactFile` for the deck card, `createFilesApi().download` for a desk file)
- * against the real router and a real HTTP socket, then against the packaged app's IPC path with the
- * shell's own `host:request` conversion reproduced from `apps/desktop/main.cjs`. What reaches the
- * person's disk is read back: the deck must be a real .pptx zip with a slide part per slide, the file
- * must equal the text that was saved, and each must carry the right content type and file name.
- *
- * It lives in `server/` because it imports the host, which nothing under `lib/` may do. The shell's
- * `host:save-bytes` half (the native dialog and the write) is not run: that needs Electron.
- */
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
