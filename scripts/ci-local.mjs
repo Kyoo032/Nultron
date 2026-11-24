@@ -310,17 +310,6 @@ function buildSteps(ctx) {
     node(["--test", ...scriptTests.map((f) => path.join("scripts", f))], { freshDataDir: true }),
   ]);
 
-  const desktop = ctx.workspaces.find((w) => w.pkg.name === "@agentforge/desktop");
-  const desktopTest = desktop?.pkg.scripts?.test;
-  if (desktopTest) {
-    const parts = desktopTest.split("&&").map((p) => p.trim().split(/\s+/));
-    const cwd = path.join(repoRoot, desktop.dir);
-    const commands = parts.every((p) => p[0] === "node" && p.length >= 2)
-      ? parts.map((p) => node(p.slice(1), { cwd }))
-      : [pnpm(["--filter", "@agentforge/desktop", "test"])];
-    add("node-test", "node-test:apps/desktop", true, commands);
-  }
-
   // ci.yml's audit job: the hosted-image closure gates, the whole workspace is advisory.
   const closure = path.join(ctx.logDir, "audit-closure.json");
   const audit = path.join(ctx.logDir, "audit.json");

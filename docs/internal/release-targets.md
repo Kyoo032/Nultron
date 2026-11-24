@@ -8,13 +8,13 @@ This file lists every product built from this repo, one card per target, coverin
 
 **Agents read this file before starting any task.** Name the target your task serves, then keep the change inside it. If the change lands on another target, stop and say so.
 
-Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colours below were sampled from each brand's own logo file.
+Last updated: 2026-11-24 (`Kyoo032/Nultron` `chore/dfind-139-retire-desktop`, from `main` at `bce117d7`). The hex colours below were sampled from each brand's own logo file.
 
 ## At a glance
 
 | Target | Type | Company | Product name | Gateway users see | Status | Focus now |
 |---|---|---|---|---|---|---|
-| [`nultron-personal`](#nultron-personal) | Desktop app | Public (retired) | Nultron | Toko Token | Retired 2026-10-14. Last release v0.15.1 (2026-09-28). 0.16.0 was packed on 2026-10-06 and never published. Repo `Kyoo032/Nultron-Desktop` archived | None. The app is merged into the web app; no new cut |
+| [`nultron-personal`](#nultron-personal) | Desktop app | Public (retired) | Nultron | Toko Token | Retired 2026-10-14; `apps/desktop/**`, desktop scripts, retired desktop skills, and Electron web bridge removed 2026-11-24 (DFIND-139). Last release v0.15.1 (2026-09-28). 0.16.0 was packed on 2026-10-06 and never published. Repo `Kyoo032/Nultron-Desktop` archived | None. The app is merged into the web app; no new cut |
 | [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, never released or deployed (checked 2026-11-06). A password-gated single-desk preview (one private desk per tester) runs at app.nultron-ai.xyz since 2026-10-06; its last logged image is `a8866263` (2026-10-19). On 2026-11-17 its Caddy still answered `401` with `WWW-Authenticate: Basic realm="restricted"`. Keep Basic Auth until the external entrypoint mounts the form and the [preview cutover checks](../../webapp-deploy/README.md#preview-desks-mount-the-form-before-changing-caddy) pass. It is not an Enterprise deploy. Release repo is `Kyoo032/Nultron-Releases` (renamed from `Kyoo032/Nultron` on 2026-10-15) | The first release and Tencent deploy, when Rizky says go. It was planned for Thu 8 Oct 2026 and did not happen |
 | [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Retired 2026-10-14 with the desktop app. Was built locally. Its brand folder is gitignored | None |
 | [`aihub-metranet`](#aihub-metranet) | Desktop flavor | Metranet (Telkom Indonesia) | AIHub Metranet | AIHub | Retired 2026-10-14 with the desktop app. Was built locally. Its brand folder is gitignored | None |
@@ -23,10 +23,8 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
 
 | Path | Targets |
 |---|---|
-| `apps/web/**`, `packages/**` | Every target built from here. The renderer and host are shared. |
-| Code behind `isServerMode()` / `isHostedBuild()` | `nultron-enterprise`. Personal must stay identical, proven by a parity test. |
-| `apps/desktop/**` | `nultron-personal`, `kemenkeu-ai`, `aihub-metranet`, all retired. Nothing ships from it. |
-| `apps/desktop/branding/<id>/**` | That one desktop target only |
+| `apps/web/**`, `packages/**`, `assets/**` | `nultron-enterprise` (hosted web app and OPC desk). |
+| Code behind `isServerMode()` / `isHostedBuild()` | `nultron-enterprise` hosted server mode only. |
 | `apps/portal/**`, `webapp-deploy/**`, `scripts/release-web.mjs` | `nultron-enterprise` |
 | `apps/mobile/**` | None. It holds rules only, and nothing ships from it. |
 
@@ -44,7 +42,11 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
 
 <img src="../../apps/web/public/brand/logo.png" alt="Nultron app logo" width="96">
 
-**Retired (Rizky, 2026-10-14).** Nultron Personal is being merged into the web app. Its release repo `Kyoo032/Nultron-Desktop` is archived and gets no new releases. Do not pack or publish a desktop cut. The code and the identity below stay in the tree until the merge.
+**Retired (Rizky, 2026-10-14; code removed 2026-11-24, DFIND-139).** Nultron Personal was merged into the web app. Its release repo `Kyoo032/Nultron-Desktop` is archived and gets no new releases. `apps/desktop/**`, the root `desktop:*` scripts, the desktop skills, and the renderer's Electron bridge were removed on 2026-11-24; this section and the changelogs remain as history.
+
+**Remote GitHub Releases cleanup decision (open for Rizky):** Legacy releases `v0.1.0–v0.14.0` still sit on `Kyoo032/Nultron` (now the private source repo). Because `Kyoo032/Nultron` is private and installed 0.15.1 copies query its `releases/latest` / `latest.yml` without auth, unauthenticated auto-update requests already receive `404` (`latest.yml` cannot serve an unintended downgrade or upgrade while the repo stays private). Decision options:
+- **Option A (keep private, low risk):** Leave `v0.1.0–v0.14.0` untouched on private `Kyoo032/Nultron` as git/release history; never flip `Kyoo032/Nultron` public without first removing or archiving those releases, because making it public would re-expose old `latest.yml` feeds to installed desktop copies.
+- **Option B (delete legacy releases on `Kyoo032/Nultron`):** Manually delete `v0.1.0–v0.14.0` GitHub Releases on `Kyoo032/Nultron` (irreversible remote action; Rizky runs separately), leaving `Kyoo032/Nultron-Desktop` (archived) as the sole desktop release archive.
 
 **Identity**
 
@@ -76,7 +78,7 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
   - Windows NSIS installer.
   - macOS dmg/zip, still a preview: nobody has smoke-tested it on a Mac yet.
   - In-app updater: this tree's `brand.json` names `Kyoo032/Nultron-Desktop` (archived). Installed 0.15.1 copies still read `Kyoo032/Nultron`, which has been the private source repo since 2026-10-15. The 0.15.1 build's `publish` block names provider, owner, repo and release type, with no `private` flag and no token (`apps/desktop/package.json:157-162` at `43c1de3`, the 0.15.1 pack commit), so the updater asks without auth. A private repo answers an unauthenticated request with `404` (measured 2026-11-06 on the repo and its `releases/latest`), so the check fails with the app's "Update feed not found (404)" message (`apps/desktop/auto-update.cjs:12`).
-- **Ships by:** nothing now. The [pack skill](../../.cursor/skills/pack-nultron/SKILL.md) and `pnpm desktop:release` are retired with the repo.
+- **Ships by:** nothing now. The pack skill, `apps/desktop/**`, and `pnpm desktop:release` were removed on 2026-11-24 (DFIND-139).
 - **Versions:** semver. Published `v0.15.1` (2026-09-28), the last release. `0.16.0` was packed on 2026-10-06 (branch `chore/release-0.16.0`, [`0.16.0-changelog.md`](0.16.0-changelog.md)) and was never published. It will not be published.
 - **Focus now:** none. Do not drive the packed app or cut a release for it.
 - **Logs:**

@@ -31,9 +31,8 @@ describe("the default agent's name on screen", () => {
     expect(virtualAgentName({ id: "research", generalist: false }, assistantNameOf(brand))).toBe("Research");
   });
 
-  it("reads the character from a ping body and from an IPC envelope", () => {
+  it("reads the character from a ping body", () => {
     expect(brandFromUnknown({ productName: "Acme Desk", assistantName: " Mika " }, web).assistantName).toBe("Mika");
-    expect(brandFromUnknown({ body: { assistantName: "Mika" } }, web).assistantName).toBe("Mika");
     expect(brandFromUnknown({ productName: "Acme Desk" }, web).assistantName).toBeUndefined();
   });
 

@@ -1,5 +1,13 @@
-import type { DesktopUpdateSnapshot } from "./desktop-bridge";
 import { t } from "./i18n";
+
+export type DesktopUpdateSnapshot = {
+  supported: boolean;
+  status?: string;
+  currentVersion?: string;
+  version?: string;
+  percent?: number;
+  message?: string;
+};
 
 export type UpdateStatus =
   | "idle"

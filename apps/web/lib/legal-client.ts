@@ -10,13 +10,12 @@ import type {
 } from "@agentforge/core/legal";
 import { DELIVERABLE_KINDS, DOC_ROLES, LEGAL_WORK_TYPES } from "@agentforge/core/legal";
 import { z } from "zod";
-import { apiFetch, isElectron } from "./api-client";
+import { apiFetch } from "./api-client";
 import { saveBlob } from "./artifacts-client";
 
 /** Mirrors the host message for a non-docx upload (contract §3). */
 export const LEGAL_DOCX_ONLY_MESSAGE =
   "Only .docx files are accepted in v1. Convert PDF or other formats to .docx first.";
-/** Per-file cap that matches the desktop IPC envelope (contract §3). */
 export const LEGAL_FILE_MAX_BYTES = 25 * 1024 * 1024;
 export const LEGAL_ACCEPT = ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -392,14 +391,10 @@ export async function listLegalPlaybooks(): Promise<LegalPlaybookSummary[]> {
   });
 }
 
-/** Download a deliverable through the host; on desktop apiFetch already opened the native save dialog. */
 export async function downloadLegalArtifact(artifact: LegalArtifactRef): Promise<void> {
   const res = await apiFetch(legalArtifactFilePath(artifact.artifactId));
   if (!res.ok) {
     throw new Error(errorMessage(await res.json().catch(() => null), `Could not download ${artifact.filename}`));
-  }
-  if (isElectron()) {
-    return;
   }
   const disposition = res.headers.get("Content-Disposition") ?? "";
   const filename = disposition.match(/filename="([^"]+)"/)?.[1] ?? artifact.filename;

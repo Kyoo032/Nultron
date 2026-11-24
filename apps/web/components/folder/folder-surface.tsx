@@ -5,7 +5,7 @@ import { useFolder } from "@/components/folder/use-folder";
 import { folderErrorText } from "@/lib/folder-copy";
 import { hasProposalRows, pendingCount, type FolderState } from "@/lib/folder-state";
 import type { FolderController } from "@/lib/folder-actions";
-import { hasNativeFilePicker, useHostCapabilities } from "@/lib/host-capabilities";
+import { useHostCapabilities } from "@/lib/host-capabilities";
 import type { HostCapabilities } from "@agentforge/core/capabilities";
 
 /**
@@ -22,18 +22,15 @@ type ViewProps = {
   state: FolderState;
   capabilities: HostCapabilities;
   controller: FolderController;
-  /** Whether the shell can open a folder dialog. Left out, the capability flag alone decides. */
   picker?: boolean;
 };
 
-/** The pieces, given state: nothing here reads the host, the bridge or a hook. */
 export function FolderSurfaceView({ state, capabilities, controller, picker = true }: ViewProps) {
   const status = state.status;
   if (!status?.available) {
     return null;
   }
-  // The control needs a folder dialog to press; the panel needs only an open folder with changes in it.
-  const showControl = picker && hasNativeFilePicker(capabilities);
+  const showControl = picker && capabilities.nativeFilePicker;
   const showProposals = status.mounted && hasProposalRows(state);
   if (!showControl && !showProposals) {
     return null;

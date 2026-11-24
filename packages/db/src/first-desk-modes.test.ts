@@ -1,12 +1,3 @@
-/**
- * The first desk of a fresh install, Personal or hosted, is Chat alone (owner decision, Rizky,
- * 2026-10-21, replacing 2026-09-29's list), and nothing else. This file holds the structural half of that
- * hard rule; `packages/host/src/first-run-modes.test.ts` holds the half that goes through the real
- * first-run path on a real data dir, including Start over.
- *
- * The expected list is spelled out here on purpose. A test that read `FIRST_RUN_MODES` back would
- * pass whatever the constant said.
- */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,7 +12,7 @@ import { ensurePortalOwner } from "./portal-owner";
 import * as schema from "./schema";
 import { workspaces } from "./schema";
 
-const PERSONAL_FIRST_DESK = ["chat"];
+const OPC_FIRST_DESK = ["chat"];
 const HOSTED_FIRST_DESK = ["chat"];
 const EVERY_MODE = PRODUCT_MODES.map((mode) => mode.id);
 
@@ -47,21 +38,21 @@ async function homeDesk() {
   return row;
 }
 
-describe("ensureLocalOwner: the first desk on a fresh Personal install", () => {
+describe("ensureLocalOwner: the first desk on a fresh OPC desk", () => {
   it("is created with exactly Chat", async () => {
     await ensureLocalOwner(db);
 
     const row = await homeDesk();
-    expect(row?.productModes).toEqual(PERSONAL_FIRST_DESK);
+    expect(row?.productModes).toEqual(OPC_FIRST_DESK);
   });
 
   it("carries no mode outside that list, whatever the catalog grows to", async () => {
     await ensureLocalOwner(db);
 
     const stored = (await homeDesk())?.productModes ?? [];
-    const extra = stored.filter((id) => !PERSONAL_FIRST_DESK.includes(id));
+    const extra = stored.filter((id) => !OPC_FIRST_DESK.includes(id));
     expect(extra).toEqual([]);
-    const missing = PERSONAL_FIRST_DESK.filter((id) => !stored.includes(id));
+    const missing = OPC_FIRST_DESK.filter((id) => !stored.includes(id));
     expect(missing).toEqual([]);
   });
 
@@ -70,7 +61,7 @@ describe("ensureLocalOwner: the first desk on a fresh Personal install", () => {
     await ensureLocalOwner(db);
 
     expect(await db.select().from(workspaces)).toHaveLength(1);
-    expect((await homeDesk())?.productModes).toEqual(PERSONAL_FIRST_DESK);
+    expect((await homeDesk())?.productModes).toEqual(OPC_FIRST_DESK);
   });
 
   it("never rewrites an existing desk: a desk with every mode keeps every mode", async () => {
@@ -109,7 +100,7 @@ describe("ensureLocalOwner: the first desk on a fresh Personal install", () => {
     const made = await createLocalWorkspace(db, tenant.organizationId, "Studio", undefined, [...EVERY_MODE]);
 
     expect(made.productModes).toEqual(EVERY_MODE);
-    expect((await homeDesk())?.productModes).toEqual(PERSONAL_FIRST_DESK);
+    expect((await homeDesk())?.productModes).toEqual(OPC_FIRST_DESK);
   });
 });
 
@@ -174,14 +165,14 @@ describe("every desk writer takes its first-desk modes from the named constants"
     expect(writers).toEqual(["db/src/ensure-local-owner.ts", "db/src/portal-owner.ts"]);
   });
 
-  it("the Personal first desk reads FIRST_RUN_MODES through firstDeskModes, never a literal or WORK_PRODUCT_MODES", () => {
+  it("the OPC first desk reads FIRST_RUN_MODES through firstDeskModes, never a literal or WORK_PRODUCT_MODES", () => {
     const source = readFileSync(join(packagesRoot, "db", "src", "ensure-local-owner.ts"), "utf8");
     const firstDesk = source.slice(source.indexOf("ownedWorkspaces.length === 0"), source.indexOf("const homeRow"));
     expect(firstDesk).toContain("productModes: firstDeskModes(isServerMode())");
     expect(firstDesk).not.toContain("WORK_PRODUCT_MODES");
   });
 
-  it("the hosted first desk reads HOSTED_FIRST_DESK_MODES, so Enterprise cannot inherit the Personal list", () => {
+  it("the hosted first desk reads HOSTED_FIRST_DESK_MODES, so Enterprise cannot inherit the OPC list", () => {
     const source = readFileSync(join(packagesRoot, "db", "src", "portal-owner.ts"), "utf8");
     expect(source).toContain("productModes: [...HOSTED_FIRST_DESK_MODES]");
     expect(source).not.toContain("FIRST_RUN_MODES");

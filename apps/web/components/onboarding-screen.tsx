@@ -5,7 +5,7 @@ import { BrandMark } from "@/components/brand-mark";
 import { ComponentSetupPanel } from "@/components/component-setup";
 import { FfmpegSetupNotice } from "@/components/ffmpeg-setup-notice";
 import { OnboardingDesks } from "@/components/onboarding-desks";
-import { apiFetch, checkGateway, isElectron } from "@/lib/api-client";
+import { apiFetch, checkGateway } from "@/lib/api-client";
 import { useMayChangeCompanyKey } from "@/lib/company-key-access";
 import { fetchEditDoctor, type EditDoctor } from "@/lib/edit-client";
 import { onboardingFfmpegLaterKey } from "@/lib/ffmpeg-notice-copy";
@@ -105,8 +105,7 @@ export function OnboardingScreen({ onDone, gateway, onLater }: Props) {
     setError(null);
     // The panes the desk mounts next must not start from the closed gate the boot read published.
     publishGate(next);
-    // Straight into Chat once the host accepts the key — no intermediate try screen.
-    if (resolveGate(next, isElectron()) === "app") {
+    if (resolveGate(next, false) === "app") {
       finish();
       return true;
     }

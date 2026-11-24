@@ -1,49 +1,45 @@
-# Unreleased changes (after the 0.16.0 cut)
+# Unreleased changes (web / OPC desk)
 
-**Purpose:** what is on `main` or on a cut branch but not inside a published installer. **0.16.0 is cut and packed, not published** (2026-10-06, branch `chore/release-0.16.0`; Windows from `4dd33fa`, mac from `e7a17c2`). It is the first installer under the Nultron name. Until it ships, the installer in the wild is **v0.15.1** (`DPSBuddy Setup 0.15.1.exe`, published 2026-09-28 04:54 UTC from `43c1de3`). The ship list and the pack table are [`0.16.0-changelog.md`](0.16.0-changelog.md).
+**Purpose:** append-only change log of what is on `main` for the hosted web app and OPC desk since the desktop app was retired on 2026-10-14. Every entry names its `Lanes:` and what was verified.
 
-This file was started over at the 0.16.0 cut. The 0.15.1 cut never started it over, so the log it held ran from after 0.15.0 to 2026-10-05; that whole log is summarised in [`0.16.0-changelog.md`](0.16.0-changelog.md), and its full text is readable from git at `de95267` (`git show de95267:docs/internal/unreleased.md`). The pre-0.14.27 findings lists are readable at `e2e477e`.
+**History (desktop installer era, retired 2026-10-14):** This file started over at the unpublished `0.16.0` desktop cut (2026-10-06, `4dd33fa` / `e7a17c2`, recorded in [`0.16.0-changelog.md`](0.16.0-changelog.md)). Earlier logs are at `de95267` (`git show de95267:docs/internal/unreleased.md`) and `e2e477e`. The desktop app was retired on 2026-10-14 (`Kyoo032/Nultron-Desktop` archived) and its code tree (`apps/desktop/**`) was removed on 2026-11-24 (DFIND-139).
 
-Convention unchanged: at the next bump everything listed here folds into `<version>-changelog.md` and this file starts over. Nothing counts as shipped until it is staged, packed, installed, and driven on the packaged app. Append-only.
-
-## Where each published artifact came from
+## Historical desktop releases (archived)
 
 | Release | Source | Published (UTC) | Record |
 |---|---|---|---|
-| v0.15.1 | `43c1de3`, worktree `agentforge-pack-0.15.1`; Docker Linux `--arch all` for mac | 2026-09-28 04:54, 7 assets on [`Kyoo032/Nultron`](https://github.com/Kyoo032/Nultron/releases/tag/v0.15.1) | [`0.15.1-changelog.md`](0.15.1-changelog.md) § Pack + publish |
-| v0.15.0 | `88bb803`, worktree `agentforge-pack-0.15.0`; Docker Linux `--arch all` for mac | 2026-09-23 11:25, 7 assets on `Kyoo032/DPSBuddy` (now redirects to `Kyoo032/Nultron`) | [`0.15.0-changelog.md`](0.15.0-changelog.md) § Pack + publish |
+| v0.15.1 | `43c1de3`, worktree `agentforge-pack-0.15.1`; Docker Linux `--arch all` for mac | 2026-09-28 04:54, 7 assets on [`Kyoo032/Nultron-Desktop`](https://github.com/Kyoo032/Nultron-Desktop/releases/tag/v0.15.1) (archived; last desktop release) | [`0.15.1-changelog.md`](0.15.1-changelog.md) § Pack + publish |
+| v0.15.0 | `88bb803`, worktree `agentforge-pack-0.15.0`; Docker Linux `--arch all` for mac | 2026-09-23 11:25, 7 assets on `Kyoo032/Nultron-Desktop` (was `Kyoo032/DPSBuddy`) | [`0.15.0-changelog.md`](0.15.0-changelog.md) § Pack + publish |
 | v0.14.27 | Windows `05e97a5`, mac `6da52d7` | 2026-09-18 01:47 | [`0.14.27-changelog.md`](0.14.27-changelog.md) |
 
-0.16.0 rows are added here when it is published; until then its pack table lives only in [`0.16.0-changelog.md`](0.16.0-changelog.md). mac is **preview** for every release above: no dmg since 0.14.26 has been opened on Mac hardware.
+## Still open, carried over from the 0.16.0 cut
 
-## Still open, carried over at the 0.16.0 cut
-
-Nothing below is closed by 0.16.0. Carried forward from the old file's "Still open after the 0.14.27 cut" list and its 2026-10-05 findings, as they stood at `de95267`.
+Packaged-desktop-only items below were closed on 2026-11-24 (desktop retired 2026-10-14; historical pack records remain in [`0.16.0-changelog.md`](0.16.0-changelog.md)). Web and hosted-shared items remain open.
 
 ### From before 0.15.0
 
-- [ ] **Packaged bundled-anydoc load.** No packed app has been shown to *load* `anydoc.<platform>.node` from `app.asar.unpacked`. Proof owed: `doctor --desktop` plus `GET /api/v1/components` reporting `anydoc` `ready` with `source: "bundled"`.
-- [ ] **Any macOS run of the component installer's download route.** Never done.
-- [ ] **The onboarding component panel** (`component-setup`) has never been seen on the packaged app.
-- [ ] **Legal:** one live matter run against the gateway (`features/legal.md` steps 4 to 8), and the Word / Excel round-trip of the redline and deviation report.
-- [ ] **Packaged Windows drive of Start over + the gateway gate** (`doctor --desktop`, `host-status.json` `hasOpenai: false` after sign-out).
-- [ ] **The manual Windows smoke list** from `apps/desktop/platform/windows/AGENTS.md`: Ctrl+V and right-click Paste on the onboarding key field, composer clipboard round-trip, the rail-footer update panel, Start over → reset → "Keep my data", model-output links opening the default browser, the model picker on a narrow pane.
-- [ ] **Packaged CSP console check** on a packed build (the static half is proven; the runtime half is not).
-- [ ] **mac launch smoke on hardware.** Owed for every build since 0.14.26.
-- [ ] **ffmpeg in the packaged app.** The installer is meant to carry its own ffmpeg (bundle in the tree, nothing packed or launched yet; the "Hosted image carries ffmpeg" section below has the state and what is owed). Until a pack is driven, assume the manual-install notice (`ffmpeg-setup-notice`) is still what a packed app shows. Webdev still reads PATH.
-- [ ] **The unfixed findings** from the 2026-09-17 mapping pass, the knowledge-flow pass and the 2026-09-15 harness pass. Read the lists at `e2e477e`; the harness pass is also P7–P15 in [`blockers-2026-09-15.md`](blockers-2026-09-15.md).
-- [ ] **Chat card titles.** A Chat thread's title is never regenerated after turn 1 (`threads.ts` `setThreadTitleFromParts`).
+- [x] **Closed (desktop retired 2026-10-14).** **Packaged bundled-anydoc load.** Packaged desktop proof no longer owed; hosted image verifies native `anydoc` at build time (`webapp-deploy/Dockerfile`).
+- [x] **Closed (desktop retired 2026-10-14).** **Any macOS run of the component installer's download route.**
+- [x] **Closed (desktop retired 2026-10-14).** **The onboarding component panel** (`component-setup`) on the packaged app.
+- [ ] **Legal (web):** one live matter run against the gateway (`features/legal.md` steps 4 to 8), and the Word / Excel round-trip of the redline and deviation report.
+- [x] **Closed (desktop retired 2026-10-14).** **Packaged Windows drive of Start over + the gateway gate.**
+- [x] **Closed (desktop retired 2026-10-14).** **The manual Windows smoke list** from `apps/desktop/platform/windows/AGENTS.md`.
+- [x] **Closed (desktop retired 2026-10-14).** **Packaged CSP console check** on a packed build.
+- [x] **Closed (desktop retired 2026-10-14).** **mac launch smoke on hardware.**
+- [x] **Closed (desktop retired 2026-10-14).** **ffmpeg in the packaged app.** Hosted image ships static ffmpeg/ffprobe (`webapp-deploy/Dockerfile`).
+- [ ] **The unfixed findings (web)** from the 2026-09-17 mapping pass, the knowledge-flow pass and the 2026-09-15 harness pass. Read the lists at `e2e477e`; the harness pass is also P7–P15 in [`blockers-2026-09-15.md`](blockers-2026-09-15.md).
+- [ ] **Chat card titles (web).** A Chat thread's title is never regenerated after turn 1 (`threads.ts` `setThreadTitleFromParts`).
 - [ ] **Housekeeping on the owner's desk:** 72 stub Videos rows in the dev `data/agentforge.sqlite`, 36 with no file (shown as "File missing" since 2026-09-29).
 
 ### Findings from the verify-skill maintenance pass, 2026-10-05 (product bugs)
 
-Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-agentforge/evidence/<feature>/2026-10-05-maintain/`. The first two were fixed on the 0.16.0 cut branch (`f193ab2`, `a0683bd`; see [`0.16.0-changelog.md`](0.16.0-changelog.md), "Fixes made on the cut branch"). The rest are still open.
+Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-agentforge/evidence/<feature>/2026-10-05-maintain/`. The first two were fixed on the 0.16.0 cut branch (`f193ab2`, `a0683bd`; see [`0.16.0-changelog.md`](0.16.0-changelog.md), "Fixes made on the cut branch"). The rest are still open unless closed by desktop retirement.
 
-- [x] **Fixed at the 0.16.0 cut (`f193ab2`).** **A non-`ok` gate verdict never heals (both products, highest impact).** `needsGatewayRefresh` re-checks in the background only an `ok` verdict past its TTL (`packages/host/src/gateway-gate.ts:559-567`). An `unreachable` or `error` verdict stays on disk, and once `lastOkAt` is older than the 7-day grace, `deriveGatewayGate` closes the desk (`:327-330`) until a manual Re-check.
-- [x] **Fixed at the 0.16.0 cut (`a0683bd`).** **Settings Save with a blank key field forgets the key (Personal and webdev).** The form posts `openaiApiKey` on every save (`apps/web/components/settings-page.tsx:284-289`); off server mode a blank is forwarded (`packages/host/src/handlers/settings.ts:226-234`) and `mergeSecrets` deletes the key (`packages/core/src/secrets.ts:137-139`). Traced in source; not driven.
+- [x] **Fixed at the 0.16.0 cut (`f193ab2`).** **A non-`ok` gate verdict never heals (highest impact).** `needsGatewayRefresh` re-checks in the background only an `ok` verdict past its TTL (`packages/host/src/gateway-gate.ts:559-567`). An `unreachable` or `error` verdict stays on disk, and once `lastOkAt` is older than the 7-day grace, `deriveGatewayGate` closes the desk (`:327-330`) until a manual Re-check.
+- [x] **Fixed at the 0.16.0 cut (`a0683bd`).** **Settings Save with a blank key field forgets the key (webdev).** The form posts `openaiApiKey` on every save (`apps/web/components/settings-page.tsx:284-289`); off server mode a blank is forwarded (`packages/host/src/handlers/settings.ts:226-234`) and `mergeSecrets` deletes the key (`packages/core/src/secrets.ts:137-139`). Traced in source; not driven.
 - [ ] **Finance loses 1 px of scroll per rail detour.** Cause not found.
 - [ ] **Finance shows a vague error, or none, on a closed gate** (`packages/host/src/handlers/finance.ts:52`). Matters on hosted "Add it later".
-- [ ] **Empty box above the key form after a component install** (`apps/web/components/onboarding-screen.tsx:293`, `apps/web/lib/use-component-setup.ts:126`). Appears only where a real download runs, such as a packed mac build.
+- [x] **Closed (desktop retired 2026-10-14).** **Empty box above the key form after a component install** (`apps/web/components/onboarding-screen.tsx:293`, `apps/web/lib/use-component-setup.ts:126`). Appeared only where a real download ran, such as a packed mac build.
 - [ ] **Model label casing.** `gpt-oss-120b` shows as "GPT Oss 120B" (`packages/core/src/models/curation.ts:28`).
 - [ ] **Portal: "we already sent a code" after a send that failed** (`apps/portal/src/otp/send.ts:119-122`). Enterprise only.
 - [ ] **Portal: a mail outage holds every send for about 8 s before the 503.** Enterprise only.
@@ -53,6 +49,14 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 ## Log
 
 Append below, newest first.
+
+## Retire leftover Personal/Electron desktop tree, bridge, skills, and docs (DFIND-139), 2026-11-24 (branch `chore/dfind-139-retire-desktop` from `main` at `bce117d7`; Biome, tsc, vitest, script tests, lane-guard passed)
+
+Lanes: enterprise
+
+- **Removed `apps/desktop/**` and retired desktop tooling.** Relocated shared starter media and example video clips from `apps/desktop/resources/{starters,examples/videos}` to `assets/{starters,examples/videos}` (`packages/host/src/edit/starter-media.ts`, `packages/host/src/video-examples.ts`, `scripts/edit-starters.mjs`, `scripts/video-examples.mjs`). Removed `apps/desktop/**`, retired `desktop:*` scripts from root `package.json`, `scripts/release-desktop-retired.test.mjs`, `packages/host/src/components/mac-pack-pins.test.ts`, and retired desktop skills (`.cursor/skills/pack-nultron/`, `.cursor/skills/verify-agentforge/features/desktop.md`, `desktop-brands.md`, `scripts/desktop-app-url.mjs`). Updated `scripts/ci-local.mjs`, `scripts/release-web.test.mjs`, `scripts/build-sandbox-runtime.test.mjs`, `biome.json`, `.gitignore`, `lanes.json`, and `nix/checks/ci-node-test.nix`.
+- **Removed dead Electron bridge and branches in `apps/web`.** Deleted `apps/web/lib/desktop-bridge.ts`, `desktop-save.ts`, `ipc-abort.ts`, `media-src.ts`, their tests, `desktop-download-wiring.test.ts`, `personal-reset-card.test.tsx`, and `apps/web/lib/__fixtures__/personal-*.golden.json`. Simplified `api-client.ts`, `voice-browser-deps.ts`, `main.tsx`, `App.tsx`, `onboarding-screen.tsx`, `product-brand.tsx`, `host-capabilities.tsx`, `use-app-updates.ts`, `app-updates-copy.ts`, `chat-file-save.ts`, `files-api.ts`, `artifacts-client.ts`, `finance-export.ts`, `legal-client.ts`, `market-client.ts`, `folder-actions.ts`, `use-folder.ts`, `folder-surface.tsx`, `documents-studio.tsx`, `edit-studio.tsx`, `presentations-studio.tsx`, `settings-page.tsx`, and `settings-reset-card.tsx` to browser-only paths, guarded by `apps/web/lib/no-desktop-bridge.test.ts`.
+- **Updated wording and docs.** Updated `packages/db/src/first-desk-modes.test.ts` and `packages/core/src/agents/product-modes.ts` wording ("fresh OPC desk"), refreshed `docs/internal/unreleased.md`, `docs/public/releases-readme.md`, `docs/internal/release-targets.md`, and `AGENTS.md`, and documented the remote `Kyoo032/Nultron` `v0.1.0–v0.14.0` release cleanup decision options without modifying remote GitHub Releases.
 
 ## At-rest sealing and FTS5 secure-delete hardening (DFIND-143..147), 2026-11-24 (branch `fix/dfind-143-147-knowledge-at-rest` from `main` at `5118c795`; unit tests run, not driven live)
 

@@ -1,21 +1,6 @@
-/**
- * Tests for scripts/release-web.mjs, the Enterprise release to Kyoo032/Nultron-Releases.
- *
- * Node's own runner, like scripts/review-proxy.test.mjs: repo tooling outside every workspace
- * package, so no vitest config collects it. `node --test "scripts/*.test.mjs"` runs it.
- *
- * Nothing here calls gh, docker or the network. Every release-web case drives `main` against a temp
- * repo root, a fake git (which "clones" by making a directory), and recording docker / tar / gh stubs.
- * The desktop cases at the end run apps/desktop/scripts/release-desktop.mjs --dry-run in a child
- * process, against a temp dist/. That script refuses off main, so the child is a copy in a temp repo on main
- * (desktopReleaseFixture): the same code, not this checkout's branch. Its git calls run in that temp repo only.
- */
-
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import {
-  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -929,110 +914,7 @@ test("the proxy gets exactly what the Caddyfile and the site files read, never t
   }
 });
 
-// ---------- the same refusal list on the Personal release ----------
-
-// The files release-desktop.mjs reads or imports. Its checkCheckout() refuses off main, so these cases cannot
-// run it from a feature checkout: they run a copy of exactly these files in a temp repo whose HEAD is main.
-const DESKTOP_RELEASE_FILES = [
-  "apps/desktop/scripts/release-desktop.mjs",
-  "apps/desktop/scripts/release-artifacts.mjs",
-  "apps/desktop/package.json",
-  "scripts/release-marks.mjs",
-  "scripts/where-am-i.mjs",
-];
-let desktopFixture;
-
-function desktopReleaseFixture() {
-  if (desktopFixture) return desktopFixture;
-  const dir = tempDir("release-desktop-repo-");
-  for (const rel of DESKTOP_RELEASE_FILES) {
-    mkdirSync(dirname(join(dir, rel)), { recursive: true });
-    copyFileSync(join(REPO_ROOT, rel), join(dir, rel));
-  }
-  const init = spawnSync("git", ["init", "-q"], { cwd: dir, encoding: "utf8" });
-  assert.equal(init.status, 0, init.stderr);
-  const head = spawnSync("git", ["symbolic-ref", "HEAD", "refs/heads/main"], { cwd: dir, encoding: "utf8" });
-  assert.equal(head.status, 0, head.stderr);
-  // An unborn branch reads as detached to `git branch --show-current`, so the fixture needs one commit on main.
-  const commit = spawnSync(
-    "git",
-    [
-      "-c",
-      "user.name=fixture",
-      "-c",
-      "user.email=fixture@example.invalid",
-      "-c",
-      "commit.gpgsign=false",
-      "commit",
-      "-q",
-      "--allow-empty",
-      "-m",
-      "fixture",
-    ],
-    { cwd: dir, encoding: "utf8" },
-  );
-  assert.equal(commit.status, 0, commit.stderr);
-  desktopFixture = join(dir, "apps", "desktop", "scripts", "release-desktop.mjs");
-  return desktopFixture;
-}
-
-function tempDir(prefix) {
-  const dir = mkdtempSync(join(tmpdir(), prefix));
-  roots.push(dir);
-  return dir;
-}
-
-function notesAt(relativePath, text) {
-  const file = join(tempDir("release-desktop-notes-"), relativePath);
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, text, "utf8");
-  return file;
-}
-
-/**
- * A dist/ that release-desktop.mjs accepts: one Setup exe, its blockmap, and a latest.yml that matches.
- * The exe name comes from the desktop package's own `build.artifactName`, so this fixture follows the
- * installer name instead of repeating it (release-desktop.mjs's ARTIFACT_PREFIX must agree with it).
- */
-function fakeDesktopDist() {
-  const { version, build } = JSON.parse(readFileSync(join(REPO_ROOT, "apps", "desktop", "package.json"), "utf8"));
-  const dist = tempDir("release-desktop-dist-");
-  const exeName = build.artifactName.replace(/\$\{version\}/, version).replace(/\$\{ext\}/, "exe");
-  const exe = Buffer.from("not an installer");
-  writeFileSync(join(dist, exeName), exe);
-  writeFileSync(join(dist, `${exeName}.blockmap`), "blockmap");
-  const sha512 = createHash("sha512").update(exe).digest("base64");
-  const url = exeName.replace(/ /g, "-");
-  const latest = [
-    `version: ${version}`,
-    "files:",
-    `  - url: ${url}`,
-    `    sha512: ${sha512}`,
-    `    size: ${exe.length}`,
-    `path: ${url}`,
-    `sha512: ${sha512}`,
-  ];
-  writeFileSync(join(dist, "latest.yml"), `${latest.join("\n")}\n`, "utf8");
-  return dist;
-}
-
-/** release-desktop.mjs exits the process on refusal, so it is run, not imported. --dry-run: gh never runs. */
-function desktopDryRun(notesFile, cwd = process.cwd()) {
-  // --allow-retired: these cases are about notes and dist, not the retired refusal (release-desktop-retired.test.mjs).
-  const args = [
-    desktopReleaseFixture(),
-    "--dry-run",
-    "--allow-dirty",
-    "--allow-retired",
-    "--dist",
-    fakeDesktopDist(),
-    "--notes",
-    notesFile,
-  ];
-  return spawnSync(process.execPath, args, { cwd, encoding: "utf8" });
-}
-
-test("both release scripts share one refusal list", () => {
+test("release scripts share one refusal list", () => {
   assert.equal(forbiddenMarksIn, sharedMarks.forbiddenMarksIn);
   assert.equal(FORBIDDEN_MARKS, sharedMarks.FORBIDDEN_MARKS);
   assert.ok(Object.isFrozen(FORBIDDEN_MARKS));
@@ -1052,30 +934,6 @@ test("a docs/internal path is caught in any letter case, with either separator, 
     assert.equal(sharedMarks.isInternalDocsPath(path), false, path);
   }
 });
-
-test("the desktop release refuses notes that carry a mark, and names the marks", () => {
-  const run = desktopDryRun(notesAt("notes.md", "# Nultron\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n"));
-  assert.equal(run.status, 1, run.stdout + run.stderr);
-  assert.match(run.stderr, /refusing .*notes\.md: it contains "Claude", "Anthropic", "Co-Authored"/);
-  assert.doesNotMatch(run.stdout, /dry run/);
-});
-
-test("the desktop release refuses notes under docs/internal in any letter case", () => {
-  const run = desktopDryRun(notesAt(join("DOCS", "Internal", "notes.md"), CLEAN_NOTES));
-  assert.equal(run.status, 1, run.stdout + run.stderr);
-  assert.match(run.stderr, /refusing to publish docs\/internal notes/);
-});
-
-test("the desktop release hands gh the checked notes file by its absolute path", () => {
-  // Relative, from another cwd: gh runs in apps/desktop and would resolve a relative name there.
-  const notes = notesAt("notes.md", CLEAN_NOTES);
-  const run = desktopDryRun("notes.md", dirname(notes));
-  assert.equal(run.status, 0, run.stdout + run.stderr);
-  assert.ok(run.stdout.includes(`--notes-file ${notes}`) || run.stdout.includes(`--notes-file "${notes}"`), run.stdout);
-  assert.match(run.stdout, /dry run, nothing uploaded/);
-});
-
-// ---------- the company sites in the bundle ----------
 
 test("readSiteFiles maps webapp-deploy/sites to sites/, drops comments from Caddy files only, and sorts", () => {
   const bundle = fakeSiteBundle();

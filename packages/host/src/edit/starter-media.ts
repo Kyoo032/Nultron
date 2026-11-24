@@ -12,9 +12,7 @@ import { probe } from "./ffmpeg/recipes";
 import type { EditScope } from "./ffmpeg/paths";
 import { log } from "../log";
 
-type ProcessWithResources = NodeJS.Process & { resourcesPath?: string };
-
-const DEV_RELATIVE = path.join("apps", "desktop", "resources", "starters");
+const DEV_RELATIVE = path.join("assets", "starters");
 /** Bundled clips are small; anything larger is not a starter file we shipped. */
 export const STARTER_MEDIA_MAX_BYTES = 200 * 1024 * 1024;
 
@@ -34,17 +32,7 @@ function findUp(start: string, relative: string): string | null {
   return null;
 }
 
-/**
- * Where the bundled starter media lives. Offline only: env override, then the packaged
- * Electron resources folder, then the repo checkout for webdev.
- */
 export function starterMediaDir(): string | null {
-  const resourcesPath = (process as ProcessWithResources).resourcesPath;
-  if (process.versions.electron && resourcesPath) {
-    // Packaged app: only the bundled folder. The env override is a dev/test hook and is ignored here.
-    const packaged = path.join(resourcesPath, "starters");
-    return existsSync(packaged) ? packaged : null;
-  }
   const fromEnv = process.env.AGENTFORGE_STARTER_MEDIA_DIR?.trim();
   if (fromEnv) {
     return path.resolve(fromEnv);

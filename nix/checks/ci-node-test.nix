@@ -1,4 +1,4 @@
-# scripts/ci-local.mjs --only node-test: `node --test scripts/*.test.mjs` and the apps/desktop tests.
+# scripts/ci-local.mjs --only node-test: `node --test scripts/*.test.mjs`.
 { ci-pkg-step, workspace-filesets }:
 ci-pkg-step {
   name = "node-test";

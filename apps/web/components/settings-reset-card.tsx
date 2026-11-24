@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { cancelReset, relaunchDesktopApp, resetApp } from "@/lib/api-client";
-import { hasDesktopShell, useHostCapabilities } from "@/lib/host-capabilities";
+import { cancelReset, resetApp } from "@/lib/api-client";
+import { useHostCapabilities } from "@/lib/host-capabilities";
 import { useMayChangeCompanyKey } from "@/lib/company-key-access";
 import { announceGate } from "@/lib/gateway-gate";
 import { t } from "@/lib/i18n";
@@ -81,16 +81,8 @@ export function SettingsResetCard({ resetPending = false }: SettingsResetCardPro
     setPending(resetPending);
   }, [resetPending]);
 
-  /** One place to read a relaunch answer, so a refusal never renders as "restarting". */
   async function requestRestart(): Promise<boolean> {
-    const relaunched = await relaunchDesktopApp({ reset: true });
-    if (relaunched.ok) {
-      setRestartReason(null);
-      setOutcome("restarting");
-      return true;
-    }
-    // Webdev has no shell to ask; the operator restarts the dev server instead.
-    setRestartReason(relaunched.reason === "unavailable" ? null : (relaunched.reason ?? null));
+    setRestartReason(null);
     setOutcome("restartNeeded");
     return false;
   }
@@ -109,16 +101,6 @@ export function SettingsResetCard({ resetPending = false }: SettingsResetCardPro
       setOutcome("pendingCancelled");
     } catch {
       setError(t("settings.reset.failed"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onRestartPending() {
-    setError(null);
-    setBusy(true);
-    try {
-      await requestRestart();
     } finally {
       setBusy(false);
     }
@@ -213,17 +195,6 @@ export function SettingsResetCard({ resetPending = false }: SettingsResetCardPro
             >
               {t("settings.reset.pendingCancel")}
             </button>
-            {hasDesktopShell(capabilities) ? (
-              <button
-                type="button"
-                className={dangerButtonClass}
-                data-testid="settings-reset-pending-restart"
-                disabled={busy}
-                onClick={() => void onRestartPending()}
-              >
-                {t("settings.reset.pendingRestart")}
-              </button>
-            ) : null}
           </div>
         </div>
       ) : null}

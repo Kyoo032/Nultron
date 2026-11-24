@@ -14,28 +14,19 @@
  * outcome and never throws: a dead network is `network`, a body this app cannot read is `bad_response`,
  * and a host refusal keeps the host's own code so the screen can say it in the owner's language.
  */
-import { apiFetch, isElectron } from "@/lib/api-client";
+import { apiFetch } from "@/lib/api-client";
 import { saveBlob } from "./artifacts-client";
-import { DesktopSaveError } from "./desktop-save";
 import { filenameFromDisposition, leafName } from "./download-name";
 import type { FileEntry, FileRead, FileVersion } from "./files-model";
 
 /** The slice of `apiFetch` these calls use, so a test can hand it a stub. */
 export type FilesFetch = (input: string, init?: RequestInit) => Promise<Response>;
 
-/**
- * How a finished download reaches the person. In the packaged app `apiFetch` has already written the
- * bytes through the native save dialog, so there is nothing left to do (a second save would open a
- * second dialog); on the web the blob is saved through an anchor. Injected so a test can watch both.
- */
 export type DownloadIo = {
-  readonly desktop: () => boolean;
   readonly saveBlob: (blob: Blob, filename: string) => void;
 };
 
-/** Called, not bound: a test that mocks `api-client` without `isElectron` can still import this file. */
 const DEFAULT_DOWNLOAD_IO: DownloadIo = {
-  desktop: () => isElectron(),
   saveBlob: (blob, filename) => saveBlob(blob, filename),
 };
 
@@ -168,18 +159,13 @@ export function createFilesApi(fetcher: FilesFetch = apiFetch, io: DownloadIo = 
     let res: Response;
     try {
       res = await fetcher(`${BASE}/download${query({ path })}`);
-    } catch (error) {
-      // In the packaged app the fetcher also writes the file, and it throws when the disk refused it:
-      // that is not the network, and "check the connection" would send the person the wrong way.
-      return { ok: false, code: error instanceof DesktopSaveError ? "save_failed" : "network", status: 0 };
+    } catch {
+      return { ok: false, code: "network", status: 0 };
     }
     if (!res.ok) {
       return { ok: false, code: errorCode(await res.json().catch(() => null)), status: res.status };
     }
     const filename = filenameFromDisposition(res.headers.get("Content-Disposition")) ?? leafName(path);
-    if (io.desktop()) {
-      return { ok: true, data: { filename } };
-    }
     try {
       io.saveBlob(await res.blob(), filename);
     } catch {

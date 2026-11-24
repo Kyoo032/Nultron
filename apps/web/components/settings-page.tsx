@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { DEFAULT_GATEWAY_IMAGE_MODEL, DEFAULT_GATEWAY_VIDEO_MODEL } from "@agentforge/core/media-kind";
 import { isAppLocale, parseAppLocale, type AppLocale } from "@agentforge/core/locale";
 import { UiSelect } from "@/components/ui-select";
-import { apiFetch, checkGateway, relaunchDesktopApp } from "@/lib/api-client";
+import { apiFetch, checkGateway } from "@/lib/api-client";
 import { useMayChangeCompanyKey } from "@/lib/company-key-access";
 import { publishGate } from "@/lib/gate-state";
 import {
@@ -400,10 +400,6 @@ export function SettingsPage() {
       }
       applyPayload(answer.payload);
       applyLocale(answer.payload.locale);
-      const relaunched = await relaunchDesktopApp();
-      if (relaunched.ok) {
-        return;
-      }
       window.dispatchEvent(new Event(LOCALE_RESTART_EVENT));
     } finally {
       setLocaleBusy(false);

@@ -2,6 +2,8 @@
 
 Product: both · Instance: main :3000
 
+Last verified: 2026-11-24 on `chore/dfind-139-retire-desktop` (DFIND-139) for `packages/core/src/agents/product-modes.ts` wording only ("fresh Personal install" -> "fresh OPC desk"; `FIRST_RUN_MODES` and `HOSTED_FIRST_DESK_MODES` unchanged). Nothing else on this page was re-read.
+
 Last verified: 2026-10-17 at 07cb099 for the theme row of § 4 only (the pre-paint theme script; driven on a built bundle and on stub webdev in headless Chrome).
 
 Last verified: 2026-10-16, tester tree after the OPC strip (P5b); every `file:line` citation on this page re-read against the tree, not driven in a browser. Before that: 2026-10-12 at e8a7eca8 for the "Chat-first shell" section only (the shell switch and the Virtual agents page; read against the tester branch before it was promoted to `main`, PR #157). Nothing else on the page was re-read.

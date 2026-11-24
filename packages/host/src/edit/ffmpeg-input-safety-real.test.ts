@@ -1,17 +1,5 @@
-/**
- * The input whitelist, the format gate and the timeouts against a REAL ffmpeg and ffprobe (SR-135).
- *
- * `ffmpeg/input-safety.test.ts` and `ffmpeg/run-input-safety.test.ts` hold the logic with a stub. This file runs
- * the bundled programs on tiny files it generates itself and answers the three questions a stub cannot:
- * does an ordinary mp4, mov, webm, mp3, wav and m4a still import, extract and render with the whitelist on; is a
- * playlist or concat script refused; and does the whitelist really keep ffmpeg from opening an address.
- *
- * The programs are found, in order, through AGENTFORGE_FFMPEG_PATH, the staged copy in
- * `apps/desktop/resources/ffmpeg/` (`node apps/desktop/scripts/stage-ffmpeg.mjs --target <t>`), then PATH. With none
- * of them the whole file is skipped, so a machine without ffmpeg stays green.
- */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -26,12 +14,6 @@ process.env.AGENTFORGE_RUNTIME = "stub";
 delete process.env.AGENTFORGE_SETTINGS_PATH;
 delete process.env.DATABASE_URL;
 delete process.env.AGENTFORGE_SERVER;
-
-const STAGED = fileURLToPath(new URL("../../../../apps/desktop/resources/ffmpeg/", import.meta.url));
-const EXE = process.platform === "win32" ? ".exe" : "";
-if (!process.env.AGENTFORGE_FFMPEG_PATH && existsSync(join(STAGED, `ffmpeg${EXE}`))) {
-  process.env.AGENTFORGE_FFMPEG_PATH = join(STAGED, `ffmpeg${EXE}`);
-}
 
 const binary = await import("./ffmpeg-binary");
 const ffmpeg = binary.resolveFfmpeg();

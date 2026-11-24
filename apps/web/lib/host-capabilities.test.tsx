@@ -1,19 +1,8 @@
-/**
- * Phase 8 — the capability flags in the renderer, actually rendered.
- *
- * `packages/core/src/capabilities.test.ts` owns the flags themselves: what each one is on each
- * target, and that an unknown payload reads as all-false. What it cannot prove is the half that
- * matters to a person looking at the screen — that the Electron-only controls are not on the page
- * on a hosted server, and that they still are on the desk. A flag nobody reads hides nothing.
- *
- * `renderToStaticMarkup` runs each card for real against the real `t()` and the real catalogs, so
- * a hidden control is genuinely absent from the markup rather than merely styled away.
- */
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { hostCapabilities, parseCapabilities } from "@agentforge/core/capabilities";
-import { EVERYTHING_OFF, hasDesktopShell, hasNativeFilePicker, HostCapabilitiesFixture } from "./host-capabilities";
+import { EVERYTHING_OFF, HostCapabilitiesFixture } from "./host-capabilities";
 import { pingOnce, resetPingForTests } from "./host-ping";
 import { applyLocale, resetLocaleForTests } from "./i18n";
 import { SESSIONS_OFF, SessionFixture, type SessionRole, type SessionSnapshot } from "./session";
@@ -22,11 +11,9 @@ const HOSTED = hostCapabilities({ AGENTFORGE_SERVER: "1" });
 const DESK = hostCapabilities({});
 
 vi.mock("@/lib/api-client", () => ({
-  isElectron: () => electron,
   apiFetch: (path: string, init?: { method?: string }) => fetched(path, init),
 }));
 
-let electron = false;
 let calls: Array<{ path: string; method: string }> = [];
 let respond: (path: string) => unknown = () => ({});
 
@@ -40,7 +27,6 @@ async function fetched(path: string, init?: { method?: string }): Promise<Respon
 }
 
 beforeEach(() => {
-  electron = false;
   calls = [];
   respond = () => ({});
   resetPingForTests();
@@ -61,27 +47,6 @@ describe("the closed default", () => {
     // The same object `parseCapabilities` builds for a host that said nothing: a surface stays
     // hidden until the host has said it exists, which is the fail-closed direction.
     expect(EVERYTHING_OFF).toEqual(parseCapabilities(undefined));
-  });
-});
-
-describe("the desktop shell tests", () => {
-  it("needs the bridge AND the flag, because neither alone is the packaged app", () => {
-    electron = false;
-    expect(hasDesktopShell(DESK)).toBe(false);
-    electron = true;
-    expect(hasDesktopShell(DESK)).toBe(true);
-    // A packaged build pointed at a hosted host: the bridge is there, the host says no.
-    expect(hasDesktopShell(HOSTED)).toBe(false);
-  });
-
-  it("treats the native picker as its own capability, not as the shell's", () => {
-    electron = true;
-    expect(hasNativeFilePicker(DESK)).toBe(true);
-    expect(hasNativeFilePicker(HOSTED)).toBe(false);
-    electron = false;
-    // Webdev: not the hosted server, and still no shell to ask. `isElectron()` alone could never
-    // tell those two apart, which is the whole reason these flags exist.
-    expect(hasNativeFilePicker(DESK)).toBe(false);
   });
 });
 

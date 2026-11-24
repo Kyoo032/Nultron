@@ -12,10 +12,7 @@ import { hostCapabilities } from "@agentforge/core/capabilities";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-let electron = true;
-
 vi.mock("@/lib/api-client", () => ({
-  isElectron: () => electron,
   apiFetch: async () => ({ ok: true, json: async () => ({}) }) as Response,
 }));
 
@@ -44,8 +41,10 @@ function stateFrom(actions: FolderAction[]): FolderState {
 
 const OPEN_NOTES: FolderAction = { type: "status", status: { available: true, mounted: true, name: "notes" } };
 
-function render(state: FolderState, capabilities = DESKTOP): string {
-  return renderToStaticMarkup(<FolderSurfaceView state={state} capabilities={capabilities} controller={CONTROLLER} />);
+function render(state: FolderState, capabilities = DESKTOP, picker = true): string {
+  return renderToStaticMarkup(
+    <FolderSurfaceView state={state} capabilities={capabilities} controller={CONTROLLER} picker={picker} />,
+  );
 }
 
 function tag(markup: string, testId: string): string {
@@ -59,7 +58,6 @@ function tag(markup: string, testId: string): string {
 const count = (markup: string, testId: string) => markup.split(`data-testid="${testId}"`).length - 1;
 
 beforeEach(() => {
-  electron = true;
   applyLocale("en");
 });
 
@@ -79,9 +77,8 @@ describe("where the surface is absent", () => {
   });
 
   it("renders nothing on webdev: the host allows a folder but there is no shell to pick one", () => {
-    electron = false;
     const state = stateFrom([{ type: "status", status: { available: true, mounted: false, name: null } }]);
-    expect(render(state)).toBe("");
+    expect(render(state, DESKTOP, false)).toBe("");
   });
 
   it("renders nothing for a packaged shell pointed at a host that does not allow folders", () => {

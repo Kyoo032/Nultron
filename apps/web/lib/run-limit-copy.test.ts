@@ -1,13 +1,3 @@
-/**
- * SR-138 in the renderer: the host refuses a run over the hosted caps with 429 `too_many_runs` or
- * 503 `server_busy`, and the person reads a sentence in their own language, never the host's English.
- *
- * The sentence is put in at the one place every answer passes through, `apiFetch`, so every studio
- * that reads `error.message` off a refused request (Chat, Documents, Images, Videos, Music, Finance,
- * Market, Edit, the job reader) shows it without each growing its own lookup, and a studio added next
- * month gets it too. This file holds the catalog copy, the pure lookup, and that boundary on both
- * transports (`fetch` on the web, IPC in the packaged app).
- */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import enCommon from "../locales/en/common.json";
 import idCommon from "../locales/id/common.json";
@@ -164,19 +154,5 @@ describe("a refused request through apiFetch on the web", () => {
     const response = await apiFetch("/api/v1/images", { method: "POST", body: "{}" });
     expect(response.status).toBe(503);
     expect(await response.text()).toBe("<html>upstream</html>");
-  });
-});
-
-describe("a refused request through apiFetch in the packaged app (IPC)", () => {
-  it.each(CASES)("hands every caller the catalog sentence for $code there too", async ({ code, status, key }) => {
-    const invoke = vi.fn(async () => ({
-      type: "json" as const,
-      status,
-      body: { error: { code, message: HOST_ENGLISH } },
-    }));
-    (globalThis as { window?: unknown }).window = { agentforge: { isElectron: true, invoke } };
-    const response = await apiFetch("/api/v1/music", { method: "POST", body: "{}" });
-    expect(response.status).toBe(status);
-    expect(await response.json()).toEqual({ error: { code, message: enCommon.runLimit[key] } });
   });
 });

@@ -9,9 +9,7 @@ import {
   type VideoExample,
 } from "@agentforge/core/edit";
 
-type ProcessWithResources = NodeJS.Process & { resourcesPath?: string };
-
-const DEV_RELATIVE = path.join("apps", "desktop", "resources", "examples", "videos");
+const DEV_RELATIVE = path.join("assets", "examples", "videos");
 /** Example clips are re-encoded small by scripts/video-examples.mjs; anything larger is not one we shipped. */
 export const VIDEO_EXAMPLE_MAX_BYTES = 40 * 1024 * 1024;
 export const VIDEO_EXAMPLE_MIME = "video/mp4";
@@ -46,16 +44,7 @@ function findUp(start: string, relative: string): string | null {
   return null;
 }
 
-/**
- * Where the bundled example clips live. Offline only: the packaged Electron resources folder,
- * then the env override, then the repo checkout for webdev. Same rules as the Edit starters.
- */
 export function videoExamplesDir(): string | null {
-  const resourcesPath = (process as ProcessWithResources).resourcesPath;
-  if (process.versions.electron && resourcesPath) {
-    const packaged = path.join(resourcesPath, "examples", "videos");
-    return existsSync(packaged) ? packaged : null;
-  }
   const fromEnv = process.env.AGENTFORGE_VIDEO_EXAMPLES_DIR?.trim();
   if (fromEnv) {
     return path.resolve(fromEnv);

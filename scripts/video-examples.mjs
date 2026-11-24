@@ -1,22 +1,4 @@
 #!/usr/bin/env node
-/**
- * Generate the bundled Videos example clips into apps/desktop/resources/examples/videos/.
- *
- * The manifest (packages/core/src/edit/video-examples.json) lists one clip per prompt template.
- * Each clip is generated once through a running Nultron host (the dev desk on :3000 or any
- * host URL) with that template's prompt, then re-encoded small (H.264, <= 1280 px, faststart)
- * so it plays instantly from disk. The app never fetches these at runtime: they ship inside the
- * installer next to the Edit starters. After a clip is written the manifest entry gets the
- * measured width, height, duration, model and date.
- *
- * Usage (repo root):
- *   node scripts/video-examples.mjs [--host http://127.0.0.1:3000] [--only file.mp4]... [--force] [--model id]
- *                                   [--seconds-allowed 4,6,8]   snap each template's seconds to the nearest value
- *                                                               the chosen model accepts (veo-3.1: 4 / 6 / 8)
- *   node scripts/video-examples.mjs --check     only verify every manifest file exists; exit 1 if not
- *
- * Needs ffmpeg + ffprobe on PATH (or AGENTFORGE_FFMPEG_PATH / AGENTFORGE_FFPROBE_PATH).
- */
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
@@ -28,7 +10,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const manifestPath = path.join(repoRoot, "packages/core/src/edit/video-examples.json");
 const templatesPath = path.join(repoRoot, "packages/core/src/edit/prompt-templates.json");
-const outDir = path.join(repoRoot, "apps/desktop/resources/examples/videos");
+const outDir = path.join(repoRoot, "assets/examples/videos");
 
 const DEFAULT_HOST = "http://127.0.0.1:3000";
 const MAX_EDGE_PX = 1280;

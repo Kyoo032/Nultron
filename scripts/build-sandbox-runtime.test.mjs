@@ -1,7 +1,3 @@
-// node --test scripts/build-sandbox-runtime.test.mjs
-// The pure parts of scripts/build-sandbox-runtime.mjs: lockfile trimming, manifest building and diffing, the
-// refusal of a download whose sha256 differs, and the contracts between the lock, package.json, the installer
-// config and the Dockerfile. Nothing here touches the network or needs the built folder.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -642,33 +638,6 @@ test("the lock pins the exact versions the root package.json installs", () => {
   assert.equal(dev["quickjs-emscripten-core"], byName["quickjs-emscripten-core"]);
   assert.equal(dev["@jitl/quickjs-wasmfile-release-sync"], byName["@jitl/quickjs-wasmfile-release-sync"]);
   assert.match(dev.pyodide, /^\d+\.\d+\.\d+$/);
-});
-
-test("the installer ships the built folder as real files in resources/sandbox, outside the asar", () => {
-  const build = readRepoJson("apps", "desktop", "package.json").build;
-  assert.deepEqual(
-    build.extraResources.filter((entry) => entry.to === "sandbox"),
-    [{ from: "../../vendor/sandbox-runtime", to: "sandbox" }],
-  );
-  assert.equal(
-    build.asarUnpack.some((pattern) => pattern.includes("sandbox")),
-    false,
-  );
-  assert.equal(
-    build.files.some((pattern) => pattern.includes("sandbox")),
-    false,
-  );
-});
-
-test("every desktop build script builds the sandbox folder before electron-builder runs", () => {
-  const scripts = readRepoJson("apps", "desktop", "package.json").scripts;
-  const packing = Object.entries(scripts).filter(([, command]) =>
-    /electron-builder|pack-brand\.mjs|pack-all-brands\.mjs/.test(command),
-  );
-  assert.ok(packing.length >= 6, "expected the desktop-build family of scripts");
-  for (const [name, command] of packing) {
-    assert.match(command, /build-sandbox-runtime\.mjs/, `${name} must build the sandbox runtime first`);
-  }
 });
 
 test("the image builds the folder in the build stage and runs with it read-only at /app/sandbox", () => {

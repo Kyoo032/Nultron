@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiFetch, saveBlob, isElectron } = vi.hoisted(() => ({
+const { apiFetch, saveBlob } = vi.hoisted(() => ({
   apiFetch: vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(),
   saveBlob: vi.fn(),
-  isElectron: vi.fn(() => false),
 }));
 
-vi.mock("./api-client", () => ({ apiFetch, isElectron }));
+vi.mock("./api-client", () => ({ apiFetch }));
 vi.mock("./artifacts-client", () => ({ saveBlob }));
 
 import {
@@ -122,7 +121,6 @@ function lastCall(): { url: string; init: RequestInit } {
 beforeEach(() => {
   apiFetch.mockReset();
   saveBlob.mockReset();
-  isElectron.mockReturnValue(false);
 });
 
 describe("legal-client paths", () => {
@@ -299,12 +297,5 @@ describe("downloads", () => {
     await downloadLegalArtifact({ kind: "redline", artifactId: "a2", filename: "fallback.docx" });
     expect(lastCall().url).toBe("/api/v1/artifacts/a2/file");
     expect(saveBlob).toHaveBeenCalledWith(expect.any(Blob), "redline.docx");
-  });
-
-  it("leaves saving to the native dialog on desktop", async () => {
-    isElectron.mockReturnValue(true);
-    apiFetch.mockResolvedValue(new Response(new Uint8Array([1]), { status: 200 }));
-    await downloadLegalArtifact({ kind: "issues-memo", artifactId: "a3", filename: "memo.docx" });
-    expect(saveBlob).not.toHaveBeenCalled();
   });
 });

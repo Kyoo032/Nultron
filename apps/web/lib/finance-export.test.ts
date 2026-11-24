@@ -16,9 +16,8 @@ import {
 
 const apiFetch = vi.hoisted(() => vi.fn());
 const saveBlob = vi.hoisted(() => vi.fn());
-const isElectron = vi.hoisted(() => vi.fn(() => false));
 
-vi.mock("@/lib/api-client", () => ({ apiFetch, isElectron }));
+vi.mock("@/lib/api-client", () => ({ apiFetch }));
 vi.mock("@/lib/artifacts-client", () => ({ saveBlob }));
 
 const brief: FinanceBrief = {
@@ -110,7 +109,6 @@ describe("downloadFinanceExport", () => {
   beforeEach(() => {
     apiFetch.mockReset();
     saveBlob.mockReset();
-    isElectron.mockReturnValue(false);
   });
 
   it("posts to the export route and saves the bytes under the host's filename", async () => {
@@ -122,13 +120,6 @@ describe("downloadFinanceExport", () => {
     const sent = apiFetch.mock.calls[0]?.[1] as { body?: string } | undefined;
     expect(JSON.parse(sent?.body ?? "{}")).toMatchObject({ format: "pptx" });
     expect(saveBlob).toHaveBeenCalledWith(expect.any(Blob), "Q3.pptx");
-  });
-
-  it("leaves the file to the desktop host and saves nothing in the page", async () => {
-    isElectron.mockReturnValue(true);
-    apiFetch.mockResolvedValue(new Response("PK", { status: 200 }));
-    await downloadFinanceExport({ brief, format: "xlsx" }, "failed");
-    expect(saveBlob).not.toHaveBeenCalled();
   });
 
   it("raises the host's own message, never a bare status", async () => {

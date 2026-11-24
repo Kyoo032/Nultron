@@ -8,7 +8,7 @@
  */
 import type { FinanceBrief } from "@agentforge/core/artifacts";
 import type { FinanceReport } from "@agentforge/core/finance";
-import { apiFetch, isElectron } from "./api-client";
+import { apiFetch } from "./api-client";
 import { saveBlob } from "./artifacts-client";
 import { filenameFromDisposition as fileNameFromHeader } from "./download-name";
 import { messageUnlessBlocked } from "./gateway-blocked";
@@ -141,7 +141,6 @@ function messageFrom(payload: unknown, fallback: string): string {
   });
 }
 
-/** One request, one file. On desktop the host writes it natively, so there is nothing to save here. */
 export async function downloadFinanceExport(request: FinanceExportRequest, failureMessage: string): Promise<void> {
   const res = await apiFetch(FINANCE_EXPORT_ENDPOINT, {
     method: "POST",
@@ -150,9 +149,6 @@ export async function downloadFinanceExport(request: FinanceExportRequest, failu
   });
   if (!res.ok) {
     throw new Error(messageFrom(await res.json().catch(() => null), failureMessage));
-  }
-  if (isElectron()) {
-    return;
   }
   saveBlob(await res.blob(), filenameFromDisposition(res.headers.get("Content-Disposition"), request.format));
 }

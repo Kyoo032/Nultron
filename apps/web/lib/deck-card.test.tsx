@@ -216,10 +216,9 @@ describe("the wiring the card relies on", () => {
     expect(shared).toContain("downloadArtifactFile");
   });
 
-  it("says why a save failed when the shell refused it, and keeps its generic sentence for everything else", () => {
+  it("keeps its generic download-failed sentence when saving throws", () => {
     const shared = source("../lib/chat-file-save.ts");
-    expect(shared).toContain('from "@/lib/desktop-save"');
-    expect(shared).toContain("saveFailureMessage(");
+    expect(shared).not.toContain("desktop-save");
     expect(source("../components/chat-deck-card.tsx")).toContain("chat.deck.downloadFailed");
   });
 

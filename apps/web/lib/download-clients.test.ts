@@ -1,15 +1,3 @@
-/**
- * The two download calls the Chat buttons make, on each transport this renderer has.
- *
- * - the deck card calls `downloadArtifactFile` (artifacts-client), and a desk file calls `download`
- *   on the files API;
- * - on the web both fetch bytes and save a blob through an anchor;
- * - in the packaged app `apiFetch` crosses the IPC bridge, the shell answers `{ type: "bytes" }`, and
- *   `apiFetch` itself hands the bytes to `window.agentforge.saveBytes` (the native save dialog). The
- *   caller must then do nothing more, or the person gets a second dialog for the same file.
- *
- * The shell's own half (`host:save-bytes` in apps/desktop/main.cjs) is not run here.
- */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { downloadArtifactFile } from "./artifacts-client";
 import { createFilesApi, type FilesFetch } from "./files-api";
@@ -43,7 +31,7 @@ function sink() {
   const saved: Array<{ blob: Blob; filename: string }> = [];
   return {
     saved,
-    io: { desktop: () => false, saveBlob: (blob: Blob, filename: string) => void saved.push({ blob, filename }) },
+    io: { saveBlob: (blob: Blob, filename: string) => void saved.push({ blob, filename }) },
   };
 }
 
@@ -93,16 +81,6 @@ describe("a desk file, on the web", () => {
     expect(await down.download("a.md")).toEqual({ ok: false, code: "network", status: 0 });
     expect(saved).toEqual([]);
   });
-
-  it("does not save a second copy on the desktop, where apiFetch has already written the file", async () => {
-    const { saved, io } = sink();
-    const outcome = await createFilesApi(async () => file("x", 'attachment; filename="a.md"'), {
-      ...io,
-      desktop: () => true,
-    }).download("a.md");
-    expect(outcome).toEqual({ ok: true, data: { filename: "a.md" } });
-    expect(saved).toEqual([]);
-  });
 });
 
 describe("the deck, on the web", () => {
@@ -147,121 +125,5 @@ describe("the deck, on the web", () => {
         }),
     );
     await expect(downloadArtifactFile("missing")).rejects.toThrow("Artifact not found");
-  });
-});
-
-describe("in the packaged app, over the IPC bridge", () => {
-  function bridge(answer: { type: "bytes"; status: number; bytes: number[]; contentType: string; filename?: string }) {
-    const invoke = vi.fn(async (_request: unknown) => answer);
-    const saveBytes = vi.fn(async () => undefined);
-    vi.stubGlobal("window", { agentforge: { isElectron: true, invoke, stream: vi.fn(), saveBytes } });
-    return { invoke, saveBytes };
-  }
-
-  it("a desk file goes through the native save dialog once and no blob is made", async () => {
-    const text = "# Plan\n";
-    const { invoke, saveBytes } = bridge({
-      type: "bytes",
-      status: 200,
-      bytes: Array.from(bytesOf(text)),
-      contentType: "text/markdown; charset=utf-8",
-      filename: "plan.md",
-    });
-    const createUrl = vi.spyOn(URL, "createObjectURL");
-    const outcome = await createFilesApi().download("notes/plan.md");
-    expect(outcome).toEqual({ ok: true, data: { filename: "plan.md" } });
-    expect(invoke).toHaveBeenCalledTimes(1);
-    expect(invoke.mock.calls[0]?.[0]).toMatchObject({
-      method: "GET",
-      path: "/api/v1/files/download",
-      query: { path: "notes/plan.md" },
-    });
-    expect(saveBytes).toHaveBeenCalledTimes(1);
-    expect(saveBytes).toHaveBeenCalledWith("plan.md", Array.from(bytesOf(text)));
-    expect(createUrl).not.toHaveBeenCalled();
-  });
-
-  it("the deck goes through the native save dialog once, with the zip bytes the host built", async () => {
-    const zip = [0x50, 0x4b, 0x03, 0x04, 9, 8, 7];
-    const { invoke, saveBytes } = bridge({
-      type: "bytes",
-      status: 200,
-      bytes: zip,
-      contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      filename: "quarterly-review.pptx",
-    });
-    const createUrl = vi.spyOn(URL, "createObjectURL");
-    await downloadArtifactFile("a1b2", "deck.pptx");
-    expect(invoke.mock.calls[0]?.[0]).toMatchObject({ method: "GET", path: "/api/v1/artifacts/a1b2/file" });
-    expect(saveBytes).toHaveBeenCalledTimes(1);
-    expect(saveBytes).toHaveBeenCalledWith("quarterly-review.pptx", zip);
-    expect(createUrl).not.toHaveBeenCalled();
-  });
-
-  it("a refusal from the host reaches the caller and opens no dialog", async () => {
-    const invoke = vi.fn(async () => ({
-      type: "json",
-      status: 404,
-      body: { error: { code: "not_found", message: "Artifact not found" } },
-    }));
-    const saveBytes = vi.fn(async () => undefined);
-    vi.stubGlobal("window", { agentforge: { isElectron: true, invoke, stream: vi.fn(), saveBytes } });
-    await expect(downloadArtifactFile("missing")).rejects.toThrow("Artifact not found");
-    expect(await createFilesApi().download("gone.md")).toEqual({ ok: false, code: "not_found", status: 404 });
-    expect(saveBytes).not.toHaveBeenCalled();
-  });
-});
-
-describe("in the packaged app, when the save itself does not happen", () => {
-  /** The host sent the bytes; what the shell's save dialog and disk did with them is `answer`. */
-  function shell(answer: unknown) {
-    const invoke = vi.fn(async () => ({
-      type: "bytes",
-      status: 200,
-      bytes: [1, 2, 3],
-      contentType: "application/octet-stream",
-      filename: "deck.pptx",
-    }));
-    const saveBytes = vi.fn(async () => answer);
-    vi.stubGlobal("window", { agentforge: { isElectron: true, invoke, stream: vi.fn(), saveBytes } });
-    return { saveBytes };
-  }
-
-  it("a disk that refused the write is an error the card can show, not a download that seems to have worked", async () => {
-    const { saveBytes } = shell({ ok: false, reason: "write-failed" });
-    await expect(downloadArtifactFile("a1b2", "deck.pptx")).rejects.toMatchObject({
-      name: "DesktopSaveError",
-      reason: "write-failed",
-      message: expect.stringMatching(/could not be written/i),
-    });
-    expect(saveBytes).toHaveBeenCalledTimes(1);
-  });
-
-  it("every other refusal throws too, with a sentence", async () => {
-    for (const reason of ["too-large", "forbidden", "bad-filename"]) {
-      shell({ ok: false, reason });
-      await expect(downloadArtifactFile("a1b2", "deck.pptx"), reason).rejects.toMatchObject({
-        name: "DesktopSaveError",
-        reason,
-      });
-    }
-  });
-
-  it("a desk file's refusal is save_failed, not a network error", async () => {
-    shell({ ok: false, reason: "write-failed" });
-    expect(await createFilesApi().download("notes/plan.md")).toEqual({ ok: false, code: "save_failed", status: 0 });
-  });
-
-  it("a closed dialog is the person's choice: no error from either button", async () => {
-    shell({ ok: false, reason: "canceled" });
-    await expect(downloadArtifactFile("a1b2", "deck.pptx")).resolves.toBeUndefined();
-    expect(await createFilesApi().download("notes/plan.md")).toEqual({ ok: true, data: { filename: "deck.pptx" } });
-  });
-
-  it("a save that worked, and an older shell that answers nothing, stay what they were", async () => {
-    shell({ ok: true });
-    await expect(downloadArtifactFile("a1b2", "deck.pptx")).resolves.toBeUndefined();
-    shell(undefined);
-    await expect(downloadArtifactFile("a1b2", "deck.pptx")).resolves.toBeUndefined();
   });
 });

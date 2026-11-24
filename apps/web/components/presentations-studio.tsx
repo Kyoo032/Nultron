@@ -43,7 +43,7 @@ import { presentationStarters } from "@/lib/job-starters";
 import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { useJobModel } from "@/lib/use-job-model";
 import { modelPickBody, regenModelPick, studioModelPick } from "@/lib/model-choice";
-import { apiFetch, isElectron } from "@/lib/api-client";
+import { apiFetch } from "@/lib/api-client";
 
 function errorMessage(payload: unknown, fallback: string): string {
   // Hosted only: a 403 gateway_blocked is "no usable key", said as the catalog sentence (`gateway-blocked.ts`).
@@ -348,11 +348,6 @@ export function PresentationsStudio() {
         const data = await res.json().catch(() => null);
         throw new Error(errorMessage(data, t("presentation.downloadError")));
       }
-      if (isElectron()) {
-        // apiFetch already wrote the bytes through the native save dialog; a second, browser-style
-        // download here would open the save dialog twice.
-        return;
-      }
       const blob = await res.blob();
       const disposition = res.headers.get("Content-Disposition") ?? "";
       const filename = filenameFromDisposition(disposition) ?? "presentation.pptx";
@@ -369,7 +364,6 @@ export function PresentationsStudio() {
     }
   }
 
-  // The local error (save, download, regenerate) and the stream's own error share one banner.
   const shownError = error ?? job.error?.message ?? null;
   const showingOpenSlide = engine === "open-slide";
   const hasDeck = showingOpenSlide ? openDeck !== null : outline !== null;

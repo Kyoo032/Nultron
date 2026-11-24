@@ -4,7 +4,7 @@
  * ending or a decision re-reads the host, and each way an approval can end lands as its outcome.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { DesktopFolderPick } from "./desktop-bridge";
+import type { FolderPick } from "./folder-actions";
 import { createFolderController } from "./folder-actions";
 import type { FolderApi, FolderResult, FolderStatus, ProposalDiff, ProposalSummary } from "./folder-api";
 import { folderReducer, INITIAL_FOLDER_STATE, type FolderState } from "./folder-state";
@@ -49,7 +49,7 @@ function fakeApi(over: Partial<FolderApi> = {}): FolderApi {
 
 function harness(
   api: FolderApi,
-  pick: () => Promise<DesktopFolderPick | null> = async () => ({ path: "/x/notes" }),
+  pick: () => Promise<FolderPick | null> = async () => ({ path: "/x/notes" }),
   initial = INITIAL_FOLDER_STATE,
 ) {
   let current: FolderState = initial;

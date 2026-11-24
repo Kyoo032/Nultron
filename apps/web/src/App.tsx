@@ -30,7 +30,6 @@ import { CustomersPage } from "@/components/customers-page";
 import { DeskPane } from "@/components/desk-pane";
 import { WorkModeKeepAlive } from "@/components/work-mode-keep-alive";
 import { OnboardingScreen } from "@/components/onboarding-screen";
-import { isElectron } from "@/lib/api-client";
 import { publishGate } from "@/lib/gate-state";
 import {
   GATE_EVENT,
@@ -123,12 +122,20 @@ function Shell({ children }: { children: ReactNode }) {
       });
   }, [modesCacheKey]);
 
+  const lastTriggerRef = useRef<{ path: string; reload: () => void } | null>(null);
+
   useEffect(() => {
-    reload();
+    if (lastTriggerRef.current?.path !== location.pathname || lastTriggerRef.current.reload !== reload) {
+      lastTriggerRef.current = { path: location.pathname, reload };
+      reload();
+    }
+  }, [reload, location.pathname]);
+
+  useEffect(() => {
     const onRefresh = () => reload();
     window.addEventListener("agentforge-shell-refresh", onRefresh);
     return () => window.removeEventListener("agentforge-shell-refresh", onRefresh);
-  }, [reload, location.pathname]);
+  }, [reload]);
 
   return (
     <WorkspaceScope.Provider value={{ id: workspaceId, name: workspaceName }}>
@@ -245,18 +252,13 @@ export function AppRoutes() {
       const reported = readGateEvent(event);
       setGateway(reported);
       publishGate(reported);
-      setGate(resolveGate(reported, isElectron(), undefined, deferralRef.current));
+      setGate(resolveGate(reported, false, undefined, deferralRef.current));
     };
     window.addEventListener(GATE_EVENT, onGate);
     return () => window.removeEventListener(GATE_EVENT, onGate);
   }, []);
 
   useEffect(() => {
-    // Phase 9: the boot order is ping → session → settings. A signed-out visitor to the hosted
-    // deployment never makes this call: it answers `401 session_required` (the gate exempts only
-    // ping and components), the `.catch` below would read that as `"onboarding"`, and they would be
-    // shown a form asking for the operator's gateway key. Off a hosted deployment `view` is "app"
-    // as soon as ping answers, so webdev and the desktop reach this exactly as they always did.
     if (view !== "app") {
       return;
     }
@@ -287,7 +289,7 @@ export function AppRoutes() {
         const deferral = read.hasSession && choseLaterRef.current ? { ...read, later: true } : read;
         setKeyLater(deferral.later);
         setGateway(reported);
-        setGate(resolveGate(reported, isElectron(), undefined, deferral));
+        setGate(resolveGate(reported, false, undefined, deferral));
       })
       .catch(() => {
         if (localeEpoch === 0) {

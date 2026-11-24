@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Ownership manifest read by scripts/lane-guard.mjs. Its never-promote (neverPromote), protected and brand rules block; the map rule only advises. Each entry maps a path glob to the map page that describes it, the lanes the path reaches, and whether it is protected. Lanes: enterprise (the hosted app, main), tester (agentforge-chat, tester/chat-first). personal (Nultron Personal, retired 2026-10-14, owes nothing) stays only on the apps/desktop entries, because it is the one lane those paths reach and every entry must name a lane. A file may match several entries: its map pages are the union, it is protected if any match is. 'map: null' means no map check. Since the 2026-10-15 repo split this repo is Nultron only: Nultron may be named in shared code, Toko Token may not, and no downstream repo syncs from main. Plan (history): docs/internal/white-label-and-agent-guardrails-plan.md. Map: docs/internal/maps/release-and-sync-lanes.md.",
+  "about": "Ownership manifest read by scripts/lane-guard.mjs. Its never-promote (neverPromote), protected and brand rules block; the map rule only advises. Each entry maps a path glob to the map page that describes it, the lanes the path reaches, and whether it is protected. Lanes: enterprise (the hosted app, main), tester (agentforge-chat, tester/chat-first). personal (Nultron Personal, retired 2026-10-14; apps/desktop removed 2026-11-24) owes nothing. A file may match several entries: its map pages are the union, it is protected if any match is. 'map: null' means no map check. Since the 2026-10-15 repo split this repo is Nultron only: Nultron may be named in shared code, Toko Token may not, and no downstream repo syncs from main. Plan (history): docs/internal/white-label-and-agent-guardrails-plan.md. Map: docs/internal/maps/release-and-sync-lanes.md.",
   "brandLiterals": ["Toko Token"],
   "brandScope": {
     "include": ["apps/web/**", "packages/**"],
@@ -446,21 +446,6 @@
       "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "Schema and ensureSchema. Product database is SQLite; the portal's Postgres is separate."
-    },
-
-    {
-      "glob": "apps/desktop/scripts/release-*.mjs",
-      "map": "docs/internal/maps/release-and-sync-lanes.md",
-      "lanes": ["personal"],
-      "protected": true,
-      "note": "Retired desktop release script. It published to Kyoo032/Nultron-Desktop, now archived (2026-10-14), so it takes no new cut. Code kept. AGENTS.md: a change to the release scripts needs Rizky's word. Never run from the tester folder."
-    },
-    {
-      "glob": "apps/desktop/**",
-      "map": "docs/internal/maps/desktop-pack-routes.md",
-      "lanes": ["personal"],
-      "protected": false,
-      "note": "Electron shell. Platform rules: apps/desktop/platform/*/AGENTS.md."
     },
 
     {
