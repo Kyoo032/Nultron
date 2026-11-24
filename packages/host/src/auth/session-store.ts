@@ -38,10 +38,12 @@ export interface SessionStore {
   save(session: SessionRecord): Promise<void>;
   /**
    * A rotation landed at `at`: the stamp moves forward (never back) and the sealed token becomes
-   * `refreshSealed` — in one write, so the two can never disagree. `null` clears it. A row revoked
-   * while the rotation was in flight keeps no token. No-op when the session is unknown.
+   * `refreshSealed` — in one write, so the two can never disagree. `null` clears it. When
+   * `gatewayEndpoint` is provided (string or `null`), the row's operator-assigned gateway endpoint
+   * is updated in the same write; when omitted (`undefined`), the existing value is preserved. A
+   * row revoked while the rotation was in flight keeps no token. No-op when the session is unknown.
    */
-  recordRotation(id: string, at: number, refreshSealed: string | null): Promise<void>;
+  recordRotation(id: string, at: number, refreshSealed: string | null, gatewayEndpoint?: string | null): Promise<void>;
   /** The sealed refresh token of a live (unrevoked) session, or null. */
   readRefreshSealed(id: string): Promise<string | null>;
   /**
@@ -99,13 +101,17 @@ export function createMemorySessionStore(seed: readonly SessionRecord[] = []): S
         sealed.delete(key);
       }
     },
-    async recordRotation(id, at, refreshSealed) {
+    async recordRotation(id, at, refreshSealed, gatewayEndpoint) {
       const key = hashSessionId(id);
       const stored = rows.get(key);
       if (!stored) {
         return;
       }
-      rows.set(key, { ...stored, portalCheckedAt: Math.max(stored.portalCheckedAt ?? at, at) });
+      rows.set(key, {
+        ...stored,
+        portalCheckedAt: Math.max(stored.portalCheckedAt ?? at, at),
+        ...(gatewayEndpoint !== undefined && stored.revokedAt === null ? { gatewayEndpoint } : {}),
+      });
       if (stored.revokedAt === null && refreshSealed !== null) {
         sealed.set(key, refreshSealed);
       } else {
@@ -184,7 +190,11 @@ export function createDrizzleSessionStore(database: Database): SessionStore {
   return {
     async create(session, refreshSealed = null) {
       const authSessions = await table();
-      await database.insert(authSessions).values({ ...atRest(session), refreshSealed });
+      await database.insert(authSessions).values({
+        ...atRest(session),
+        gatewayEndpoint: session.gatewayEndpoint ?? null,
+        refreshSealed,
+      });
     },
     async find(id) {
       const authSessions = await table();
@@ -200,13 +210,22 @@ export function createDrizzleSessionStore(database: Database): SessionStore {
           absoluteExpiresAt: authSessions.absoluteExpiresAt,
           revokedAt: authSessions.revokedAt,
           portalCheckedAt: authSessions.portalCheckedAt,
+          gatewayEndpoint: authSessions.gatewayEndpoint,
         })
         .from(authSessions)
         .where(eq(authSessions.id, hashSessionId(id)))
         .limit(1);
-      return row
-        ? { ...row, id, revokedAt: row.revokedAt ?? null, portalCheckedAt: row.portalCheckedAt ?? null }
-        : null;
+      if (!row) {
+        return null;
+      }
+      const { gatewayEndpoint, ...rest } = row;
+      return {
+        ...rest,
+        id,
+        revokedAt: row.revokedAt ?? null,
+        portalCheckedAt: row.portalCheckedAt ?? null,
+        ...(gatewayEndpoint ? { gatewayEndpoint } : {}),
+      };
     },
     async save(session) {
       const authSessions = await table();
@@ -224,13 +243,18 @@ export function createDrizzleSessionStore(database: Database): SessionStore {
         })
         .where(eq(authSessions.id, hashSessionId(session.id)));
     },
-    async recordRotation(id, at, refreshSealed) {
+    async recordRotation(id, at, refreshSealed, gatewayEndpoint) {
       const authSessions = await table();
       await database
         .update(authSessions)
         .set({
           portalCheckedAt: sql`max(coalesce(${authSessions.portalCheckedAt}, ${at}), ${at})`,
           refreshSealed: sql`CASE WHEN ${authSessions.revokedAt} IS NULL THEN ${refreshSealed} ELSE NULL END`,
+          ...(gatewayEndpoint !== undefined
+            ? {
+                gatewayEndpoint: sql`CASE WHEN ${authSessions.revokedAt} IS NULL THEN ${gatewayEndpoint} ELSE ${authSessions.gatewayEndpoint} END`,
+              }
+            : {}),
         })
         .where(eq(authSessions.id, hashSessionId(id)));
     },
@@ -276,8 +300,8 @@ export function createHostSessionStore(): SessionStore {
     async save(session) {
       return (await resolve()).save(session);
     },
-    async recordRotation(id, at, refreshSealed) {
-      return (await resolve()).recordRotation(id, at, refreshSealed);
+    async recordRotation(id, at, refreshSealed, gatewayEndpoint) {
+      return (await resolve()).recordRotation(id, at, refreshSealed, gatewayEndpoint);
     },
     async readRefreshSealed(id) {
       return (await resolve()).readRefreshSealed(id);

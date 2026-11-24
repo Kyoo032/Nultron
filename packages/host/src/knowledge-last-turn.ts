@@ -4,6 +4,7 @@ import type { KnowledgeBackendId, RetrievedChunk, RetrieveResult } from "./knowl
 import { knowledgeInjection, sourcesPart, type KnowledgeInjection } from "./knowledge";
 import { openVectorBody } from "./knowledge-vector-seal";
 import { andVisibleSource } from "./knowledge-visibility";
+import { openThreadTitle } from "./thread-title-seal";
 import { log } from "./log";
 
 /**
@@ -31,7 +32,7 @@ const LAST_COMPLETED_RUN = `SELECT id FROM runs
  */
 function recordedChunksSql(visibleSource: string): string {
   return `SELECT r.source_id AS sourceId, r.chunk_index AS chunkIndex, r.score AS score,
-    r.backend AS backend, s.name AS sourceName
+    r.backend AS backend, s.name AS sourceName, s.origin_kind AS originKind
   FROM knowledge_retrievals r
   JOIN knowledge_sources s ON s.id = r.source_id AND s.workspace_id = r.workspace_id
   WHERE r.workspace_id = ? AND r.thread_id = ? AND r.run_id = ?${visibleSource}
@@ -44,6 +45,7 @@ type RecordedChunk = {
   score: number;
   backend: string;
   sourceName: string;
+  originKind: string | null;
 };
 
 /** The text of the chunks a run was handed. Every indexed source has vector rows, local stubs included. */
@@ -90,7 +92,7 @@ export function lastTurnRetrieval(tenant: TenantContext, threadId: string): Retr
     const chunks: RetrievedChunk[] = recorded.map((chunk) => ({
       body: bodies.get(`${chunk.sourceId}#${chunk.chunkIndex}`) ?? "",
       sourceId: chunk.sourceId,
-      sourceName: chunk.sourceName,
+      sourceName: chunk.originKind === "thread" ? openThreadTitle(chunk.sourceName) : chunk.sourceName,
       score: chunk.score,
       chunkIndex: chunk.chunkIndex,
     }));

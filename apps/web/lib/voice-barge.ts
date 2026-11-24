@@ -73,6 +73,19 @@ export class BargeCoordinator {
     }
   }
 
+  /** Explicit user Stop/Interrupt button: drops playback right away and tells the host to cut immediately. */
+  interruptNow(): void {
+    this.settle();
+    this.handled = false;
+    const paused = this.effects.pausePlayback();
+    this.effects.send({ type: "barge_in", immediate: true });
+    this.enqueue(async () => {
+      const ms = await paused;
+      await this.effects.dropPlayback();
+      this.effects.send({ type: "played", ms });
+    });
+  }
+
   /** A host frame. Only `resume_audio` and `stop_audio` are for this; the rest are ignored. */
   onHostFrame(frame: VoiceHostFrame): void {
     if (frame.type === "resume_audio") {

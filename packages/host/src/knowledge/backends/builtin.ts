@@ -12,6 +12,7 @@ import { getKnowledgeModels } from "../../knowledge";
 import { ftsSourceFilter, knowledgeFtsQuery } from "../../knowledge-text";
 import { openVectorBody, sealVectorBody } from "../../knowledge-vector-seal";
 import { andVisibleSource, andVisibleSourceId } from "../../knowledge-visibility";
+import { openThreadTitle } from "../../thread-title-seal";
 import type {
   BackendHealth,
   BackendRetrieveOptions,
@@ -62,10 +63,14 @@ function sourceNames(tenant: TenantContext, sourceIds: string[]): Map<string, st
   const visible = andVisibleSource(tenant);
   const rows = sql
     .prepare(
-      `SELECT id, name FROM knowledge_sources WHERE workspace_id = ? AND id IN (${placeholders(sourceIds)})${visible.sql}`,
+      `SELECT id, name, origin_kind FROM knowledge_sources WHERE workspace_id = ? AND id IN (${placeholders(sourceIds)})${visible.sql}`,
     )
-    .all(tenant.workspaceId, ...sourceIds, ...visible.params) as Array<{ id: string; name: string }>;
-  return new Map(rows.map((row) => [row.id, row.name]));
+    .all(tenant.workspaceId, ...sourceIds, ...visible.params) as Array<{
+    id: string;
+    name: string;
+    origin_kind: string | null;
+  }>;
+  return new Map(rows.map((row) => [row.id, row.origin_kind === "thread" ? openThreadTitle(row.name) : row.name]));
 }
 
 /**

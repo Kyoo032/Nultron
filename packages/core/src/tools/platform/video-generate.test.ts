@@ -326,4 +326,18 @@ describe("videoGenerateTool model choice", () => {
     await run({ model: "studio-picked-model" });
     expect(sentModel(fetchMock)).toBe("studio-picked-model");
   });
+
+  it("masks PII in the outbound video prompt before calling the gateway", async () => {
+    const fetchMock = stubGateway();
+    await run({
+      model: "grok-imagine-video",
+      prompt: "Title card calling alex.rivera@example.com for Kirim ke Rina Wijaya",
+    });
+    const body = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body)) as {
+      prompt?: string;
+    };
+    expect(body.prompt).toBe("Title card calling [email] for Kirim ke [name]");
+    expect(body.prompt).not.toContain("alex.rivera@example.com");
+    expect(body.prompt).not.toContain("Rina Wijaya");
+  });
 });

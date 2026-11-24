@@ -109,5 +109,13 @@
   "models.reason.upstream_rejected": "Gateway menerima permintaan, lalu penyedia di baliknya menolaknya.",
   "models.refresh": "Periksa lagi",
   "models.refreshing": "Memeriksa…",
-  "models.refreshFailed": "Tidak bisa memeriksa model. Coba lagi sebentar lagi."
+  "models.refreshFailed": "Tidak bisa memeriksa model. Coba lagi sebentar lagi.",
+  "tabs.aria": "Bagian pengaturan",
+  "tabs.general": "Umum",
+  "tabs.agents": "Agen",
+  "tabs.team": "Tim",
+  "tabs.channels": "Channel",
+  "tabs.customers": "Pelanggan",
+  "tabs.usage": "Pemakaian",
+  "advancedHeading": "Model & penyimpanan"
 }

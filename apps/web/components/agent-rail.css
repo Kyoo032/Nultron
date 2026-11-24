@@ -131,8 +131,8 @@
   border-radius: 8px;
   color: var(--rail-text-2);
   transition:
-    background-color 120ms ease,
-    color 120ms ease;
+    background-color var(--motion-hover),
+    color var(--motion-hover);
 }
 
 .agent-rail-link:hover {
@@ -285,7 +285,7 @@
 }
 
 .agent-rail {
-  transition: width 140ms ease;
+  transition: width var(--motion-2) var(--ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {

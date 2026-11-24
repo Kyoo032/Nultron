@@ -34,6 +34,10 @@ import { openStore } from "../src/store";
 
 const REFUSALS: Readonly<Record<IssueInviteRefusal, { readonly code: number; readonly message: string }>> = {
   invalid_email: { code: 2, message: "That is not an e-mail address." },
+  invalid_gateway_endpoint: {
+    code: 2,
+    message: "--gateway-endpoint must be a valid HTTPS URL without credentials, query string, or fragment.",
+  },
   unknown_tenant: { code: 3, message: "No tenant has that slug. Seed it first with `pnpm portal:seed`." },
   unknown_org: { code: 3, message: "That tenant has no org with that slug." },
   choose_org: { code: 3, message: "That tenant has more than one org. Say which with --org-slug." },
@@ -104,6 +108,7 @@ async function main(): Promise<void> {
       email: args.email,
       role: args.role ?? undefined,
       ttlMs: args.ttlDays * 24 * 60 * 60 * 1000,
+      gatewayEndpoint: args.gatewayEndpoint,
     });
     if (!result.ok && result.reason === "already_member" && args.role !== null) {
       // An active member needs no invite. Given a role, this is how it is changed -- here, by the

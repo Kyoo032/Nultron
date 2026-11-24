@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
 import type { AddressInfo, LookupFunction } from "node:net";
 import { Agent, fetch as undiciFetch } from "undici";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +12,7 @@ import {
   nextHopUrl,
   pinnedAgent,
   pinnedLookup,
+  SAFE_FETCH_TLS_OPTIONS,
 } from "./safe-fetch";
 import type { HostLookup } from "./safe-fetch";
 
@@ -474,6 +476,17 @@ describe("pinnedAgent", () => {
       await agent.destroy();
       await listener.close();
     }
+  });
+
+  it("enforces TLSv1.2 minimum and strict certificate verification", () => {
+    expect(SAFE_FETCH_TLS_OPTIONS).toEqual({
+      minVersion: "TLSv1.2",
+      rejectUnauthorized: true,
+    });
+    expect(typeof createHttpsServer).toBe("function");
+    const agent = pinnedAgent("example.test", [{ address: "93.184.216.34" }]);
+    expect(agent).toBeInstanceOf(Agent);
+    void agent.destroy();
   });
 });
 

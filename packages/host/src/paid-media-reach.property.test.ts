@@ -24,7 +24,7 @@ const RUN_ENTRIES: Readonly<Record<string, Entry>> = {
   },
   "packages/host/src/delegation/run-delegation.ts": {
     how: "tools stripped",
-    why: "A delegated run binds `delegateToolKeys(agent)` (or `delegateToolKeys({ tools: FULL_CHAT_TOOLS })` for a team bot), which drops `image_generate` and `video_generate` (checked for every agent in core).",
+    why: "A delegated run binds `delegateToolKeys(agent)` (or `delegateToolKeys({ tools: FULL_CHAT_TOOLS })` for a team bot), which drops `image_generate` and `video_generate` (checked for every agent in core), and voice-started delegations further filter through `voiceDelegateToolKeys`.",
   },
   "packages/host/src/team-propose.ts": {
     how: "tools stripped",
@@ -206,8 +206,10 @@ describe("every way into a model-driven run is accounted for", () => {
     }
   });
 
-  it("binds a delegated run through delegateToolKeys and a job through toolKeysWithinSpec", () => {
+  it("binds a delegated run through delegateToolKeys, voice runs through voiceBindings/voiceDelegateToolKeys, and a job through toolKeysWithinSpec", () => {
     expect(scanned.texts.get("packages/host/src/delegation/run-delegation.ts")).toContain("delegateToolKeys(");
+    expect(scanned.texts.get("packages/host/src/delegation/run-delegation.ts")).toContain("voiceDelegateToolKeys(");
+    expect(scanned.texts.get("packages/host/src/voice/ask.ts")).toContain("voiceBindings(");
     expect(scanned.texts.get("packages/host/src/job-regen.ts")).toContain("toolKeysWithinSpec(");
   });
 

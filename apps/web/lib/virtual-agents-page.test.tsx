@@ -115,9 +115,9 @@ describe("VirtualAgentsView", () => {
     expect(count(html, 'data-testid="agent-let-go"')).toBe(2);
     expect(count(html, 'data-testid="agent-always"')).toBe(1);
     expect(html).toContain("Always on your desk");
-    expect(html).not.toContain('aria-label="Let Acme go"');
-    expect(html).toContain('aria-label="Let Research go"');
-    expect(html).toContain('aria-label="Let Documents go"');
+    expect(html).not.toContain('aria-label="Delete Acme"');
+    expect(html).toContain('aria-label="Delete Research"');
+    expect(html).toContain('aria-label="Delete Documents"');
   });
 
   it("names the generalist after the product, not a brand typed in the page", () => {
@@ -179,7 +179,7 @@ describe("VirtualAgentsView", () => {
     expect(html).toContain(">Hiring<");
     expect(count(html, "disabled")).toBe(4);
     const letting = view({ busyId: "research" });
-    expect(letting).toContain(">Letting go<");
+    expect(letting).toContain(">Deleting<");
   });
 
   it("shows a failure as an alert", () => {

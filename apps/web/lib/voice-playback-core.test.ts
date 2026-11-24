@@ -162,6 +162,51 @@ describe("the playback clock", () => {
     expect(queue.playedMs).toBe(0);
   });
 
+  it("resets paused on drop() so subsequent agent turns render audio instead of staying muted", () => {
+    const queue = new PlaybackQueue();
+    queue.enqueue(ramp(2400));
+    queue.render(new Float32Array(480));
+    queue.pause();
+    expect(queue.stats().paused).toBe(true);
+
+    expect(queue.drop()).toBe(1920);
+    expect(queue.paused).toBe(false);
+    expect(queue.stats().paused).toBe(false);
+
+    queue.enqueue(ramp(480, 500));
+    expect(queue.playing).toBe(true);
+    const out = new Float32Array(QUANTUM);
+    expect(queue.render(out)).toBe(QUANTUM);
+    expect(out[0]).toBeCloseTo(500 / 1_000_000, 9);
+  });
+
+  it("resets paused on endTurn() and supports multi-turn barge-in cycles", () => {
+    const queue = new PlaybackQueue();
+    // Turn 1: pause -> endTurn (without drop) -> Turn 2 audio plays normally.
+    queue.enqueue(ramp(1200));
+    queue.render(new Float32Array(240));
+    queue.pause();
+    queue.endTurn();
+    expect(queue.paused).toBe(false);
+
+    // Turn 2: pause -> drop -> endTurn -> Turn 3 audio plays normally.
+    queue.drop();
+    queue.enqueue(ramp(1200, 100));
+    expect(queue.playing).toBe(true);
+    const turn2 = new Float32Array(240);
+    expect(queue.render(turn2)).toBe(240);
+    expect(turn2[0]).toBeCloseTo(100 / 1_000_000, 9);
+
+    queue.pause();
+    queue.drop();
+    queue.endTurn();
+    queue.enqueue(ramp(480, 900));
+    expect(queue.playing).toBe(true);
+    const turn3 = new Float32Array(QUANTUM);
+    expect(queue.render(turn3)).toBe(QUANTUM);
+    expect(turn3[0]).toBeCloseTo(900 / 1_000_000, 9);
+  });
+
   it("clears everything for a new session", () => {
     const queue = new PlaybackQueue();
     queue.enqueue(ramp(2400));

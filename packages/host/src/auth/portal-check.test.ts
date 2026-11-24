@@ -46,6 +46,7 @@ function tokens(generation: number): PortalTokens {
     orgId: "org_1",
     tenantId: "tnt_1",
     role: "member",
+    gatewayEndpoint: null,
   };
 }
 

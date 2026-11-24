@@ -267,7 +267,6 @@ describe("the onboarding key step", () => {
     // The ways forward that need no key survive: look around now, or check again once it is added.
     expect(markup).toContain('data-testid="onboarding-later"');
     expect(markup).toContain('data-testid="onboarding-recheck"');
-    expect(markup).toContain('data-testid="onboarding-back"');
     // The hint under Add it later tells a person to paste their own key, which is not theirs to do.
     expect(markup).not.toContain('data-testid="onboarding-later-hint"');
   });

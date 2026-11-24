@@ -165,8 +165,18 @@ export function pinnedLookup(pinnedHost: string, addresses: readonly ResolvedAdd
   };
 }
 
+export const SAFE_FETCH_TLS_OPTIONS = Object.freeze({
+  minVersion: "TLSv1.2" as const,
+  rejectUnauthorized: true,
+});
+
 export function pinnedAgent(hostname: string, addresses: readonly ResolvedAddress[]): Agent {
-  return new Agent({ connect: { lookup: pinnedLookup(hostname, addresses) } });
+  return new Agent({
+    connect: {
+      lookup: pinnedLookup(hostname, addresses),
+      ...SAFE_FETCH_TLS_OPTIONS,
+    },
+  });
 }
 
 export const defaultFetch = undiciFetch as unknown as typeof fetch;

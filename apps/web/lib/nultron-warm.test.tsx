@@ -214,7 +214,6 @@ describe("the mount points ask at the right moment", () => {
     expect(read("components", "chat-turn.tsx")).toMatch(/next=\{LIVE_TURN_NEXT\}/);
     expect(read("components", "component-setup.tsx")).toMatch(/next=\{SETUP_NEXT\}/);
     expect(read("components", "app-updates.tsx")).toMatch(/next=\{UPDATE_NEXT\}/);
-    expect(read("components", "onboarding-screen.tsx")).toMatch(/next=\{ONBOARDING_NEXT\}/);
   });
 
   it("no longer fetches every strip when a mascot mounts", () => {

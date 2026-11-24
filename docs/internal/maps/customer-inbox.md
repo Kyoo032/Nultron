@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-11-03, on top of a5a87c8 plus the keep-everything and erase change (Phase 1). Driven in Chromium against the local sandbox (`scripts/whatsapp-sandbox.ts`) on a stub-runtime desk, erase included; never driven against Meta or on a hosted server.
+Last verified: 2026-11-24 on `main`, for AES-256-GCM sealing of `customer_conversations.contact_name`, `last_message_preview`, and `customer_messages.text` in `packages/host/src/inbox/store.ts` (SR-193, with legacy plaintext fallback and full wrap-key rotation coverage). Before that: 2026-11-03, on top of a5a87c8 plus the keep-everything and erase change (Phase 1). Driven in Chromium against the local sandbox (`scripts/whatsapp-sandbox.ts`) on a stub-runtime desk, erase included; never driven against Meta or on a hosted server.
 
 ## Overview
 

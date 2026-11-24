@@ -4,6 +4,7 @@ export { getTenant, agentService } from "./tenant";
 export { loadSettings, saveSettings, adoptLegacySettings, loadOwnerLocale, saveOwnerLocale } from "./settings-store";
 export { getBootLocale, getSavedLocale, applySavedLocaleAsBoot, resetBootLocaleForTests } from "./locale-boot";
 export { getRunContext, withRunContext, localeForRun } from "./run-context";
+export { currentAssignedGatewayEndpoint, withAssignedGatewayEndpoint } from "./gateway-endpoint-scope";
 export type { RunContext } from "./run-context";
 export { readSelectedWorkspaceId, writeSelectedWorkspaceId, WORKSPACE_COOKIE } from "./workspace";
 export { jsonError, jsonOk } from "./errors";

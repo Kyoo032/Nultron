@@ -34,13 +34,14 @@ import { log } from "../log";
 import { chatHistoryFromRows, prepareChatRun } from "../runs";
 import { activeRuns, admitRun, runCapsFromEnv } from "../run-limits";
 import { withRunContext } from "../run-context";
+import { currentAssignedGatewayEndpoint, withAssignedGatewayEndpoint } from "../gateway-endpoint-scope";
 import { toolMediaModels } from "../selectable-models";
 import { listMessages } from "../threads";
 import { withToolRun } from "../tool-run-context";
 import { recordChatRunUsage, recordTokenUsage } from "../usage-record";
 import { withWorkerChannel } from "../workers/worker-channel";
 import { askCopy, speakable, tapSummary, voiceNote } from "./ask-speech";
-import { REQUEST_TAP_TOOL_KEY, ensureVoiceToolsRegistered, voiceBindings } from "./ask-tools";
+import { REQUEST_TAP_TOOL_KEY, ensureVoiceToolsRegistered, isVoiceReadTool, voiceBindings } from "./ask-tools";
 import type { VoiceLocale } from "./turns";
 
 export const ASK_NULTRON_TOOL_NAME = "ask_nultron";
@@ -87,10 +88,10 @@ export type AskInput = {
   readonly locale: VoiceLocale;
   readonly signal: AbortSignal;
   /**
-   * A delegated run's progress label (`Research agent`, a bot's name), for the relay's caption. UI
-   * only: it is never saved.
+   * A delegated run or read tool's progress label (`Research agent`, a bot's name, or a read tool status),
+   * for the relay's caption. UI only: it is never saved.
    */
-  readonly onProgress?: (label: string) => void;
+  readonly onProgress?: (label: string, kind?: "delegate" | "tool") => void;
 };
 
 /** No result within this long is a `timeout`. A voice turn that takes longer is no longer a conversation. */
@@ -307,6 +308,7 @@ export async function askNultron(input: AskInput, options: AskOptions = {}): Pro
         tainted: hasNonTextUserPart(history),
         locale,
       });
+      const announcedTools = new Set<string>();
       const onEvent = (event: RuntimeEvent) => {
         if (event.type === "run.probing") {
           state.contacted = true;
@@ -324,6 +326,11 @@ export async function askNultron(input: AskInput, options: AskOptions = {}): Pro
             status: "started",
             input: redactSecretsDeep(event.input),
           });
+        } else if (event.type === "tool.started" && isVoiceReadTool(event.toolKey)) {
+          if (!announcedTools.has(event.toolKey)) {
+            announcedTools.add(event.toolKey);
+            input.onProgress?.(copy.toolStatus(event.toolKey), "tool");
+          }
         } else if (event.type === "tool.completed" && event.toolKey === DELEGATE_TOOL_KEY) {
           const output = redactSecretsDeep(event.output);
           const last = [...toolCalls]
@@ -346,37 +353,39 @@ export async function askNultron(input: AskInput, options: AskOptions = {}): Pro
       // reaches it, and a `delegating` phase goes to the relay's caption. Everything else is ignored.
       // Each agent once: a delegation re-sends its phase on every heartbeat, and parallel ones interleave.
       const announced = new Set<string>();
-      await withToolRun({ runId, mode: prepared.agentPolicy ? prepared.agentPolicy.agent.id : "chat" }, () =>
-        withRunContext({ threadId: prepared.thread.id, agentId: prepared.thread.agentId, locale, voice: true }, () =>
-          runOutboundGuarded(outbound, () =>
-            withWorkerChannel(
-              {
-                emit: (_toolKey, job) => {
-                  if (job.type === "job.phase" && job.phase === "delegating" && !announced.has(job.label)) {
-                    announced.add(job.label);
-                    input.onProgress?.(job.label);
-                  }
-                },
-                signal: run.signal,
-              },
-              () =>
-                runtime.execute({
-                  tenant,
-                  runId,
-                  modality: "text",
-                  version: { ...prepared.version, systemPrompt: prepared.version.systemPrompt + voiceNote(locale) },
-                  bindings: voiceBindings(prepared.bindings),
-                  budget: VOICE_BUDGET,
-                  history,
-                  mediaPermission: prepared.mediaPermission,
-                  thinking: prepared.thinkingEnabled,
-                  reasoningEffort: prepared.reasoningEffort,
-                  reasoningEffortExplicit: prepared.reasoningEffortExplicit,
-                  wire: prepared.wire,
-                  locale,
+      await withAssignedGatewayEndpoint(tenant.gatewayEndpoint ?? currentAssignedGatewayEndpoint(), () =>
+        withToolRun({ runId, mode: prepared.agentPolicy ? prepared.agentPolicy.agent.id : "chat" }, () =>
+          withRunContext({ threadId: prepared.thread.id, agentId: prepared.thread.agentId, locale, voice: true }, () =>
+            runOutboundGuarded(outbound, () =>
+              withWorkerChannel(
+                {
+                  emit: (_toolKey, job) => {
+                    if (job.type === "job.phase" && job.phase === "delegating" && !announced.has(job.label)) {
+                      announced.add(job.label);
+                      input.onProgress?.(job.label, "delegate");
+                    }
+                  },
                   signal: run.signal,
-                  onEvent,
-                }),
+                },
+                () =>
+                  runtime.execute({
+                    tenant,
+                    runId,
+                    modality: "text",
+                    version: { ...prepared.version, systemPrompt: prepared.version.systemPrompt + voiceNote(locale) },
+                    bindings: voiceBindings(prepared.bindings),
+                    budget: VOICE_BUDGET,
+                    history,
+                    mediaPermission: prepared.mediaPermission,
+                    thinking: prepared.thinkingEnabled,
+                    reasoningEffort: prepared.reasoningEffort,
+                    reasoningEffortExplicit: prepared.reasoningEffortExplicit,
+                    wire: prepared.wire,
+                    locale,
+                    signal: run.signal,
+                    onEvent,
+                  }),
+              ),
             ),
           ),
         ),

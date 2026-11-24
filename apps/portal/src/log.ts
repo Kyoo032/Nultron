@@ -77,9 +77,82 @@ export function redactSecrets(value: string): string {
   return value.replace(JWT_PATTERN, REDACTED_MARKER).replace(LONG_TOKEN_PATTERN, REDACTED_MARKER);
 }
 
+const EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+const NPWP_DOTTED_RE = /\b\d{2}\.\d{3}\.\d{3}\.\d-\d{3}\.\d{3}\b/g;
+const NIK_PROVINCES = new Set([
+  "11", "12", "13", "14", "15", "16", "17", "18", "19", "21",
+  "31", "32", "33", "34", "35", "36", "51", "52", "53",
+  "61", "62", "63", "64", "65", "71", "72", "73", "74", "75", "76",
+  "81", "82", "91", "92", "93", "94", "95", "96", "99",
+]);
+const NIK_DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const;
+const NIK_BARE_RE = /(?<![\d.,-])\d{16}(?![\d.,-])/g;
+const LOCAL_PHONE_RE = /(?<![\d.,-])08\d{1,2}[\s.-]?\d{3,4}[\s.-]?\d{3,5}\b/g;
+const INTL_PHONE_RE = /(?:\+|00)\d{1,3}[\s.-]?\(?\d{2,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{3,4}(?:[\s.-]?\d{1,4})?/g;
+const CARD_CANDIDATE_RE = /\b(?:\d[ -]*?){13,19}\b/g;
+const CARD_PREFIX_RE = /^(?:4|5[1-5]|2[2-7]|34|37|6011|64[4-9]|65|35|30[0-5]|36|3[89]|62)/;
+
+function isLikelyNik(digits: string): boolean {
+  if (!NIK_PROVINCES.has(digits.slice(0, 2))) return false;
+  if (Number(digits.slice(2, 4)) === 0 || Number(digits.slice(4, 6)) === 0) return false;
+  const rawDay = Number(digits.slice(6, 8));
+  const day = rawDay > 40 ? rawDay - 40 : rawDay;
+  const month = Number(digits.slice(8, 10));
+  if (month < 1 || month > 12 || day < 1 || day > NIK_DAYS_IN_MONTH[month - 1]) return false;
+  const serial = Number(digits.slice(12));
+  return serial > 0 && serial % 1000 !== 0;
+}
+
+function passesLuhn(digits: string): boolean {
+  if (!/^\d{13,19}$/.test(digits)) return false;
+  let sum = 0;
+  let alt = false;
+  for (let i = digits.length - 1; i >= 0; i -= 1) {
+    let n = Number(digits[i]);
+    if (alt) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alt = !alt;
+  }
+  return sum % 10 === 0;
+}
+
+/** Lightweight standalone PII scrub (email, NPWP, NIK, phone, Luhn card) for portal logs. */
+export function scrubPii(value: string): string {
+  if (!value) {
+    return value;
+  }
+  return value
+    .replace(EMAIL_RE, "[email]")
+    .replace(NPWP_DOTTED_RE, "[npwp]")
+    .replace(NIK_BARE_RE, (match) => (isLikelyNik(match) ? "[nik]" : match))
+    .replace(LOCAL_PHONE_RE, (match) => {
+      const len = match.replace(/\D/g, "").length;
+      return len >= 10 && len <= 13 ? "[phone]" : match;
+    })
+    .replace(INTL_PHONE_RE, (match) => {
+      const len = match.replace(/\D/g, "").length;
+      return len >= 10 && len <= 15 ? "[phone]" : match;
+    })
+    .replace(CARD_CANDIDATE_RE, (match) => {
+      const digits = match.replace(/\D/g, "");
+      if (!passesLuhn(digits)) return match;
+      if (/[ -]/.test(match) || (CARD_PREFIX_RE.test(digits) && !/0{4}$/.test(digits))) {
+        return "[card]";
+      }
+      return match;
+    });
+}
+
+function sanitiseText(value: string): string {
+  return scrubPii(redactSecrets(value));
+}
+
 function sanitiseValue(value: unknown, depth: number): unknown {
   if (typeof value === "string") {
-    return redactSecrets(value);
+    return sanitiseText(value);
   }
   if (value === null || typeof value === "number" || typeof value === "boolean") {
     return value;
@@ -91,7 +164,7 @@ function sanitiseValue(value: unknown, depth: number): unknown {
     return undefined;
   }
   if (value instanceof Error) {
-    return redactSecrets(value.message ? `${value.name}: ${value.message}` : value.name);
+    return sanitiseText(value.message ? `${value.name}: ${value.message}` : value.name);
   }
   if (value instanceof Date) {
     return value.toISOString();
@@ -110,7 +183,7 @@ function sanitiseValue(value: unknown, depth: number): unknown {
   if (typeof value === "object") {
     return sanitiseFields(value as Record<string, unknown>, depth + 1);
   }
-  return redactSecrets(String(value));
+  return sanitiseText(String(value));
 }
 
 function sanitiseFields(fields: Readonly<Record<string, unknown>>, depth: number): Record<string, unknown> {
@@ -162,7 +235,7 @@ function resolveLevel(env: Readonly<Record<string, string | undefined>>): LogLev
 }
 
 export function formatLine(level: LogLevel, event: string, fields: LogFields): string {
-  const record = { ts: new Date().toISOString(), level, event: redactSecrets(event), ...sanitiseFields(fields, 0) };
+  const record = { ts: new Date().toISOString(), level, event: sanitiseText(event), ...sanitiseFields(fields, 0) };
   try {
     return JSON.stringify(record);
   } catch {

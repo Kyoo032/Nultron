@@ -419,7 +419,8 @@ function ensureAuthSessionTables(sqlite: Database.Database): void {
       absolute_expires_at integer NOT NULL,
       revoked_at integer,
       portal_checked_at integer,
-      refresh_sealed text
+      refresh_sealed text,
+      gateway_endpoint text
     );
     CREATE INDEX IF NOT EXISTS auth_sessions_user_seen_idx ON auth_sessions (user_id, last_seen_at);
     CREATE INDEX IF NOT EXISTS auth_sessions_expires_idx ON auth_sessions (expires_at);
@@ -433,6 +434,9 @@ function ensureAuthSessionTables(sqlite: Database.Database): void {
   }
   if (!have.has("refresh_sealed")) {
     sqlite.exec("ALTER TABLE `auth_sessions` ADD `refresh_sealed` text");
+  }
+  if (!have.has("gateway_endpoint")) {
+    sqlite.exec("ALTER TABLE `auth_sessions` ADD `gateway_endpoint` text");
   }
 }
 

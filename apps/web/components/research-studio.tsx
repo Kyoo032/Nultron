@@ -1,43 +1,38 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { Link } from "@/lib/nav";
+import { useMemo, useState, type FormEvent } from "react";
 import { ArtifactActions } from "@/components/artifact-actions";
 import { ArtifactPicker } from "@/components/artifact-picker";
 import { Confetti } from "@/components/confetti";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
-import { ExampleGallery } from "@/components/example-gallery";
 import { FormattedText } from "@/components/formatted-text";
 import { JobProgressList } from "@/components/job-progress";
-import { ModeHeader } from "@/components/mode-header";
+import { ModeIcon } from "@/components/mode-icons";
 import { ModelSelect } from "@/components/model-select";
-import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { NeedsKeyNote } from "@/components/needs-key-note";
-import { StudioEmptyDesk } from "@/components/studio-empty-desk";
-import { WorkingStatus } from "@/components/working-status";
 import { ResearchChecksNote } from "@/components/research-checks-note";
 import { ResearchPreview } from "@/components/research-preview";
+import { StudioEmptyDesk } from "@/components/studio-empty-desk";
+import { WorkingStatus } from "@/components/working-status";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { t } from "@/lib/i18n";
-import { PROMPT_ACTIONS, PROMPT_INPUT, PROMPT_ROW } from "@/lib/prompt-row";
+import { modelPickBody, studioModelPick } from "@/lib/model-choice";
+import { Link } from "@/lib/nav";
 import { researchChecksNote, type ResearchChecksNoteModel } from "@/lib/research-checks-view";
 import { researchNotesToMarkdown, type ResearchNotes } from "@/lib/research-notes";
+import { localizedLibrary } from "@/lib/ui-copy";
 import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { useJobModel } from "@/lib/use-job-model";
-import { modelPickBody, studioModelPick } from "@/lib/model-choice";
 import { useJobStream } from "@/lib/use-job-stream";
+import "@/components/studio-minimal.css";
 
 type ResearchResult = ResearchNotes & {
   artifactId: string | null;
   dossierId?: string | null;
   dossier?: { title: string; markdown: string };
-  /** The host's checks report. Read only through `researchChecksNote`, which accepts any shape. */
   checks?: unknown;
 };
 
-/**
- * What the studio shows: a fresh run (notes + dossier), or a reopened saved dossier (Markdown only).
- * Both carry what the checks still found, so a reopened dossier says it too.
- */
 type Shown =
   | {
       kind: "run";
@@ -56,20 +51,22 @@ function needsSettingsHint(message: string): boolean {
 
 function tabClass(active: boolean): string {
   return active
-    ? "select-row wash inline-flex h-8 items-center rounded-pill bg-[var(--accent)] px-3 text-xs font-medium text-[var(--surface)]"
-    : "wash inline-flex h-8 items-center rounded-lg border border-[var(--line)] bg-transparent px-3 text-xs text-[var(--text)] hover:bg-[var(--accent-soft)]";
+    ? "select-row wash inline-flex h-8 items-center rounded-pill bg-[var(--accent)] px-3.5 text-xs font-medium text-[var(--surface)]"
+    : "wash inline-flex h-8 items-center rounded-pill border border-[var(--line)] bg-transparent px-3.5 text-xs text-[var(--text)] hover:bg-[var(--accent-soft)]";
 }
 
 export function ResearchStudio() {
-  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key. Hosted only; false elsewhere.
   const needsKey = useHostedNeedsKey();
   const { models, model, pinned: modelPinned, setModel } = useJobModel("research");
   const job = useJobStream<ResearchResult>();
   const [prompt, setPrompt] = useState("");
+  const [selectedExampleId, setSelectedExampleId] = useState<string | null>(null);
   const [shown, setShown] = useState<Shown | null>(null);
   const [tab, setTab] = useState<Tab>("notes");
   const [landed, setLanded] = useState(0);
   const error = job.error?.message ?? null;
+
+  const starters = useMemo(() => localizedLibrary("research"), []);
 
   async function onGenerate(event: FormEvent) {
     event.preventDefault();
@@ -77,7 +74,6 @@ export function ResearchStudio() {
     if (!topic || job.busy || needsKey) {
       return;
     }
-    // Only a deliberate pick travels as pinned: a seeded default stays rescuable by the host's fallback.
     const result = await job.run("/api/v1/research/stream", {
       prompt: topic,
       ...modelPickBody(studioModelPick(model, modelPinned)),
@@ -98,40 +94,41 @@ export function ResearchStudio() {
 
   const title = shown?.kind === "run" ? shown.notes.title : (shown?.title ?? "");
   const markdown = shown?.kind === "run" ? shown.dossierMarkdown : (shown?.markdown ?? "");
+  const showStarters = !shown && !job.busy && starters.length > 0;
 
   return (
-    <main
-      data-mode="research"
-      className="flex min-h-full w-full flex-col px-6 py-4 text-[var(--text)]"
-      data-testid="research-studio"
-    >
-      <ModeHeader
-        icon="research"
-        title={t("research.title")}
-        outcome={t("research.expectedInputs")}
-        actions={
-          <ArtifactPicker
-            mode="research"
-            label={t("research.reopenSaved")}
-            disabled={job.busy}
-            testId="research-saved"
-            onPick={(artifact) => {
-              setShown({
-                kind: "saved",
-                title: artifact.title,
-                markdown: artifact.body,
-                artifactId: artifact.id,
-                checks: researchChecksNote(artifact.meta.checks),
-              });
-              setTab("dossier");
-            }}
-          />
-        }
-      />
+    <main data-mode="research" className="studio-shell" data-testid="research-studio">
+      <header className="studio-head">
+        <div className="studio-head-main">
+          <span className="studio-head-icon" aria-hidden="true">
+            <ModeIcon name="research" size={18} strokeWidth={1.75} />
+          </span>
+          <div className="min-w-0">
+            <h1 className="studio-head-title">{t("research.title")}</h1>
+            <p className="studio-head-sub">{t("research.expectedInputs")}</p>
+          </div>
+        </div>
+        <ArtifactPicker
+          mode="research"
+          label={t("research.reopenSaved")}
+          disabled={job.busy}
+          testId="research-saved"
+          onPick={(artifact) => {
+            setShown({
+              kind: "saved",
+              title: artifact.title,
+              markdown: artifact.body,
+              artifactId: artifact.id,
+              checks: researchChecksNote(artifact.meta.checks),
+            });
+            setTab("dossier");
+          }}
+        />
+      </header>
 
       {error && !isGatewayBlockedText(error) ? (
         <div
-          className="mt-6 rounded-lg border border-[var(--line)] px-4 py-3 text-sm text-[var(--danger)]"
+          className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--danger)]"
           role="alert"
           data-testid="research-error"
         >
@@ -147,22 +144,25 @@ export function ResearchStudio() {
         </div>
       ) : null}
 
-      <ExampleGallery mode="research" onSelect={(entry) => setPrompt(entry.prompt)} />
-
       <form
-        className="mt-6 space-y-2 rounded-xl border border-[var(--line)] bg-transparent p-3"
+        className="studio-composer"
         onSubmit={(event) => void onGenerate(event)}
         data-testid="research-studio-prompt-bar"
       >
-        <ModelSelect
-          models={models}
-          value={model}
-          onChange={setModel}
-          disabled={job.busy || models.length === 0}
-          testId="research-studio-model"
-          className="select-field w-full"
-        />
-        <div className={PROMPT_ROW}>
+        <div className="studio-composer-top">
+          <input
+            type="text"
+            value={prompt}
+            onChange={(event) => {
+              setPrompt(event.target.value);
+              setSelectedExampleId(null);
+            }}
+            className="studio-composer-input"
+            placeholder={t("research.promptPlaceholder")}
+            disabled={job.busy}
+            data-testid="research-prompt"
+            aria-label={t("research.promptAria")}
+          />
           <EnhancePromptButton
             text={prompt}
             surface="research"
@@ -171,96 +171,125 @@ export function ResearchStudio() {
             testId="research-enhance"
             onApply={setPrompt}
           />
-          <input
-            type="text"
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            className={PROMPT_INPUT}
-            placeholder={t("research.promptPlaceholder")}
-            disabled={job.busy}
-            data-testid="research-prompt"
-            aria-label={t("research.promptAria")}
-          />
-          <div className={PROMPT_ACTIONS}>
-            {job.busy ? (
-              <button
-                type="button"
-                className="wash inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-[var(--line)] bg-transparent px-3 text-xs text-[var(--text)] hover:bg-[var(--accent-soft)] disabled:opacity-45"
-                onClick={job.cancel}
-                data-testid="research-cancel"
-              >
-                {t("research.cancel")}
-              </button>
-            ) : null}
+          {job.busy ? (
             <button
-              type="submit"
-              className="btn btn-primary h-8 shrink-0 rounded-pill px-4"
-              disabled={job.busy || !prompt.trim() || needsKey}
-              data-testid="research-generate"
+              type="button"
+              className="studio-pill-toggle"
+              onClick={job.cancel}
+              data-testid="research-cancel"
             >
-              {job.busy ? <WorkingStatus label={t("research.working")} /> : t("research.generate")}
+              {t("research.cancel")}
             </button>
-          </div>
+          ) : null}
+          <button
+            type="submit"
+            className="btn btn-primary h-9 shrink-0 rounded-pill px-4"
+            disabled={job.busy || !prompt.trim() || needsKey}
+            data-testid="research-generate"
+          >
+            {job.busy ? <WorkingStatus label={t("research.working")} /> : t("research.generate")}
+          </button>
         </div>
-        {needsKey ? <NeedsKeyNote testId="research-needs-key" /> : null}
+
+        <div className="studio-composer-bar">
+          <ModelSelect
+            models={models}
+            value={model}
+            onChange={setModel}
+            disabled={job.busy || models.length === 0}
+            testId="research-studio-model"
+            variant="pill"
+            prefix={t("research.modelLabel")}
+            ariaLabel={t("research.modelLabel")}
+          />
+        </div>
+
+        {needsKey ? (
+          <div className="studio-composer-notes">
+            <NeedsKeyNote testId="research-needs-key" />
+          </div>
+        ) : null}
       </form>
 
-      {job.busy || (job.progress.phases.length > 0 && !shown) ? (
-        <div className="mt-6">
-          <JobProgressList progress={job.progress} busy={job.busy} mode="research" testId="research-progress" elapsed />
+      {showStarters ? (
+        <div
+          className="studio-chips-row"
+          aria-label={t("research.examplesHeading")}
+          data-testid="example-gallery"
+        >
+          {starters.map((entry) => (
+            <button
+              key={entry.exampleId}
+              type="button"
+              className="studio-chip"
+              data-testid="example-card"
+              data-example-id={entry.exampleId}
+              aria-pressed={selectedExampleId === entry.exampleId}
+              title={entry.resultSummary}
+              disabled={job.busy}
+              onClick={() => {
+                setSelectedExampleId(entry.exampleId);
+                setPrompt(entry.prompt);
+              }}
+            >
+              {entry.title}
+            </button>
+          ))}
         </div>
+      ) : null}
+
+      {job.busy || (job.progress.phases.length > 0 && !shown) ? (
+        <JobProgressList progress={job.progress} busy={job.busy} mode="research" testId="research-progress" elapsed />
       ) : null}
 
       {shown || job.busy || job.progress.phases.length > 0 ? null : <StudioEmptyDesk mode="research" />}
 
       {shown ? (
-        <div className="mt-8">
-          <div className="enter-rise relative space-y-4">
-            {landed > 0 ? <Confetti key={landed} /> : null}
-            <ArtifactActions
-              title={title}
-              markdown={markdown}
-              artifactId={shown.artifactId}
-              kbType="Dossier"
-              disabled={job.busy}
-              testIdPrefix="research"
-            />
-            <ResearchChecksNote note={shown.checks} />
-            {shown.kind === "run" ? (
-              <div className="flex gap-2" role="tablist" data-testid="research-tabs">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === "notes"}
-                  className={tabClass(tab === "notes")}
-                  onClick={() => setTab("notes")}
-                  data-testid="research-tab-notes"
-                >
-                  {t("research.tabNotes")}
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === "dossier"}
-                  className={tabClass(tab === "dossier")}
-                  onClick={() => setTab("dossier")}
-                  data-testid="research-tab-dossier"
-                >
-                  {t("research.tabDossier")}
-                </button>
-              </div>
-            ) : null}
-            {shown.kind === "run" && tab === "notes" ? (
-              <ResearchPreview notes={shown.notes} />
-            ) : (
-              <article
-                className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-8 py-10"
-                data-testid="research-dossier-preview"
+        <div className="enter-rise relative space-y-4 pt-2">
+          {landed > 0 ? <Confetti key={landed} /> : null}
+          <ArtifactActions
+            title={title}
+            markdown={markdown}
+            artifactId={shown.artifactId}
+            kbType="Dossier"
+            disabled={job.busy}
+            testIdPrefix="research"
+          />
+          <ResearchChecksNote note={shown.checks} />
+          {shown.kind === "run" ? (
+            <div className="flex gap-2" role="tablist" data-testid="research-tabs">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "notes"}
+                className={tabClass(tab === "notes")}
+                onClick={() => setTab("notes")}
+                data-testid="research-tab-notes"
               >
-                <FormattedText text={markdown} className="text-sm leading-relaxed text-[var(--text-2)]" />
-              </article>
-            )}
-          </div>
+                {t("research.tabNotes")}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "dossier"}
+                className={tabClass(tab === "dossier")}
+                onClick={() => setTab("dossier")}
+                data-testid="research-tab-dossier"
+              >
+                {t("research.tabDossier")}
+              </button>
+            </div>
+          ) : null}
+          {shown.kind === "run" && tab === "notes" ? (
+            <ResearchPreview notes={shown.notes} />
+          ) : (
+            <article
+              className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-8 py-10"
+              data-testid="research-dossier-preview"
+            >
+              <FormattedText text={markdown} className="text-sm leading-relaxed text-[var(--text-2)]" />
+            </article>
+          )}
         </div>
       ) : null}
     </main>

@@ -1,4 +1,5 @@
 /** Argument parsing for `pnpm --filter @agentforge/portal invite`. Its own file so the issuing stays testable. */
+import { InvalidGatewayEndpointError, normaliseGatewayEndpoint } from "../gateway-endpoint";
 
 export const INVITE_DEFAULT_TTL_DAYS = 7;
 export const INVITE_MAX_TTL_DAYS = 30;
@@ -28,6 +29,8 @@ export interface InviteArgs {
   readonly language: InviteLanguage;
   /** Print the code too. Off by default: it is e-mailed, and exists nowhere else. */
   readonly printCode: boolean;
+  /** Operator-assigned API gateway base URL, or `null` when omitted (uses default pinned gateway). */
+  readonly gatewayEndpoint: string | null;
 }
 
 export class InviteArgsError extends Error {
@@ -57,6 +60,8 @@ Options:
                       has to be --role owner. For an address that is already an active member this
                       CHANGES their role instead of inviting them.
   --lang <en|id>      Language of the invite e-mail                (default: en)
+  --gateway-endpoint <url>
+                      Optional operator-assigned API gateway base URL for this person (HTTPS).
   --print             Also print the code, once. For an operator who has to hand it over another
                       way. Without it the code exists only in the e-mail.`;
 
@@ -134,6 +139,19 @@ ${INVITE_USAGE}`);
     throw new InviteArgsError(`--lang must be en or id; got ${JSON.stringify(language)}`);
   }
 
+  const gatewayRaw = values.get("gateway-endpoint");
+  let gatewayEndpoint: string | null = null;
+  if (gatewayRaw !== undefined) {
+    try {
+      gatewayEndpoint = normaliseGatewayEndpoint(gatewayRaw);
+    } catch (error) {
+      if (error instanceof InvalidGatewayEndpointError) {
+        throw new InviteArgsError(`${error.message}\n\n${INVITE_USAGE}`);
+      }
+      throw error;
+    }
+  }
+
   const orgSlug = values.get("org-slug")?.trim().toLowerCase();
   return Object.freeze({
     email,
@@ -143,5 +161,6 @@ ${INVITE_USAGE}`);
     role: (roleRaw as InviteRole | undefined) ?? null,
     language,
     printCode: flags.has("print"),
+    gatewayEndpoint,
   });
 }

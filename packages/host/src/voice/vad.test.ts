@@ -675,3 +675,35 @@ describe("long.wav and the early send", () => {
     expect(utterances(events)).toHaveLength(1);
   });
 });
+
+describe("immediateOnset (push-to-talk calibration)", () => {
+  it("does not let loud initial speech on frame 0 push the floor up and suppress speech_start", () => {
+    // Frame 0 starts loud at 0.08 RMS (which in default mode pushes floor to 0.03 and startBar to 0.09,
+    // suppressing subsequent 0.05 RMS speech), followed by 0.05 RMS speech and trailing silence.
+    const loudStart = tone(80, 300, 0.08);
+    const body = tone(250, 350, 0.05);
+    const clip = concat(loudStart, body, silence(500));
+
+    // Default hands-free mode calibrates on the first 50 ms and raises the bar above 0.05.
+    const defaultResult = feed(clip);
+    expect(defaultResult.events.some((e) => e.type === "speech_start")).toBe(false);
+
+    // Push-to-talk immediateOnset skips the 50 ms calibration and detects speech from frame 0.
+    const pttResult = feed(clip, 1920, { immediateOnset: true });
+    const found = utterances(pttResult.events);
+    expect(found).toHaveLength(1);
+    expect(found[0]?.startMs).toBe(0);
+  });
+
+  it("can toggle immediateOnset dynamically via setImmediateOnset", () => {
+    const vad = createVad();
+    vad.setImmediateOnset(true);
+    const clip = concat(tone(250, 400, 0.05), silence(500));
+    const events: VadEvent[] = [];
+    for (let i = 0; i < clip.length; i += 1920) {
+      events.push(...vad.push(clip.subarray(i, i + 1920)));
+    }
+    expect(events.map((e) => e.type)).toEqual(["speech_start", "speech_end"]);
+    expect(events[0]?.atMs).toBe(0);
+  });
+});

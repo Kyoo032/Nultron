@@ -4,6 +4,7 @@ import type { RetrievedChunk, RetrieveResult } from "./knowledge/backend";
 import { getGraph } from "./knowledge-graph";
 import { ftsSourceFilter } from "./knowledge-text";
 import { sourceIsVisible } from "./knowledge-visibility";
+import { openThreadTitle } from "./thread-title-seal";
 import { log } from "./log";
 
 /**
@@ -149,9 +150,10 @@ function firstChunkOf(tenant: TenantContext, sourceId: string): { body: string; 
       return null;
     }
     const source = sql
-      .prepare("SELECT name FROM knowledge_sources WHERE workspace_id = ? AND id = ?")
-      .get(tenant.workspaceId, sourceId) as { name: string } | undefined;
-    return { body: row.body, name: source?.name ?? sourceId };
+      .prepare("SELECT name, origin_kind FROM knowledge_sources WHERE workspace_id = ? AND id = ?")
+      .get(tenant.workspaceId, sourceId) as { name: string; origin_kind: string | null } | undefined;
+    const name = source ? (source.origin_kind === "thread" ? openThreadTitle(source.name) : source.name) : sourceId;
+    return { body: row.body, name };
   } catch (error) {
     log.warn("knowledge_expand_chunk_read_failed", {
       sourceId,

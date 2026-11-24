@@ -114,5 +114,6 @@
     "format": "format {asked} → {used}"
   },
   "sent": "Dibuat dengan {summary}.",
-  "unverified": "Sebagian nilai untuk model ini berasal dari API vendor, bukan dari gateway, dan belum diperiksa di sini."
+  "unverified": "Sebagian nilai untuk model ini berasal dari API vendor, bukan dari gateway, dan belum diperiksa di sini.",
+  "modelLabel": "Model"
 }

@@ -8,24 +8,22 @@ Turn the push guard on once per clone with `pnpm hooks:install`. It writes `core
 
 | Folder | Branch | What it is | Webdev |
 |---|---|---|---|
-| `C:\Users\rizky\agentforge` and worktrees `C:\Users\rizky\agentforge-<topic>` | `main`, or a branch cut from `main` | Published code. Every release and deploy comes from here. | `:3000` |
-| `C:\Users\rizky\agentforge-chat` | `tester/chat-first` | Tester = staging. New work lands here first. Read `TESTER.md`. | `:3200` |
+| `C:\Users\rizky\Documents\nultron` (or `C:\Users\rizky\agentforge`) and worktrees `nultron-<topic>` / `agentforge-<topic>` | `main`, or a branch cut from `main` | Active development & published code. **All production updates, fixes, and new features go into `main` (Rizky, 2026-11-24).** | `:3000` |
+| `C:\Users\rizky\agentforge-chat` | `tester/chat-first` | **Paused until live (Rizky, 2026-11-24).** Not needed and owes no sync step until Rizky explicitly re-enables it. | `:3200` |
 
-- **Stage (Rizky, 2026-10-14).** The tester is the staging code at every stage.
-- **Staging instance.** Nultron's tester stages on the tester's staging subdomain (name pending). `TESTER.md`, "Staging instance", has the detail.
+- **Main-first rapid iteration (Rizky, 2026-11-24).** While pushing updates and features rapidly before going live, `tester/chat-first` is paused and not needed until Rizky says so. All updates, features, UI/UX changes, voice work, and security work land directly on `main` (directly or via branches cut from `main`). No tester sync step is owed after merging to `main` while tester is paused.
+- **Stage (Rizky, 2026-10-14; paused 2026-11-24).** When re-enabled after live launch, the tester returns as the staging code (`TESTER.md`).
 - **The tester is OPC only (Rizky, 2026-10-15; stripped 2026-10-16, repo split P5b).** The team board, collective Workspaces, versioned documents and the document tools, quota and the company gateway management token, the enterprise shell, prompt-made agents, people names, paid media approval and per-person file privacy were removed from `tester/chat-first`. What stays there beyond `main`: the chat-first bots shell, the four model choices (K-D31, on the `opc` profile), stored pictures as input (F3) and chat upload originals (U1). Their old tables stay orphaned in existing databases, with no DROP. Do not build any of the removed features here.
 
 ## Where a change goes
 
 | The change | Cut the branch from | Work in | Pull request to | Still owed before it counts as done |
 |---|---|---|---|---|
-| A bug seen on the live app, the preview or `:3000` | `main` | a worktree `agentforge-<topic>` | `main` | merge `origin/main` into the tester + `ci:local` there |
-| A new feature or a behaviour change | `tester/chat-first` | `agentforge-chat` | none at first (commit on the tester) | a drive on the staging instance (the tester's staging subdomain, name pending), then a promotion pull request Rizky approves |
-| A bug in a feature that exists only in the tester | `tester/chat-first` | `agentforge-chat` | none | a drive on the staging instance (the tester's staging subdomain, name pending) |
-| Docs, maps, skills about shared code | `main` | a worktree | `main` | merge into the tester |
-| A release or a deploy | `main` only | `agentforge` | none | Rizky's go at that moment |
+| Any feature, UI/UX update, behaviour change, bug fix, or security work | `main` (or direct on `main` when rapid-iterating) | `nultron` or a worktree `nultron-<topic>` | `main` | `ci:local` / tests passing (tester sync paused until live) |
+| Docs, maps, skills about shared code | `main` | `nultron` or a worktree | `main` | none while tester is paused |
+| A release or a deploy | `main` only | `nultron` / `agentforge` | none | Rizky's go at that moment |
 
-Never: a fix pull request from `tester/chat-first`; a release from `C:\Users\rizky\agentforge-chat`; a hand fix in two places.
+Never: a release from `C:\Users\rizky\agentforge-chat`; a hand fix in two places. (When Rizky re-enables `tester/chat-first` after going live, restore the tester staging rows and post-merge sync step.)
 
 ## Which product a change reaches
 
@@ -110,14 +108,14 @@ The plan is [`docs/internal/chat-first-plan.md`](docs/internal/chat-first-plan.m
 
 **No team privacy rules here (2026-10-15).** A Nultron desk has one owner, so team rules (per-person Knowledge Bases, company-wide desks, sharing through a bot, leavers) are not built here. What `main` already enforces on a hosted desk stays as built: a Chat card is visible only to the person who owns its thread, the owner and admins included (`knowledge-visibility.ts`, [`knowledge-flows.md`](docs/internal/maps/knowledge-flows.md) § 7), and each person's chat uploads folder is their own ([`chat-documents.md`](docs/internal/maps/chat-documents.md)). The build focus is the chat and several agents working together.
 
-### Lanes: main and the tester (Rizky, 2026-10-06, 2026-10-09, 2026-10-14, 2026-10-15; must follow)
+### Lanes: main and the tester (Rizky, 2026-10-06, 2026-10-09, 2026-10-14, 2026-10-15, updated 2026-11-24; must follow)
 
 The tables at the top say where a change is cut, made and merged. This section keeps the rules behind them. The working form is [`docs/internal/maps/release-and-sync-lanes.md`](docs/internal/maps/release-and-sync-lanes.md).
 
-- **Lanes.** `main` is the published code: Nultron as the OPC web app. The tester (`C:\Users\rizky\agentforge-chat`, `tester/chat-first`) is the staging code at every stage. Nultron Personal is retired (2026-10-14): no sync step is owed to it, and no release is cut from it.
-- **One place to fix.** A bug fix is a pull request to `main` from a branch cut from `main`. Never fix by hand in `C:\Users\rizky\agentforge-chat`, and never open a fix pull request from `tester/chat-first`. Tester work reaches `main` only through a promotion pull request Rizky approves.
-- **Two codes, one way.** Changes move one way, from `main` into `tester/chat-first`: `git fetch origin`, then `git merge origin/main` in `C:\Users\rizky\agentforge-chat`. Never run a release from `C:\Users\rizky\agentforge-chat`. Its webdev uses port 3200 and its own data folder, so it never shares a database with `:3000`. The precise map (which change goes where, which files the tester may edit) is Rizky's vault note `C:\Users\rizky\Documents\Obsidian\40-Dev\nultron-two-codes-map.md`. Keep it current in the same session as any change to the split.
-- **After a pull request merges to `main`, in this order:** (1) merge `origin/main` into `C:\Users\rizky\agentforge-chat` and run `ci:local`; (2) release Enterprise only when Rizky says. A fix is not done for a lane until its step has run. The pull request says which lanes are still owed.
+- **Lanes (updated 2026-11-24).** `main` is the single active lane for all production updates, features, and fixes while iterating rapidly before live launch. The tester (`C:\Users\rizky\agentforge-chat`, `tester/chat-first`) is **paused until live** (until Rizky explicitly says to re-enable it), so no new work goes to `tester/chat-first` and no post-merge tester sync is owed right now. Nultron Personal is retired (2026-10-14): no sync step is owed to it, and no release is cut from it.
+- **One place to work.** All fixes, features, UI/UX changes, voice updates, and security hardening land on `main` (directly or via a branch cut from `main`). Never run a release from `C:\Users\rizky\agentforge-chat`.
+- **Two codes, one way (when tester is active).** Once Rizky re-enables `tester/chat-first` after live launch, changes move one way from `main` into `tester/chat-first` (`git fetch origin`, then `git merge origin/main` in `C:\Users\rizky\agentforge-chat`), and tester work reaches `main` only through a promotion PR Rizky approves. Its webdev uses port 3200 and its own data folder, so it never shares a database with `:3000`. The precise map is Rizky's vault note `C:\Users\rizky\Documents\Obsidian\40-Dev\nultron-two-codes-map.md`.
+- **After a change merges to `main`:** (1) Tester sync is **paused until live** (skip until Rizky re-enables it); (2) release Enterprise only when Rizky says.
 - **Shared code never names the gateway (Rizky, 2026-10-17).** Shared code and copy never hard-code `Toko Token`; they read `gatewayName`. `Nultron` may be typed: after the 2026-10-15 split this repo is the Nultron core, and `lane-guard` ratchets only `Toko Token`. `Kyoo032/hyp-ai` is a standalone codebase: nothing syncs between the two repos, a fix needed in both is made in each by hand, and brand code never comes into this repo. A difference between lanes is a setting (`PORTAL_SIGNIN_MODE`, the edge mode), not a fork.
 - **No edge on Nultron.** Nultron keeps its direct two-name setup with its own certificates and uses no Cloudflare edge. Sign-in is a portal setting, `PORTAL_SIGNIN_MODE`, with two defaults. The portal's own default, when the variable is unset, is the e-mailed one-time code (`apps/portal/src/config.ts:256-259`). The Enterprise deploy bundle sets `password` (`ENV_DEFAULTS` at `scripts/release-web.mjs:124`, written into the bundle's `portal.env.example` by `portalEnvExample()` at `:298`, tested at `scripts/release-web.test.mjs:583`; the source stack's `webapp-deploy/portal.env.example:67` matches; PR #145, 2026-10-09), so a hosted Nultron signs people in with a username and a password unless the operator sets `code`.
 - **Label what a change touches.** In a pull request and in `unreleased.md`, name the lanes with the tokens `lanes.json` reads: `enterprise` and `tester`. The retired `personal` token (owes nothing) is left only on the `apps/desktop` entries, because it is the one lane those paths reach. Shared code defaults to `enterprise` and `tester`. The guard checks only that a `Lanes:` line exists, not which tokens it names.

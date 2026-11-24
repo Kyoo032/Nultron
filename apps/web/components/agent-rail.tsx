@@ -8,6 +8,7 @@ import { RAIL_PANEL_ID, RailLink, RailMenuButton, RailToggle, type Tip } from "@
 import { BrandMark } from "@/components/brand-mark";
 import { DeskBuddyChip, DeskBuddyDock } from "@/components/desk-buddy";
 import { ModeIcon, isModeIconName, type ModeIconName } from "@/components/mode-icons";
+import { isSettingsHubPath } from "@/components/settings-shell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { productMonogram } from "@/components/app-shell";
 import { t } from "@/lib/i18n";
@@ -68,15 +69,21 @@ export type AgentRailViewProps = {
   onDismiss?: () => void;
 };
 
+/**
+ * Minimal bottom account group: Knowledge Base and the unified Settings hub (which hosts General,
+ * Agents, Team, Channels, Customers, and Usage under one entry point).
+ */
 const ACCOUNT_LINKS: ReadonlyArray<{ href: string; icon: ModeIconName; testId: string; labelKey: string }> = [
   { href: "/knowledge", icon: "knowledge", testId: "mode-knowledge", labelKey: "rail.knowledge" },
-  { href: "/channels", icon: "channels", testId: "channels-link", labelKey: "rail.channels" },
-  { href: "/customers", icon: "customers", testId: "customers-link", labelKey: "rail.customers" },
-  { href: "/team", icon: "workspaces", testId: "team-link", labelKey: "rail.team" },
-  { href: "/workspaces", icon: "workspaces", testId: "workspaces-link", labelKey: "agents.rail.manage" },
-  { href: "/usage", icon: "usage", testId: "usage-link", labelKey: "rail.usage" },
   { href: "/settings", icon: "settings", testId: "settings-link", labelKey: "rail.settings" },
 ];
+
+function isAccountLinkActive(href: string, pathname: string): boolean {
+  if (href === "/settings") {
+    return isSettingsHubPath(pathname);
+  }
+  return pathname.startsWith(href);
+}
 
 /** The generalist is the one agent every desk has, so a host answer that lacks it still gets a tile. */
 const FALLBACK_GENERALIST: VirtualAgentInfo = {
@@ -130,7 +137,7 @@ export function AgentRailView({
   const waiting = !loaded && agents.length === 0;
   const list = agents.some((agent) => agent.generalist) ? agents : [FALLBACK_GENERALIST, ...agents];
   const here = list.find((agent) => agent.id === activeId);
-  const page = here ? undefined : ACCOUNT_LINKS.find((item) => pathname.startsWith(item.href));
+  const page = here ? undefined : ACCOUNT_LINKS.find((item) => isAccountLinkActive(item.href, pathname));
   const brandTitle = assistantName ?? productName;
 
   const renderAgent = (agent: VirtualAgentInfo) => (
@@ -243,7 +250,7 @@ export function AgentRailView({
               label={t(item.labelKey)}
               testId={item.testId}
               mode={item.icon}
-              active={pathname.startsWith(item.href)}
+              active={isAccountLinkActive(item.href, pathname)}
               collapsed={collapsed}
               onTip={onTip}
               onTipEnd={onTipEnd}

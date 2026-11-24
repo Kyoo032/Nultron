@@ -473,6 +473,24 @@ describe("scanFinanceTablePii(figuresText)", () => {
     });
     expect(redacted).toBe("Transfer ke [email], No. Rekening: [account], HP [phone]");
   });
+
+  it("masks 16-digit NIKs in headerless pipe-delimited rows without touching amounts (SR-187)", () => {
+    const text = [
+      "1 | 3273010101900001 | 8.500.000",
+      "2 | 3273014107950123 | 12.000.000",
+    ].join("\n");
+    const { redacted, hits } = scanFinanceTablePii({ figuresText: text });
+    expect(redacted).toBe(["1 | [nik] | 8.500.000", "2 | [nik] | 12.000.000"].join("\n"));
+    expect(hits.map((hit) => hit.kind)).toEqual(["nik", "nik"]);
+
+    const noIndexCol = ["3273010101900001 | 1.250.000.000", "3273014107950123 | 2.500.000.000"].join("\n");
+    expect(scanFinanceTablePii({ figuresText: noIndexCol }).redacted).toBe(
+      ["[nik] | 1.250.000.000", "[nik] | 2.500.000.000"].join("\n"),
+    );
+
+    const singleLine = "1 | 3273010101900001 | 8.500.000";
+    expect(scanFinanceTablePii({ figuresText: singleLine }).redacted).toBe("1 | [nik] | 8.500.000");
+  });
 });
 
 describe("scanFinanceTablePii(lineItems)", () => {

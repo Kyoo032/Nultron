@@ -53,6 +53,7 @@ export type VoiceViewState = {
   readonly phase: VoicePhase;
   readonly state: VoiceState;
   readonly mode: VoiceMode;
+  readonly muted: boolean;
   readonly captions: readonly VoiceCaption[];
   readonly card: VoiceCardView | null;
   readonly endReason: VoiceEndReason | null;
@@ -73,6 +74,7 @@ export function initialVoiceViewState(mode: VoiceMode = "hands_free"): VoiceView
     phase: "closed",
     state: "connecting",
     mode,
+    muted: false,
     captions: [],
     card: null,
     endReason: null,
@@ -96,8 +98,11 @@ export type VoiceViewAction =
   | { readonly type: "dropped" }
   | { readonly type: "backgrounded" }
   | { readonly type: "mode"; readonly value: VoiceMode }
+  | { readonly type: "muted"; readonly value: boolean }
   /** The person tapped the card and its prompt went to Chat. */
-  | { readonly type: "card_started" };
+  | { readonly type: "card_started" }
+  /** The person dismissed the card without ending voice. */
+  | { readonly type: "dismiss_card" };
 
 /** The turn a caption id belongs to: the host names them `u3`, `a3` and `ack3` for turn 3. Null for any other id. */
 function turnOf(id: string): number | null {
@@ -175,8 +180,12 @@ export function voiceViewReducer(state: VoiceViewState, action: VoiceViewAction)
       return { ...initialVoiceViewState(state.mode), saved: state.saved };
     case "mode":
       return { ...state, mode: action.value };
+    case "muted":
+      return { ...state, muted: action.value };
     case "card_started":
       return state.card ? { ...state, card: { ...state.card, started: true } } : state;
+    case "dismiss_card":
+      return state.card ? { ...state, card: null } : state;
     case "frame":
       // A session that has ended takes nothing more: a frame that was in flight when the socket closed
       // must not bring it back to life.

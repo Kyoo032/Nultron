@@ -52,7 +52,7 @@
  * `AGENTFORGE_PORTAL_URL` (never from user input), and no token, code, state or client secret is
  * ever logged or put in an error message.
  */
-import { assertAllowedEndpointUrl, parsePortalRole } from "@agentforge/core";
+import { assertAllowedEndpointUrl, normalizeAssignedGatewayEndpoint, parsePortalRole } from "@agentforge/core";
 import type { EnvLike, PortalRole } from "@agentforge/core";
 import { isAuthReason, type AuthReason } from "./session";
 
@@ -90,6 +90,12 @@ export type PortalTokens = {
    * claim is deliberately not read: the body is the portal's answer to this call.
    */
   readonly role: PortalRole | null;
+  /**
+   * Operator-assigned API gateway base URL from `gateway_endpoint`, normalised and validated
+   * (`normalizeAssignedGatewayEndpoint`), or `null` to use the host's default pinned gateway.
+   * Never writable by regular users; refreshed on every token rotation.
+   */
+  readonly gatewayEndpoint: string | null;
 };
 
 /**
@@ -284,6 +290,8 @@ function toTokens(body: unknown): PortalTokens {
     tenantId,
     // Exact match against the three values; anything else, or nothing, is no role.
     role: parsePortalRole(record.role),
+    // Operator-assigned per-user gateway endpoint; invalid or absent values fall back to default (`null`).
+    gatewayEndpoint: normalizeAssignedGatewayEndpoint(record.gateway_endpoint),
   };
 }
 
@@ -395,6 +403,7 @@ const FAKE_TOKENS: PortalTokens = {
   // The least privilege, like every default in this repo's hosted path. A case that needs an owner or
   // an admin says so (`createFakePortalClient({ tokens: { role: "owner" } })`).
   role: "member",
+  gatewayEndpoint: null,
 };
 
 /**

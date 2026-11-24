@@ -156,48 +156,35 @@ describe("AgentRailView before the host answers", () => {
 });
 
 describe("AgentRailView account group", () => {
-  it("lists the seven account pages in order with the published test ids", () => {
+  it("lists only Knowledge and Settings in the calm account group", () => {
     const html = markup({ pathname: "/settings", activeId: null });
     const group = html.slice(
       html.indexOf('data-testid="rail-account-group"'),
       html.indexOf('data-testid="rail-footer"'),
     );
     const tags = links(group);
-    expect(tags.map((tag) => attr(tag, "data-testid"))).toEqual([
-      "mode-knowledge",
-      "channels-link",
-      "customers-link",
-      "team-link",
-      "workspaces-link",
-      "usage-link",
-      "settings-link",
-    ]);
-    expect(tags.map((tag) => attr(tag, "href"))).toEqual([
-      "/knowledge",
-      "/channels",
-      "/customers",
-      "/team",
-      "/workspaces",
-      "/usage",
-      "/settings",
-    ]);
+    expect(tags.map((tag) => attr(tag, "data-testid"))).toEqual(["mode-knowledge", "settings-link"]);
+    expect(tags.map((tag) => attr(tag, "href"))).toEqual(["/knowledge", "/settings"]);
     expect(tags.filter((tag) => attr(tag, "aria-current") === "page").map((tag) => attr(tag, "data-testid"))).toEqual([
       "settings-link",
     ]);
   });
 
-  it("calls the manage page Virtual agents, and never says Workspaces", () => {
-    const html = markup();
-    const tag = links(html).find((entry) => attr(entry, "data-testid") === "workspaces-link") ?? "";
-    expect(attr(tag, "aria-label")).toBe("Virtual agents");
-    expect(wording(html)).not.toMatch(/Workspaces/i);
-  });
+  it.each(["/settings", "/workspaces", "/team", "/channels", "/customers", "/usage"])(
+    "highlights Settings as active when visiting %s",
+    (path) => {
+      const html = markup({ pathname: path, activeId: null });
+      const current = links(html).filter((tag) => attr(tag, "aria-current") === "page");
+      expect(current.map((tag) => attr(tag, "data-testid"))).toEqual(["settings-link"]);
+    },
+  );
 
-  it("speaks Indonesian when the desk does", () => {
+  it("never prints Workspaces in either language", () => {
+    expect(wording(markup())).not.toMatch(/Workspaces/i);
     applyLocale("id");
     const html = markup();
-    const tag = links(html).find((entry) => attr(entry, "data-testid") === "workspaces-link") ?? "";
-    expect(attr(tag, "aria-label")).toBe("Agen virtual");
+    const tag = links(html).find((entry) => attr(entry, "data-testid") === "settings-link") ?? "";
+    expect(attr(tag, "aria-label")).toBe("Pengaturan");
     expect(wording(html)).not.toMatch(/Workspaces|Ruang kerja/i);
   });
 

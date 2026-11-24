@@ -85,5 +85,6 @@
     "emptySections": "Sebagian bagian masih kosong.",
     "hint": "Laporan sudah tersimpan. Buka sumbernya sebelum mengandalkan sebuah temuan, atau jalankan ulang pertanyaannya.",
     "listAria": "Hasil pemeriksaan"
-  }
+  },
+  "modelLabel": "Model"
 }

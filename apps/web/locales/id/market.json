@@ -24,7 +24,8 @@
     "positionHelp": "Apa yang Anda pegang dan di harga berapa. Briefing boleh memakai angka-angka ini, tetapi tidak akan mengarang angka lain.",
     "promptLabel": "Apa yang harus dicakup briefing",
     "resetPrompt": "Kembalikan ke bawaan",
-    "lengthLimit": "Batas panjang (karakter)"
+    "lengthLimit": "Batas panjang (karakter)",
+    "modelLabel": "Model"
   },
   "depth": {
     "label": "Analisis",
@@ -132,7 +133,7 @@
       "hint": "Peringkat kinerja relatif antar sektor IDX dan ETF sektor AS: pemimpin dan yang tertinggal."
     },
     "scanner": {
-      "label": "Market Scanner",
+      "label": "Pemindai Pasar",
       "hint": "Tabel setup berperingkat per kelompok sinyal, tanpa narasi tambahan."
     },
     "summary": {
@@ -140,7 +141,7 @@
       "hint": "Gambaran satu halaman: indeks, futures, mata uang, yield, dan komoditas."
     },
     "elliott-wave": {
-      "label": "Elliott Wave Count",
+      "label": "Hitungan Gelombang Elliott",
       "hint": "Hitungan gelombang yang berhati-hati berdasarkan swing pada paket data, lengkap dengan level invalidasi."
     },
     "news": {

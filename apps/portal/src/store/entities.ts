@@ -108,6 +108,8 @@ export interface User {
   readonly displayName: string | null;
   readonly status: UserStatus;
   readonly role: UserRole;
+  /** Operator-assigned API gateway base URL for this user, or `null` for the default pinned gateway. */
+  readonly gatewayEndpoint: string | null;
   readonly createdAt: Iso;
   readonly updatedAt: Iso;
   readonly deactivatedAt: Iso | null;

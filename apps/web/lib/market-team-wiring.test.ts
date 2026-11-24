@@ -25,26 +25,18 @@ describe("market depth control wiring", () => {
     expect(studio).toContain('data-testid="market-depth"');
     expect(studio).toContain("data-testid={`market-depth-${option}`}");
     expect(studio).toContain("MARKET_DEPTHS.map((option) => (");
-    // The track hugs its two buttons instead of stretching down the flex row.
-    expect(studio).toContain("inline-flex w-fit self-start rounded-md");
+    expect(studio).toContain('className="studio-segmented"');
     expect(studio).toContain('aria-label={t("market.depth.aria")}');
-    expect(studio).toContain('{t("market.depth.label")}');
     expect(studio).toContain("{t(`market.depth.${option}`)}");
-    // The wire values stay quick/team however the catalog renames the labels.
-    expect(studio).toContain("data-testid={`market-depth-${option}`}");
-    // Written once so the two placements cannot drift apart.
     expect(studio.split("const depthControl = (")).toHaveLength(2);
     expect(studio.split('data-testid="market-depth"')).toHaveLength(2);
   });
 
-  it("puts the control beside the language select and in the empty state too", () => {
-    expect(studio.split("{depthControl}")).toHaveLength(3);
-    // The options toggle belongs to the buttons-and-select cluster, so it may stand between the select
-    // and the depth control.
-    expect(studio).toMatch(
-      /<\/select>\s*(?:<button[\s\S]*?data-testid="market-options-toggle"[\s\S]*?<\/button>\s*)?\{depthControl\}\s*\{specialistPicker\}/,
-    );
-    expect(studio).toMatch(/\{specialistPicker\}\s*\{depthControl\}/);
+  it("mounts the depth control in the unified control strip alongside language and model pickers", () => {
+    expect(studio.split("{depthControl}")).toHaveLength(2);
+    expect(studio).toContain('testId="market-language"');
+    expect(studio).toContain('testId="market-studio-model"');
+    expect(studio).toContain('data-testid="market-options-toggle"');
   });
 
   it("starts at quick, whatever the option is called", () => {

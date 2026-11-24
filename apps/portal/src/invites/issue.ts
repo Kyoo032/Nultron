@@ -21,6 +21,7 @@
  * make the address ambiguous, and sign-in sends nothing for those).
  */
 import { normaliseEmail, randomInviteCode } from "../crypto";
+import { InvalidGatewayEndpointError, normaliseGatewayEndpoint } from "../gateway-endpoint";
 import type { Invite, Org, PortalOps, PortalStore, User, UserRole } from "../store/types";
 import { EMAIL_SHAPE, MAX_INVITE_EMAIL_LENGTH } from "./args";
 
@@ -36,10 +37,13 @@ export interface IssueInviteInput {
   readonly role?: UserRole;
   /** Defaults to the seven days the schema defaults to. Negative is a test's expired invite. */
   readonly ttlMs?: number;
+  /** Operator-assigned API gateway base URL for this person, or `null` / omitted for default. */
+  readonly gatewayEndpoint?: string | null;
 }
 
 export type IssueInviteRefusal =
   | "invalid_email"
+  | "invalid_gateway_endpoint"
   | "unknown_tenant"
   | "unknown_org"
   | "choose_org"
@@ -62,6 +66,8 @@ export interface IssuedInvite {
   readonly orgSlug: string;
   readonly userId: string;
   readonly role: UserRole;
+  /** Operator-assigned gateway endpoint, or `null` when using the default pinned gateway. */
+  readonly gatewayEndpoint: string | null;
   readonly expiresAt: string;
   /** False when the address was already an `invited` member and this is a replacement code. */
   readonly userCreated: boolean;
@@ -101,6 +107,17 @@ export async function issueInvite(store: PortalStore, input: IssueInviteInput): 
   const email = normaliseEmail(input.email);
   if (!EMAIL_SHAPE.test(email) || email.length > MAX_INVITE_EMAIL_LENGTH) {
     return refuse("invalid_email");
+  }
+  let gatewayEndpoint: string | null = null;
+  if (input.gatewayEndpoint !== undefined && input.gatewayEndpoint !== null) {
+    try {
+      gatewayEndpoint = normaliseGatewayEndpoint(input.gatewayEndpoint);
+    } catch (error) {
+      if (error instanceof InvalidGatewayEndpointError) {
+        return refuse("invalid_gateway_endpoint");
+      }
+      throw error;
+    }
   }
 
   const tenantId = await store.resolve.bySlug(input.tenantSlug);
@@ -144,9 +161,12 @@ export async function issueInvite(store: PortalStore, input: IssueInviteInput): 
       return refuse("owner_required");
     }
 
-    const created = existing ?? (await createInvitedMember(ops, tenantId, org, email, role));
+    const created = existing ?? (await createInvitedMember(ops, tenantId, org, email, role, gatewayEndpoint));
     // An invited member re-invited under another role takes it now, so the row and the invite agree.
-    const user = created.role === role ? created : ((await ops.users.setRole(created.id, role)) ?? created);
+    let user = created.role === role ? created : ((await ops.users.setRole(created.id, role)) ?? created);
+    if (existing && gatewayEndpoint !== null && user.gatewayEndpoint !== gatewayEndpoint) {
+      user = (await ops.users.setGatewayEndpoint(user.id, gatewayEndpoint)) ?? user;
+    }
     const previous = await ops.invites.latestForEmail(tenantId, email);
     const invite = await ops.invites.create({
       tenantId,
@@ -171,6 +191,7 @@ export async function issueInvite(store: PortalStore, input: IssueInviteInput): 
       orgSlug: org.slug,
       userId: user.id,
       role,
+      gatewayEndpoint: user.gatewayEndpoint,
       expiresAt: invite.expiresAt,
       userCreated: existing === null,
       replacedEarlier,
@@ -184,8 +205,9 @@ function createInvitedMember(
   org: Org,
   email: string,
   role: UserRole,
+  gatewayEndpoint: string | null,
 ): Promise<User> {
-  return ops.users.create({ tenantId, orgId: org.id, email, status: "invited", role });
+  return ops.users.create({ tenantId, orgId: org.id, email, status: "invited", role, gatewayEndpoint });
 }
 
 /** The record that an invite was issued, never the code and not the address twice over. */
@@ -211,6 +233,7 @@ function auditIssued(
       user_id: input.user.id,
       role: input.invite.role,
       org_slug: input.org.slug,
+      gateway_endpoint: input.user.gatewayEndpoint,
       expires_at: input.invite.expiresAt,
       user_created: input.userCreated,
       replaced_earlier: input.replacedEarlier,
@@ -231,6 +254,7 @@ export function formatInviteReport(result: IssuedInvite, options: InviteReportOp
   const lines = [
     `address    ${result.email}`,
     `tenant     ${result.tenantSlug}   org ${result.orgSlug}   role ${result.role}`,
+    `endpoint   ${result.gatewayEndpoint ?? "default"}`,
     `expires    ${result.expiresAt}   (${days} days)`,
     `member     ${result.userCreated ? "created, status invited" : "already invited"} -- active once the invite is redeemed`,
     ...(result.replacedEarlier ? ["replaced   the earlier invite for this address, which no longer works"] : []),

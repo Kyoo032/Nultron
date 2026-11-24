@@ -56,6 +56,66 @@ function isHttpsUrlWithoutCredentials(value: string): boolean {
   }
 }
 
+const MAX_ASSIGNED_GATEWAY_ENDPOINT_LENGTH = 2048;
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+
+/**
+ * Validate and normalise an operator-assigned per-user gateway base URL (delivered by the portal
+ * token response; never writable by regular users). Returns `null` for empty or invalid values.
+ *
+ * In production and packaged builds only HTTPS URLs without credentials, query strings, or
+ * fragments are accepted. In dev/test (`gatewayUrlOverrideAllowed()`), loopback HTTP is also
+ * allowed so local stand-in gateways can be tested end-to-end.
+ */
+export function normalizeAssignedGatewayEndpoint(
+  raw: unknown,
+  options: { allowLoopbackHttp?: boolean } = {},
+): string | null {
+  if (typeof raw !== "string") {
+    return null;
+  }
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  if (!trimmed || trimmed.length > MAX_ASSIGNED_GATEWAY_ENDPOINT_LENGTH) {
+    return null;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return null;
+  }
+  if (!parsed.hostname || parsed.username || parsed.password || parsed.search || parsed.hash) {
+    return null;
+  }
+  const allowLoopbackHttp = options.allowLoopbackHttp ?? gatewayUrlOverrideAllowed();
+  const isHttps = parsed.protocol === "https:";
+  const isLoopbackHttp =
+    allowLoopbackHttp && parsed.protocol === "http:" && LOOPBACK_HOSTS.has(parsed.hostname.toLowerCase());
+  if (!isHttps && !isLoopbackHttp) {
+    return null;
+  }
+  const cleanPath = parsed.pathname.replace(/\/+$/, "");
+  return cleanPath && cleanPath !== "/"
+    ? `${parsed.protocol}//${parsed.host}${cleanPath}`
+    : `${parsed.protocol}//${parsed.host}`;
+}
+
+/**
+ * Host-side AsyncLocalStorage hook registered by `@agentforge/host` so per-request and per-run
+ * gateway resolution sees the signed-in user's operator-assigned endpoint without importing Node
+ * builtins into this browser-shared module.
+ */
+let assignedEndpointReader: (() => string | null) | null = null;
+
+export function registerAssignedGatewayEndpointReader(reader: (() => string | null) | null): void {
+  assignedEndpointReader = reader;
+}
+
+export function assignedGatewayEndpoint(): string | null {
+  const raw = assignedEndpointReader?.() ?? null;
+  return normalizeAssignedGatewayEndpoint(raw);
+}
+
 /**
  * The one gateway URL this process may use instead of `PINNED_GATEWAY_BASE_URL`, or `null` for the
  * pinned one. Two channels, never mixed:
