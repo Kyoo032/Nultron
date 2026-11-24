@@ -102,6 +102,13 @@ describe("Indonesian identifiers", () => {
     expect(maskPii("NPWP 09.254.294.3-407.000")).toBe("NPWP [npwp]");
     expect(maskPii("HP 081234567890")).toBe("HP [phone]");
     expect(maskPii("No. Rekening: 1234567890")).toBe("No. Rekening: [account]");
+    expect(maskPii("rekening BCA saya 1234567890")).toBe("rekening BCA saya [account]");
+    expect(maskPii("my BCA account is 1234567890")).toBe("my BCA account is [account]");
+    expect(maskPii("transfer Rp 1.500.000 ke 1234567890")).toBe("transfer Rp 1.500.000 ke [account]");
+    expect(maskPii("transfer ke 123456789")).toBe("transfer ke [account]");
+    expect(maskPii("Rekening Bank: 1250000000")).toBe("Rekening Bank: 1250000000");
+    expect(maskPii("Accounts payable 450000000")).toBe("Accounts payable 450000000");
+    expect(maskPii("Rp 1.500.000")).toBe("Rp 1.500.000");
   });
 
   it("has a token for every kind it can report", () => {
@@ -245,6 +252,26 @@ describe("free-text person name detection", () => {
     expect(maskPii("Mr. John Smith, Mrs. Jane Doe, Ms. Clara Oswald, Dr. Alan Grant")).toBe(
       "Mr. [name], Mrs. [name], Ms. [name], Dr. [name]",
     );
+    expect(maskPii("nama saya Budi Santoso")).toBe("nama saya [name]");
+    expect(maskPii("my name is Rizky Pratama")).toBe("my name is [name]");
+    expect(maskPii("Perkenalkan, saya Dewi Lestari")).toBe("Perkenalkan, saya [name]");
+    expect(maskPii("Kenalkan Andi Wijaya dari tim produk")).toBe("Kenalkan [name] dari tim produk");
+  });
+
+  it("leaves bare self-intro cues, lowercase-initial, and single-word names unmasked", () => {
+    for (const safe of [
+      "nama saya",
+      "my name is",
+      "perkenalkan",
+      "kenalkan",
+      "nama saya budi santoso",
+      "my name is rizky pratama",
+      "nama saya Budi",
+      "my name is Rizky",
+      "perkenalkan Nultron Enterprise",
+    ]) {
+      expect({ safe, masked: maskPii(safe) }).toEqual({ safe, masked: safe });
+    }
   });
 
   it("stops before stoplist words after a real name", () => {
