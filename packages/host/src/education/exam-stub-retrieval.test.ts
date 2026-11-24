@@ -8,7 +8,7 @@ import {
 } from "@agentforge/core";
 import { sql } from "@agentforge/db";
 import { handlePostEducationExam } from "../handlers/education";
-import { addPastedSource, getKnowledgeModels } from "../knowledge";
+import { addPastedSource, retrieveChunks } from "../knowledge";
 import { resetEmbedCircuit, searchVectors, STUB_EMBED_MODEL } from "../knowledge-embed";
 import { withRequestLocale } from "../run-context";
 import { saveSettings } from "../settings-store";
@@ -64,10 +64,9 @@ describe("SH-014 stub passages in an Education exam", () => {
   it("does not cite a stub passage that shares no word with the topic", async () => {
     const tenant = await getTenant();
     const source = await addPastedSource(tenant, "Chat", PASSAGE);
-    const models = getKnowledgeModels(tenant);
-    const hits = await searchVectors(tenant, "tides", models, 6);
-    expect(hits.model).toBe(STUB_EMBED_MODEL);
-    expect(hits.hits).toEqual([]);
+    const hits = await retrieveChunks(tenant, "tides", 6);
+    expect(hits.vectorModel).toBe(STUB_EMBED_MODEL);
+    expect(hits.chunks).toEqual([]);
 
     for (const topic of ["tides", "glaciers"]) {
       const body = await exam(topic);
@@ -83,8 +82,10 @@ describe("SH-014 stub passages in an Education exam", () => {
   it("still cites a stub passage that shares a word with the topic", async () => {
     const tenant = await getTenant();
     const source = await addPastedSource(tenant, "Chat", PASSAGE);
-    const hits = await searchVectors(tenant, "rain", getKnowledgeModels(tenant), 6);
-    expect(hits.hits.some((hit) => hit.sourceId === source.id)).toBe(true);
+    const hits = await retrieveChunks(tenant, "rain", 6);
+    expect(hits.vectorModel).toBe(STUB_EMBED_MODEL);
+    expect(hits.mode).toBe("hybrid");
+    expect(hits.chunks.some((hit) => hit.sourceId === source.id)).toBe(true);
 
     const body = await exam("rain");
     expect(body.emptyBase).toBe(false);

@@ -1,8 +1,16 @@
 import { sql } from "@agentforge/db";
-import type { KnowledgeModels, TenantContext } from "@agentforge/core";
-import { deleteVectorsForSource, indexSourceVectors, resolveVectorModel, searchVectors } from "../../knowledge-embed";
+import { cosineSimilarity, type KnowledgeModels, type TenantContext } from "@agentforge/core";
+import {
+  STUB_EMBED_MODEL,
+  countVectorsForModel,
+  deleteVectorsForSource,
+  embedQuery,
+  embedTextsWithModel,
+  resolveVectorModel,
+} from "../../knowledge-embed";
 import { getKnowledgeModels } from "../../knowledge";
 import { ftsSourceFilter, knowledgeFtsQuery } from "../../knowledge-text";
+import { openVectorBody, sealVectorBody } from "../../knowledge-vector-seal";
 import { andVisibleSource, andVisibleSourceId } from "../../knowledge-visibility";
 import type {
   BackendHealth,
@@ -105,7 +113,7 @@ function vectorChunkIndexes(workspaceId: string, sourceIds: string[]): Map<strin
     body: string;
   }>;
   for (const row of rows) {
-    const key = chunkKey(row.source_id, row.body);
+    const key = chunkKey(row.source_id, openVectorBody(row.body));
     out.set(key, [...(out.get(key) ?? []), row.chunk_index]);
   }
   for (const [key, indexes] of out) {
@@ -237,6 +245,31 @@ function ftsRows(tenant: TenantContext, query: string, limit: number, exclude: s
   }
 }
 
+const MIN_COSINE = 0.12;
+const STUB_TERM_MIN = 3;
+
+function stubTerms(text: string): Set<string> {
+  const terms = new Set<string>();
+  for (const word of text.toLowerCase().split(/\W+/)) {
+    if (word.length >= STUB_TERM_MIN) {
+      terms.add(word);
+    }
+  }
+  return terms;
+}
+
+function bodySharesStubTerm(body: string, wanted: Set<string>): boolean {
+  if (wanted.size === 0) {
+    return false;
+  }
+  for (const word of body.toLowerCase().split(/\W+/)) {
+    if (wanted.has(word)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export class SqliteBuiltinBackend implements KnowledgeBackend {
   readonly id = "builtin" as const;
 
@@ -246,9 +279,56 @@ export class SqliteBuiltinBackend implements KnowledgeBackend {
     chunks: string[],
     model: string,
   ): Promise<{ degraded: boolean }> {
-    // `createdAt` ties the vectors to this exact row version: a delete or re-index that lands while
-    // the (possibly remote) embed is in flight makes the vector write a no-op instead of an orphan.
-    return indexSourceVectors(tenant, source.id, chunks, model, source.createdAt);
+    if (chunks.length === 0) {
+      return { degraded: false };
+    }
+    let degraded = false;
+    try {
+      const embedded = await embedTextsWithModel(chunks, model, tenant);
+      degraded = embedded.degraded === true;
+      const { vectors: embeddings, model: storedModel } = embedded;
+      const insert = sql.prepare(
+        `INSERT INTO knowledge_vectors (id, workspace_id, source_id, chunk_index, body, embedding, model, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      );
+      const createdAt = Date.now();
+      const ws = tenant.workspaceId;
+      const tx = sql.transaction(() => {
+        // `createdAt` ties the vectors to this exact row version: a delete or re-index that lands while
+        // the (possibly remote) embed is in flight makes the vector write a no-op instead of an orphan.
+        const row = sql
+          .prepare("SELECT created_at FROM knowledge_sources WHERE workspace_id = ? AND id = ?")
+          .get(ws, source.id) as { created_at: number } | undefined;
+        if (!row || row.created_at !== source.createdAt) {
+          return;
+        }
+        sql.prepare("DELETE FROM knowledge_vectors WHERE workspace_id = ? AND source_id = ?").run(ws, source.id);
+        for (let i = 0; i < chunks.length; i += 1) {
+          const embedding = embeddings[i];
+          const chunk = chunks[i];
+          if (!embedding || chunk === undefined) {
+            continue;
+          }
+          insert.run(
+            crypto.randomUUID(),
+            ws,
+            source.id,
+            i,
+            sealVectorBody(chunk),
+            JSON.stringify(embedding),
+            storedModel,
+            createdAt,
+          );
+        }
+      });
+      tx.immediate();
+    } catch (error) {
+      log.warn("knowledge_embed_vectors_not_written", {
+        sourceId: source.id,
+        detail: error instanceof Error ? error.message.slice(0, 120) : "error",
+      });
+    }
+    return { degraded };
   }
 
   // `async`, not `return Promise.resolve(...)`: the SQLite delete is synchronous, so a non-async
@@ -304,7 +384,56 @@ export class SqliteBuiltinBackend implements KnowledgeBackend {
     models: KnowledgeModels,
     preferredModel: string | null,
   ): Promise<{ chunks: RetrievedChunk[]; model: string | null }> {
-    const { hits, model } = await searchVectors(tenant, query, models, limit, exclude, preferredModel);
+    const trimmed = query.trim();
+    if (!trimmed) {
+      return { chunks: [], model: null };
+    }
+    const preferred = preferredModel === undefined ? resolveVectorModel(tenant, models.embeddingModel) : preferredModel;
+    if (!preferred) {
+      return { chunks: [], model: null };
+    }
+    const { vector: queryVec, model } = await embedQuery(trimmed, preferred, tenant);
+    if (model !== preferred && countVectorsForModel(tenant, model) === 0) {
+      return { chunks: [], model: null };
+    }
+    const stubQuery = model === STUB_EMBED_MODEL ? stubTerms(trimmed) : null;
+    const ws = tenant.workspaceId;
+    const visible = andVisibleSource(tenant);
+    const rows = sql
+      .prepare(
+        `SELECT body, embedding, source_id, chunk_index FROM knowledge_vectors
+         WHERE workspace_id = ? AND model = ?
+           AND source_id IN (SELECT id FROM knowledge_sources WHERE workspace_id = ?${visible.sql})${notInClause(exclude)}`,
+      )
+      .all(ws, model, ws, ...visible.params, ...exclude) as Array<{
+      body: string;
+      embedding: string;
+      source_id: string;
+      chunk_index: number;
+    }>;
+
+    const hits = rows
+      .map((row) => {
+        let embedding: number[] = [];
+        try {
+          const parsed = JSON.parse(row.embedding) as unknown;
+          embedding = Array.isArray(parsed)
+            ? parsed.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+            : [];
+        } catch {
+          embedding = [];
+        }
+        return {
+          body: openVectorBody(row.body),
+          sourceId: row.source_id,
+          chunkIndex: row.chunk_index,
+          score: cosineSimilarity(queryVec, embedding),
+        };
+      })
+      .filter((item) => item.score >= MIN_COSINE && (stubQuery === null || bodySharesStubTerm(item.body, stubQuery)))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
     const names = sourceNames(tenant, [...new Set(hits.map((hit) => hit.sourceId))]);
     return {
       chunks: hits.map((hit) => ({

@@ -8,6 +8,7 @@ import { createLocalWorkspace, db, deleteLocalWorkspace, sql } from "@agentforge
 import { STUB_EMBED_MODEL } from "./knowledge-embed";
 import { reconstructSourceBody, reindexSource, reindexWorkspace } from "./knowledge-reindex";
 import { chunkKnowledgeText } from "./knowledge-text";
+import { isSealedVectorBody, openVectorBody } from "./knowledge-vector-seal";
 import { addFileSource } from "./knowledge";
 import { dispatch } from "./router";
 import { getTenant } from "./tenant";
@@ -119,12 +120,17 @@ function chunkBodies(ctx: TenantContext, id: string): string[] {
 }
 
 function vectorRows(ctx: TenantContext, id: string) {
-  return sql
+  const rows = sql
     .prepare(
       `SELECT chunk_index, body, model, created_at FROM knowledge_vectors
        WHERE workspace_id = ? AND source_id = ? ORDER BY chunk_index`,
     )
     .all(ctx.workspaceId, id) as Array<{ chunk_index: number; body: string; model: string; created_at: number }>;
+  return rows.map((row) => ({
+    ...row,
+    rawBody: row.body,
+    body: openVectorBody(row.body),
+  }));
 }
 
 function sourceRow(ctx: TenantContext, id: string) {
@@ -210,6 +216,7 @@ describe("reindexSource", () => {
 
     expect(chunkBodies(ctx, id)).toEqual(expected);
     const vectors = vectorRows(ctx, id);
+    expect(vectors.every((row) => isSealedVectorBody(row.rawBody))).toBe(true);
     expect(vectors.map((row) => row.body)).toEqual(expected);
     expect(vectors.map((row) => row.chunk_index)).toEqual(expected.map((_, index) => index));
     // Offline the embedder answers with local vectors, and they are stored under their own id.

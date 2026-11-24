@@ -347,7 +347,7 @@ export async function askNultron(input: AskInput, options: AskOptions = {}): Pro
       // Each agent once: a delegation re-sends its phase on every heartbeat, and parallel ones interleave.
       const announced = new Set<string>();
       await withToolRun({ runId, mode: prepared.agentPolicy ? prepared.agentPolicy.agent.id : "chat" }, () =>
-        withRunContext({ threadId: prepared.thread.id, agentId: prepared.thread.agentId, locale }, () =>
+        withRunContext({ threadId: prepared.thread.id, agentId: prepared.thread.agentId, locale, voice: true }, () =>
           runOutboundGuarded(outbound, () =>
             withWorkerChannel(
               {
