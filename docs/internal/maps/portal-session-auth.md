@@ -2,6 +2,8 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
+Re-checked 2026-11-24 on `main`, for per-user operator-assigned API gateway endpoints: `POST /auth/token` now carries `gateway_endpoint` (`string | null`, read from `users.gateway_endpoint` on every mint and refresh), `toTokens` validates it via `normalizeAssignedGatewayEndpoint`, `auth_sessions` persists it in `gateway_endpoint` (updated atomically on every rotation in `recordRotation`), and `dispatch` (`router.ts`) plus voice upgrades (`voice/upgrade.ts`) bind it in AsyncLocalStorage (`gateway-endpoint-scope.ts`) so each user on the same Nultron host routes model calls, Settings, and live gateway key checks to their assigned endpoint. Regular users can never set or override it. Every other line is as verified next.
+
 Re-checked 2026-10-07 at 9aba37e + working tree, for one paragraph only: **`signInMode`** under "Status" (the
 host learns from the portal whether it signs people in with a password, and the sign-in screen says so). Every
 other line is as verified next.

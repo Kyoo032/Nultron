@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { PINNED_GATEWAY_BASE_URL } from "./pinned";
+import { afterEach, describe, expect, it } from "vitest";
+import { PINNED_GATEWAY_BASE_URL, registerAssignedGatewayEndpointReader } from "./pinned";
 import { validateGatewayKey } from "./validate";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -86,5 +86,38 @@ describe("validateGatewayKey", () => {
       }) as unknown as typeof fetch,
     });
     expect(JSON.stringify(result)).not.toContain(apiKey);
+  });
+
+  afterEach(() => {
+    registerAssignedGatewayEndpointReader(null);
+  });
+
+  it("routes /models validation to the user's operator-assigned endpoint when active", async () => {
+    const customEndpoint = "https://gw-enterprise.example/v1";
+    registerAssignedGatewayEndpointReader(() => customEndpoint);
+    let calledUrl = "";
+    const result = await validateGatewayKey({
+      apiKey: "sk-custom-key",
+      fetch: (async (url: string | URL | Request) => {
+        calledUrl = String(url);
+        return jsonResponse({ data: [{ id: "model-x" }] });
+      }) as unknown as typeof fetch,
+    });
+    expect(calledUrl).toBe(`${customEndpoint}/models`);
+    expect(result).toEqual({ status: "ok", modelCount: 1 });
+  });
+
+  it("supports an explicit baseUrl override when valid", async () => {
+    let calledUrl = "";
+    const result = await validateGatewayKey({
+      apiKey: "sk-explicit",
+      baseUrl: "https://gw-explicit.example/v1/",
+      fetch: (async (url: string | URL | Request) => {
+        calledUrl = String(url);
+        return jsonResponse({ data: [{ id: "m1" }, { id: "m2" }, { id: "m3" }] });
+      }) as unknown as typeof fetch,
+    });
+    expect(calledUrl).toBe("https://gw-explicit.example/v1/models");
+    expect(result).toEqual({ status: "ok", modelCount: 3 });
   });
 });

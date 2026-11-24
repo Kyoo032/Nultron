@@ -102,7 +102,22 @@ describe("exchangeCode", () => {
       orgId: "org_1",
       tenantId: "tnt_1",
       role: "member",
+      gatewayEndpoint: null,
     });
+  });
+
+  it("parses and validates an operator-assigned gateway_endpoint from the token body", async () => {
+    const valid = await createPortalClient({
+      baseUrl,
+      fetchImpl: recordingFetch(() => json({ ...TOKEN_BODY, gateway_endpoint: "https://gw-custom.example/v1/" })).impl,
+    }).exchangeCode({ code: "K7M4PQ9T", ...EXCHANGE });
+    expect(valid.gatewayEndpoint).toBe("https://gw-custom.example/v1");
+
+    const invalid = await createPortalClient({
+      baseUrl,
+      fetchImpl: recordingFetch(() => json({ ...TOKEN_BODY, gateway_endpoint: "http://evil.example/v1" })).impl,
+    }).exchangeCode({ code: "K7M4PQ9T", ...EXCHANGE });
+    expect(invalid.gatewayEndpoint).toBeNull();
   });
 
   it("carries a timeout signal on every call", async () => {

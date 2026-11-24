@@ -43,6 +43,12 @@ export interface TokenResponseBody {
    * next token.
    */
   readonly role: UserRole;
+  /**
+   * Operator-assigned API gateway base URL for this person, or `null` to use the host's default
+   * pinned gateway. Read fresh from the user row on every mint and refresh so Nultron admin
+   * endpoint updates reach the host automatically and cannot be overridden by regular users.
+   */
+  readonly gateway_endpoint: string | null;
 }
 
 export type TokenResult =
@@ -172,7 +178,7 @@ export async function mintSession(
 ): Promise<TokenResult> {
   const config = await ops.tenantConfig.get(input.tenantId);
   const scope = scopeFor(config?.featureFlags);
-  const role = await roleOf(ops, input.userId);
+  const { role, gatewayEndpoint } = await userClaimsOf(ops, input.userId);
 
   const session = await ops.sessions.create({
     tenantId: input.tenantId,
@@ -226,16 +232,25 @@ export async function mintSession(
       org_id: input.orgId,
       tenant_id: input.tenantId,
       role,
+      gateway_endpoint: gatewayEndpoint,
     }),
   };
 }
 
 /**
- * The role a token carries: the member's own, read now. A member who cannot be read (removed
- * between the check and the mint) gets the least privilege there is, never a default of `owner`.
+ * The role and operator-assigned gateway endpoint a token carries: the member's own, read now. A
+ * member who cannot be read (removed between the check and the mint) gets the least privilege there
+ * is, never a default of `owner`, and no custom endpoint.
  */
-async function roleOf(ops: PortalOps, userId: string): Promise<UserRole> {
-  return (await ops.users.findById(userId))?.role ?? "member";
+async function userClaimsOf(
+  ops: PortalOps,
+  userId: string,
+): Promise<{ readonly role: UserRole; readonly gatewayEndpoint: string | null }> {
+  const user = await ops.users.findById(userId);
+  return {
+    role: user?.role ?? "member",
+    gatewayEndpoint: user?.gatewayEndpoint ?? null,
+  };
 }
 
 export interface ClientCredentials {
@@ -322,7 +337,7 @@ export async function exchangeRefreshToken(
   return runtime.store.tx(rotated.tenantId, async (ops) => {
     const config = await ops.tenantConfig.get(rotated.tenantId);
     const scope = scopeFor(config?.featureFlags);
-    const role = await roleOf(ops, rotated.userId);
+    const { role, gatewayEndpoint } = await userClaimsOf(ops, rotated.userId);
 
     await ops.audit.append({
       tenantId: rotated.tenantId,
@@ -362,6 +377,7 @@ export async function exchangeRefreshToken(
         org_id: rotated.orgId,
         tenant_id: rotated.tenantId,
         role,
+        gateway_endpoint: gatewayEndpoint,
       }),
     };
   });

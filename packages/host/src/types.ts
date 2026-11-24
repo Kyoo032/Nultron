@@ -34,6 +34,8 @@ export type HostSession = {
   readonly tenantId: string;
   readonly orgId: string;
   readonly userId: string;
+  /** Operator-assigned API gateway base URL for this user, or `null` / omitted for default. */
+  readonly gatewayEndpoint?: string | null;
 };
 
 export type HostRequest = {

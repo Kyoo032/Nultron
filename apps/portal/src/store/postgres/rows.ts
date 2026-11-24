@@ -134,6 +134,7 @@ export function toUser(row: Row): User {
     displayName: strOrNull(row.display_name),
     status: str(row.status) as User["status"],
     role: str(row.role) as User["role"],
+    gatewayEndpoint: strOrNull(row.gateway_endpoint),
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
     deactivatedAt: isoOrNull(row.deactivated_at),

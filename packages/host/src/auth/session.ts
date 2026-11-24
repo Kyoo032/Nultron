@@ -97,6 +97,8 @@ export type SessionRecord = {
   readonly revokedAt: number | null;
   /** When the portal last vouched for this session; null for never, which is due at once. */
   readonly portalCheckedAt: number | null;
+  /** Operator-assigned API gateway base URL for this signed-in user, or `null`/omitted for default. */
+  readonly gatewayEndpoint?: string | null;
 };
 
 export type SessionVerdict =
@@ -126,7 +128,13 @@ export function hashSessionId(id: string): string {
   return createHash("sha256").update(id, "utf8").digest("hex");
 }
 
-export function createSession(input: { tenantId: string; userId: string; orgId: string; now?: number }): SessionRecord {
+export function createSession(input: {
+  tenantId: string;
+  userId: string;
+  orgId: string;
+  gatewayEndpoint?: string | null;
+  now?: number;
+}): SessionRecord {
   const now = input.now ?? Date.now();
   return {
     id: mintSessionId(),
@@ -140,6 +148,7 @@ export function createSession(input: { tenantId: string; userId: string; orgId: 
     revokedAt: null,
     // Signing in is the portal vouching for this person, so the first check is due an interval later.
     portalCheckedAt: now,
+    ...(input.gatewayEndpoint ? { gatewayEndpoint: input.gatewayEndpoint } : {}),
   };
 }
 

@@ -34,6 +34,7 @@ import { log } from "../log";
 import { chatHistoryFromRows, prepareChatRun } from "../runs";
 import { activeRuns, admitRun, runCapsFromEnv } from "../run-limits";
 import { withRunContext } from "../run-context";
+import { currentAssignedGatewayEndpoint, withAssignedGatewayEndpoint } from "../gateway-endpoint-scope";
 import { toolMediaModels } from "../selectable-models";
 import { listMessages } from "../threads";
 import { withToolRun } from "../tool-run-context";
@@ -352,37 +353,39 @@ export async function askNultron(input: AskInput, options: AskOptions = {}): Pro
       // reaches it, and a `delegating` phase goes to the relay's caption. Everything else is ignored.
       // Each agent once: a delegation re-sends its phase on every heartbeat, and parallel ones interleave.
       const announced = new Set<string>();
-      await withToolRun({ runId, mode: prepared.agentPolicy ? prepared.agentPolicy.agent.id : "chat" }, () =>
-        withRunContext({ threadId: prepared.thread.id, agentId: prepared.thread.agentId, locale }, () =>
-          runOutboundGuarded(outbound, () =>
-            withWorkerChannel(
-              {
-                emit: (_toolKey, job) => {
-                  if (job.type === "job.phase" && job.phase === "delegating" && !announced.has(job.label)) {
-                    announced.add(job.label);
-                    input.onProgress?.(job.label, "delegate");
-                  }
-                },
-                signal: run.signal,
-              },
-              () =>
-                runtime.execute({
-                  tenant,
-                  runId,
-                  modality: "text",
-                  version: { ...prepared.version, systemPrompt: prepared.version.systemPrompt + voiceNote(locale) },
-                  bindings: voiceBindings(prepared.bindings),
-                  budget: VOICE_BUDGET,
-                  history,
-                  mediaPermission: prepared.mediaPermission,
-                  thinking: prepared.thinkingEnabled,
-                  reasoningEffort: prepared.reasoningEffort,
-                  reasoningEffortExplicit: prepared.reasoningEffortExplicit,
-                  wire: prepared.wire,
-                  locale,
+      await withAssignedGatewayEndpoint(tenant.gatewayEndpoint ?? currentAssignedGatewayEndpoint(), () =>
+        withToolRun({ runId, mode: prepared.agentPolicy ? prepared.agentPolicy.agent.id : "chat" }, () =>
+          withRunContext({ threadId: prepared.thread.id, agentId: prepared.thread.agentId, locale }, () =>
+            runOutboundGuarded(outbound, () =>
+              withWorkerChannel(
+                {
+                  emit: (_toolKey, job) => {
+                    if (job.type === "job.phase" && job.phase === "delegating" && !announced.has(job.label)) {
+                      announced.add(job.label);
+                      input.onProgress?.(job.label, "delegate");
+                    }
+                  },
                   signal: run.signal,
-                  onEvent,
-                }),
+                },
+                () =>
+                  runtime.execute({
+                    tenant,
+                    runId,
+                    modality: "text",
+                    version: { ...prepared.version, systemPrompt: prepared.version.systemPrompt + voiceNote(locale) },
+                    bindings: voiceBindings(prepared.bindings),
+                    budget: VOICE_BUDGET,
+                    history,
+                    mediaPermission: prepared.mediaPermission,
+                    thinking: prepared.thinkingEnabled,
+                    reasoningEffort: prepared.reasoningEffort,
+                    reasoningEffortExplicit: prepared.reasoningEffortExplicit,
+                    wire: prepared.wire,
+                    locale,
+                    signal: run.signal,
+                    onEvent,
+                  }),
+              ),
             ),
           ),
         ),
