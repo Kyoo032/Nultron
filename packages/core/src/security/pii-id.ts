@@ -1,16 +1,3 @@
-/**
- * Indonesian identifiers for the shared PII scanner.
- *
- * One rule shapes every detector in this file: **money is never masked.** A Finance prompt is mostly
- * long digit runs — a rupiah total is routinely 10 to 16 digits — so a detector may only fire when
- * the text carries something an amount cannot have: a NIK's embedded birth date, an NPWP's dotted
- * shape, the leading `0` of an `08xx` phone, or a label written immediately beside the number.
- *
- * Detectors that need a column header to be safe (a bank account with no label beside it, a person's
- * name) are deliberately not here. They live in `packages/core/src/finance/pii-scan.ts`, which only
- * ever sees a table and can read the header above a cell.
- */
-
 export type IdPiiKind = "nik" | "npwp" | "account" | "phone";
 
 export type IdPiiMatch = { kind: IdPiiKind; match: string; index: number };
@@ -138,11 +125,6 @@ const NIK_LABELLED_RE = /\b(?:nik|no\.?\s*ktp|nomor\s*ktp|ktp)\b\s*(?:no\.?|nomo
 
 const NPWP_LABELLED_RE = /\bnpwp\b\s*(?:no\.?|nomor)?\s*[:#=-]?\s*(\d[\d\s.-]{13,26})/gi;
 
-/**
- * A bank account only when the cue sits immediately before the digits. "Rekening Bank: 1250000000"
- * therefore does not match (the word `Bank` is in the way) and neither does "Accounts payable
- * 450000000" — both are amounts, and an amount that lost its digits is a wrong brief.
- */
 const BANK_NAME_PART =
   "(?:BCA|BRI|BNI|Mandiri|BSI|CIMB(?:\\s+Niaga)?|Permata|Danamon|OCBC(?:\\s+NISP)?|BTN|Panin|Maybank|Mega|UOB|HSBC|Citibank|Jago|SeaBank|Jenius|Blu)";
 
