@@ -145,7 +145,7 @@ async function ask1(
     signal?: AbortSignal;
     timeoutMs?: number;
     delegateTimeoutMs?: number;
-    onProgress?: (label: string) => void;
+    onProgress?: (label: string, kind?: "delegate" | "tool") => void;
   } = {},
 ) {
   return ask(
