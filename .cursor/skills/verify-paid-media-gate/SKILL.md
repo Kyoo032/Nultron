@@ -91,9 +91,10 @@ Applies eleven breaks to the real source one at a time (a grant never spent, any
 
 How the breaks work. Each entry in `BREAKS` names a file, the exact text to change (`find`, which must occur exactly once in the file's own line endings, LF or CRLF, or the break is `NOT RUN`) and the groups that must go red (`catchers`). The script refuses to start when the checks are already red, because it would prove nothing. It puts each file back in a `finally` and again on exit. If the process is killed before it restores (power loss), `git diff` shows the file; restore it from git.
 
-Last full run (2026-11-23, base `8871ffdf`, on Windows with CRLF checkouts): eleven of eleven caught, none missed, none not run, and `git status` was the same before and after.
+Last full run (2026-11-24, base `bce117d7`, on Windows with CRLF checkouts): eleven of eleven caught, none missed, none not run, and `git status` was the same before and after.
 
 Previous full runs:
+- 2026-11-23, base `8871ffdf`: eleven of eleven caught, none missed, none not run.
 - 2026-11-13, base `365d4af6`: eleven of eleven caught, none missed, none not run (first run on AI SDK 5 runtime `35dd6ff6`).
 - 2026-11-03, base `8dfcd9a`: eleven of eleven caught, none missed, none not run.
 
@@ -105,15 +106,15 @@ Previous full runs:
 | `packages/core/src/runtime/invoke-guarded.ts` | `invokeToolGuarded`, the `permission` lines |
 | `packages/core/src/runtime/ai-sdk-runtime.ts` | `AiSdkRuntime.stream`, where the gate is built |
 | `packages/core/src/agents/delegation.ts` | `DELEGATE_EXCLUDED_TOOLS`, `delegateToolKeys` |
-| `packages/core/src/agents/virtual-agents.ts` | virtual-agent tool sets (`FULL_CHAT_TOOLS`, `MODE_EXTRA_TOOLS`) carrying `image_generate` and `video_generate` |
+| `packages/core/src/agents/virtual-agents.ts` | virtual-agent tool sets (`FULL_CHAT_TOOLS`, `VIRTUAL_AGENTS`) carrying `image_generate` and `video_generate` |
 | `packages/core/src/harness/specs.ts` | `MODE_HARNESS_SPECS` tool sets |
 | `packages/core/src/harness/modes/` | the `tools` of each mode harness spec |
 | `packages/host/src/paid-media-body.ts` | `readMediaPermission`, `PAID_MEDIA_GRANTS_MAX` |
 | `packages/host/src/register-tools.ts` | binds `chatVideoGenerateTool` under `"video_generate"` in place of core's tool |
 | `packages/host/src/runs.ts` | Chat/mode `.execute({ bindings, mediaPermission })` |
 | `packages/host/src/voice/ask.ts` | `askNultron` `.execute({ bindings, mediaPermission })` via `prepareChatRun` + `voiceBindings` |
-| `packages/host/src/voice/ask-tools.ts` | `VOICE_DENIED_TOOLS` and `voiceBindings` excluding `image_generate` and `video_generate` from voice runs |
-| `packages/host/src/delegation/run-delegation.ts` | delegated `.execute({ bindings })` using `delegateToolKeys` (mode agents and team bots via `FULL_CHAT_TOOLS`) |
+| `packages/host/src/voice/ask-tools.ts` | `VOICE_TAP_TOOLS`, `VOICE_READ_TOOLS`, `VOICE_DELEGATE_TOOLS`, and `voiceBindings` excluding `image_generate` and `video_generate` from voice runs |
+| `packages/host/src/delegation/run-delegation.ts` | delegated `.execute({ bindings })` using `delegateToolKeys` (mode agents and team bots via `FULL_CHAT_TOOLS`) and `voiceDelegateToolKeys` for voice-started delegations |
 | `packages/host/src/team-propose.ts` | team proposal `.execute({ bindings: [] })` |
 | `packages/host/src/job-regen.ts` | studio/worker `.execute({ bindings })` bounded by `toolKeysWithinSpec` |
 | `packages/host/src/edit/agent-run.ts` | Edit agent `.execute({ bindings })` (named residual) |
@@ -121,10 +122,12 @@ Previous full runs:
 | `packages/host/src/workers/video-generate-tool.ts` | `chatVideoGenerateTool` wrapper (`keepRunAlive` around `videoGenerateTool`, gated under `"video_generate"`) |
 | `packages/core/src/tools/platform/register.ts` | registers `imageGenerateTool` and `videoGenerateTool` |
 
-**Sync commit: `8af77b99`** (`feat/security-phase1-hardening`, 2026-11-23). The check was confirmed to describe the files above at that commit. To see whether covered files moved since: `pnpm formal:sync-check` (or `git log --oneline 8af77b99..HEAD -- <files above>`). After you confirm the tests still describe the code, write the new commit here.
+**Sync commit: `bce117d7`** (`main`, 2026-11-24). The check was confirmed to describe the files above at that commit. To see whether covered files moved since: `pnpm formal:sync-check` (or `git log --oneline bce117d7..HEAD -- <files above>`). After you confirm the tests still describe the code, write the new commit here.
 
-Since the previous sync (`8871ffdf`), one change touched covered code, and the check changed with it:
-- `8af77b99` (SR-195) deleted `fingerprint` and made `mediaRequestKey` return the canonical `JSON.stringify([tool, pairs])` text. Both `F1` cases in `media-permission.property.test.ts` are plain `it` now, and the `key-ignores-model` break in `scripts/check.mjs` finds the `pairs` line.
+Since the previous sync (`8af77b99`):
+- `a19bbc42` (PR #268) added `requireGatewayAllowed` and `recordChatRunUsage` in `packages/host/src/team-propose.ts`; `.execute({ bindings: [], maxSteps: 1 })` is unchanged.
+- `6b4b096d` (PR #269) marked voice `RunContext` with `voice: true` in `packages/host/src/voice/ask.ts` (keeping `mediaPermission` and `voiceBindings`) and added `voiceDelegateToolKeys` in `packages/host/src/delegation/run-delegation.ts` to further filter `delegateToolKeys` to `VOICE_READ_TOOLS` without `VOICE_TAP_TOOLS`.
+- `packages/host/src/paid-media-reach.property.test.ts` now also checks `voiceDelegateToolKeys(` on `run-delegation.ts` and `voiceBindings(` on `voice/ask.ts`, and the Coverage record table names `VIRTUAL_AGENTS` (replacing `MODE_EXTRA_TOOLS`) and `VOICE_TAP_TOOLS` / `VOICE_READ_TOOLS` / `VOICE_DELEGATE_TOOLS` (replacing `VOICE_DENIED_TOOLS`).
 
 ## Why not TLA+
 
