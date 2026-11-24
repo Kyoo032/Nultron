@@ -109,5 +109,13 @@
   "models.reason.upstream_rejected": "The gateway took the request and the provider behind it refused it.",
   "models.refresh": "Check again",
   "models.refreshing": "Checking…",
-  "models.refreshFailed": "Could not check the models. Try again in a moment."
+  "models.refreshFailed": "Could not check the models. Try again in a moment.",
+  "tabs.aria": "Settings sections",
+  "tabs.general": "General",
+  "tabs.agents": "Agents",
+  "tabs.team": "Team",
+  "tabs.channels": "Channels",
+  "tabs.customers": "Customers",
+  "tabs.usage": "Usage",
+  "advancedHeading": "Models & storage"
 }

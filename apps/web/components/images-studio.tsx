@@ -2,11 +2,23 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { chooseImageFrame } from "@agentforge/core/images";
-import { messageUnlessBlocked } from "@/lib/gateway-blocked";
 import type { MediaPrice } from "@agentforge/core/media-pricing";
 import type { ImageSent, MediaAdjustment, MediaParamSpec } from "@agentforge/core/media-params";
+import { Confetti } from "@/components/confetti";
+import { EnhancePromptButton } from "@/components/enhance-prompt-button";
+import { GalleryImage } from "@/components/gallery-media";
+import { MascotSlot } from "@/components/mascot-slot";
 import { ImageControls, UnverifiedNote } from "@/components/media-controls";
 import { MediaControlsNote } from "@/components/media-controls-note";
+import { ModeIcon } from "@/components/mode-icons";
+import { ModelSelect } from "@/components/model-select";
+import { SettingsLinkHint } from "@/components/settings-link-hint";
+import { StudioEmptyDesk } from "@/components/studio-empty-desk";
+import { WorkingStatus } from "@/components/working-status";
+import { apiFetch, mediaSrc } from "@/lib/api-client";
+import { isGatewayBlockedText, messageUnlessBlocked } from "@/lib/gateway-blocked";
+import { t } from "@/lib/i18n";
+import { imageEstimateView, mediaPriceHints } from "@/lib/media-estimate";
 import {
   adjustedNote,
   effectiveShape,
@@ -17,25 +29,12 @@ import {
   shapeOfValue,
   type ImagePick,
 } from "@/lib/media-options";
-import { Confetti } from "@/components/confetti";
-import { EnhancePromptButton } from "@/components/enhance-prompt-button";
-import { ExampleGallery } from "@/components/example-gallery";
-import { GalleryImage } from "@/components/gallery-media";
-import { ModeHeader } from "@/components/mode-header";
-import { MascotSlot } from "@/components/mascot-slot";
-import { ModelSelect } from "@/components/model-select";
-import { StudioEmptyDesk } from "@/components/studio-empty-desk";
-import { WorkingStatus } from "@/components/working-status";
-import { SettingsLinkHint } from "@/components/settings-link-hint";
-import { t } from "@/lib/i18n";
-import { PROMPT_INPUT, PROMPT_ROW, PROMPT_SUBMIT } from "@/lib/prompt-row";
-import { imageEstimateView, mediaPriceHints } from "@/lib/media-estimate";
 import { keepModelChoice } from "@/lib/model-choice";
-import { apiFetch, mediaSrc } from "@/lib/api-client";
 import { useProductBrand } from "@/lib/product-brand";
-import { isGatewayBlockedText } from "@/lib/gateway-blocked";
-import { useDeskNeedsKey } from "@/lib/use-desk-needs-key";
 import { studioPickerEmpty } from "@/lib/studio-picker-empty";
+import { localizedLibrary } from "@/lib/ui-copy";
+import { useDeskNeedsKey } from "@/lib/use-desk-needs-key";
+import "@/components/studio-minimal.css";
 
 type StudioModel = {
   id: string;
@@ -73,8 +72,6 @@ export function ImagesStudio() {
   const [models, setModels] = useState<StudioModel[]>([]);
   const [listed, setListed] = useState(false);
   const [model, setModel] = useState("");
-  // What the controls hold. Until the person moves the size menu the sentence picks the shape; a model
-  // change moves each value to the nearest one the new model takes, and `note` says so.
   const [pick, setPick] = useState<ImagePick>({
     shape: "",
     shapeTouched: false,
@@ -87,11 +84,14 @@ export function ImagesStudio() {
   const [made, setMade] = useState<string | null>(null);
   const fitted = useRef("");
   const [prompt, setPrompt] = useState("");
+  const [selectedExampleId, setSelectedExampleId] = useState<string | null>(null);
   const needsKey = useDeskNeedsKey();
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [landed, setLanded] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  const starters = useMemo(() => localizedLibrary("images"), []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,7 +108,6 @@ export function ImagesStudio() {
       setItems(data.items ?? []);
       setModels(data.models ?? []);
       setListed(true);
-      // `load` runs again after every generate: keep the model the person chose while it is still listed.
       setModel((current) => keepModelChoice(current, data.models ?? [], data.defaultModel));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("images.loadError"));
@@ -121,15 +120,13 @@ export function ImagesStudio() {
     void load();
   }, [load]);
 
-  // Until they move the menu, the sentence picks the frame. Their pick then stands.
   const promptShape = chooseImageFrame(prompt);
   const spec = useMemo(() => imageSpecOf(model, models), [model, models]);
   const shape = effectiveShape(spec, pick, promptShape);
   const aspect = shapeOfValue(spec, shape);
-  const quality = pick.quality === "low" || pick.quality === "medium" || pick.quality === "high" ? pick.quality : undefined;
+  const quality =
+    pick.quality === "low" || pick.quality === "medium" || pick.quality === "high" ? pick.quality : undefined;
 
-  // Fit the controls to the model. The first model gets its own defaults and no note; a later one keeps
-  // each value it takes and moves the rest to the nearest valid one, and the note says what moved.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the fit runs when the model changes; the picks and the sentence are read, not watched
   useEffect(() => {
     if (!model) {
@@ -140,10 +137,8 @@ export function ImagesStudio() {
     fitted.current = model;
     setPick(result.pick);
     setNote(first ? null : adjustedNote("images", model, result.moved));
-    // `pick` and the sentence are read, not watched: the fit runs when the model changes.
   }, [model]);
 
-  // List-price estimate. Recomputed from the studio state, never from a live call.
   const estimate = useMemo(
     () => imageEstimateView({ model, models, aspect, quality }),
     [model, models, aspect, quality],
@@ -169,7 +164,6 @@ export function ImagesStudio() {
       const response = await apiFetch("/api/v1/images", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Only the fields this model has: its spec decides, the host checks again.
         body: JSON.stringify({
           prompt: prompt.trim(),
           model: model || undefined,
@@ -187,7 +181,7 @@ export function ImagesStudio() {
       }
       setLanded((count) => count + 1);
       setPrompt("");
-      // What the picture was made with, so a value the host had to move is never a surprise.
+      setSelectedExampleId(null);
       setMade(
         data.sent
           ? [imageSentNote(data.sent), adjustedNote("images", data.model ?? model, data.adjusted ?? [])]
@@ -203,17 +197,28 @@ export function ImagesStudio() {
     }
   }
 
+  const showStarters = !prompt.trim() || items.length === 0;
+  const hasNotes = Boolean(
+    noModels || (model && spec.unverified.length > 0) || note || made || (needsKey && !loading),
+  );
+
   return (
-    <main
-      data-mode="images"
-      className="flex min-h-full w-full flex-col px-6 py-4 text-[var(--text)]"
-      data-testid="images-studio"
-    >
-      <ModeHeader icon="images" title={t("images.title")} outcome={t("images.expectedInputs")} />
+    <main data-mode="images" className="studio-shell" data-testid="images-studio">
+      <header className="studio-head">
+        <div className="studio-head-main">
+          <span className="studio-head-icon" aria-hidden="true">
+            <ModeIcon name="images" size={18} strokeWidth={1.75} />
+          </span>
+          <div className="min-w-0">
+            <h1 className="studio-head-title">{t("images.title")}</h1>
+            <p className="studio-head-sub">{t("images.expectedInputs")}</p>
+          </div>
+        </div>
+      </header>
 
       {error && !isGatewayBlockedText(error) ? (
         <div
-          className="mt-4 rounded-xl border border-[var(--line)] px-4 py-3 text-sm text-[var(--danger)]"
+          className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--danger)]"
           role="alert"
           data-testid="images-studio-error"
         >
@@ -221,51 +226,20 @@ export function ImagesStudio() {
         </div>
       ) : null}
 
-      <ExampleGallery mode="images" onSelect={(entry) => setPrompt(entry.prompt)} />
-
-      <form
-        className="mt-6 space-y-3 rounded-xl border border-[var(--line)] bg-transparent p-3"
-        onSubmit={onSubmit}
-        data-testid="images-studio-prompt-bar"
-      >
-        <div className="flex flex-wrap gap-2">
-          {model ? (
-            <ImageControls spec={spec} pick={pick} shape={shape} onChange={setPick} disabled={generating} />
-          ) : null}
-          {noModels ? null : (
-            <ModelSelect
-              models={modelOptions}
-              value={model}
-              onChange={setModel}
-              disabled={generating || models.length === 0}
-              testId="images-studio-model"
-              className="select-field min-w-[12rem] flex-1"
-            />
-          )}
-        </div>
-        {noModels ? (
-          <div className="rounded-lg border border-[var(--line)] px-3 py-2" data-testid="images-studio-no-models">
-            <p className="text-sm font-medium text-[var(--text)]">{t("images.noModels.title")}</p>
-            <p className="mt-1 text-xs text-[var(--text-2)]">
-              <SettingsLinkHint i18nKey="images.noModels.body" vars={{ gateway: gatewayName }} />
-            </p>
-          </div>
-        ) : null}
-        {model ? <UnverifiedNote kind="images" unverified={spec.unverified} /> : null}
-        <MediaControlsNote kind="images" note={note} made={made} />
-        {!model || estimate.unknown ? null : (
-          <div className="space-y-0.5">
-            <p className="text-xs text-[var(--text-2)]" data-testid="images-studio-estimate">
-              {estimate.line}
-            </p>
-            {estimate.compare ? (
-              <p className="text-xs text-[var(--text-3)]" data-testid="images-studio-estimate-compare">
-                {estimate.compare}
-              </p>
-            ) : null}
-          </div>
-        )}
-        <div className={PROMPT_ROW}>
+      <form className="studio-composer" onSubmit={onSubmit} data-testid="images-studio-prompt-bar">
+        <div className="studio-composer-top">
+          <input
+            type="text"
+            className="studio-composer-input"
+            placeholder={t("images.promptPlaceholder")}
+            value={prompt}
+            onChange={(event) => {
+              setPrompt(event.target.value);
+              setSelectedExampleId(null);
+            }}
+            disabled={generating}
+            data-testid="images-studio-prompt"
+          />
           <EnhancePromptButton
             text={prompt}
             surface="images"
@@ -274,23 +248,14 @@ export function ImagesStudio() {
             testId="images-enhance"
             onApply={setPrompt}
           />
-          <input
-            type="text"
-            className={PROMPT_INPUT}
-            placeholder={t("images.promptPlaceholder")}
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            disabled={generating}
-            data-testid="images-studio-prompt"
-          />
           {generating ? <MascotSlot mode="images" placement="beside" busy decorative /> : null}
           <button
             type="submit"
-            className={`${PROMPT_SUBMIT} ${
+            className={
               needsKey
-                ? "inline-flex h-8 shrink-0 items-center justify-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
-                : "btn btn-primary h-8 shrink-0 rounded-pill px-4"
-            }`}
+                ? "inline-flex h-9 shrink-0 items-center justify-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
+                : "btn btn-primary h-9 shrink-0 rounded-pill px-4"
+            }
             disabled={generating || !prompt.trim() || needsKey || noModels}
             title={
               needsKey ? t("images.needsKey", { gateway: gatewayName, settings: t("rail.settings") }) : noModelsTitle
@@ -299,15 +264,89 @@ export function ImagesStudio() {
           >
             {generating ? <WorkingStatus label={t("images.generating")} /> : t("images.generate")}
           </button>
-          {needsKey && !loading ? (
-            <p className="basis-full text-xs text-[var(--text-3)]" data-testid="images-studio-needs-key">
-              <SettingsLinkHint i18nKey="images.needsKey" vars={{ gateway: gatewayName }} />
-            </p>
-          ) : null}
         </div>
+
+        <div className="studio-composer-bar">
+          {noModels ? null : (
+            <ModelSelect
+              models={modelOptions}
+              value={model}
+              onChange={setModel}
+              disabled={generating || models.length === 0}
+              testId="images-studio-model"
+              variant="pill"
+              prefix={t("images.modelLabel")}
+              ariaLabel={t("images.modelLabel")}
+            />
+          )}
+          {model ? (
+            <ImageControls spec={spec} pick={pick} shape={shape} onChange={setPick} disabled={generating} variant="pill" />
+          ) : null}
+          {!model || estimate.unknown ? null : (
+            <span
+              className="studio-cost-pill"
+              title={estimate.compare ?? undefined}
+              data-testid="images-studio-estimate"
+            >
+              <span>{estimate.line}</span>
+              {estimate.compare ? (
+                <span className="studio-cost-compare hidden md:inline" data-testid="images-studio-estimate-compare">
+                  · {estimate.compare}
+                </span>
+              ) : null}
+            </span>
+          )}
+        </div>
+
+        {hasNotes ? (
+          <div className="studio-composer-notes">
+            {noModels ? (
+              <div data-testid="images-studio-no-models">
+                <p className="text-xs font-medium text-[var(--text)]">{t("images.noModels.title")}</p>
+                <p className="mt-0.5 text-xs text-[var(--text-2)]">
+                  <SettingsLinkHint i18nKey="images.noModels.body" vars={{ gateway: gatewayName }} />
+                </p>
+              </div>
+            ) : null}
+            {model ? <UnverifiedNote kind="images" unverified={spec.unverified} /> : null}
+            <MediaControlsNote kind="images" note={note} made={made} />
+            {needsKey && !loading ? (
+              <p className="text-xs text-[var(--text-3)]" data-testid="images-studio-needs-key">
+                <SettingsLinkHint i18nKey="images.needsKey" vars={{ gateway: gatewayName }} />
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </form>
 
-      <section className="relative mt-8" data-testid="images-studio-gallery">
+      {showStarters && starters.length > 0 ? (
+        <div
+          className="studio-chips-row"
+          aria-label={t("images.examplesHeading")}
+          data-testid="example-gallery"
+        >
+          {starters.map((entry) => (
+            <button
+              key={entry.exampleId}
+              type="button"
+              className="studio-chip"
+              data-testid="example-card"
+              data-example-id={entry.exampleId}
+              aria-pressed={selectedExampleId === entry.exampleId}
+              title={entry.resultSummary}
+              disabled={generating}
+              onClick={() => {
+                setSelectedExampleId(entry.exampleId);
+                setPrompt(entry.prompt);
+              }}
+            >
+              {entry.title}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <section className="relative pt-2" data-testid="images-studio-gallery">
         {landed > 0 ? <Confetti key={landed} /> : null}
         {loading ? (
           <p className="text-sm text-[var(--text-3)]">{t("images.loadingGallery")}</p>
@@ -316,15 +355,19 @@ export function ImagesStudio() {
             <StudioEmptyDesk mode="images" flush />
           )
         ) : (
-          <ul className="grid gap-4 sm:grid-cols-2 min-[1600px]:grid-cols-3 min-[2400px]:grid-cols-4">
+          <ul className="studio-gallery-grid">
             {items.map((item) => (
-              <li key={item.id} className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
+              <li key={item.id} className="studio-gallery-card">
                 <GalleryImage
                   src={mediaSrc(item.url)}
                   alt={item.prompt || t("images.generatedAlt")}
                   missing={item.fileMissing === true}
                 />
-                {item.prompt ? <p className="truncate px-3 py-2 text-xs text-[var(--text-2)]">{item.prompt}</p> : null}
+                {item.prompt ? (
+                  <p className="studio-gallery-caption line-clamp-2" title={item.prompt}>
+                    {item.prompt}
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>

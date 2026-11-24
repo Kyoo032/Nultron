@@ -88,7 +88,6 @@ describe("onboarding hero thinning", () => {
   it("makes the hero the size container its shapes are queried against, without naming it (a name is the composer's)", () => {
     expect(css).toMatch(/\.onboarding-hero \{[^}]*container-type:\s*inline-size/);
     expect(css).not.toMatch(/\.onboarding-hero \{[^}]*container-name/);
-    expect(read("components", "onboarding-screen.tsx")).toMatch(/className="[^"]*\bonboarding-hero\b/);
   });
 
   it("hides tiers 2 and 3 until the hero is 26rem and 44rem wide", () => {

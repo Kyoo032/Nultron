@@ -34,8 +34,7 @@ describe("the callback reaches the screen only for a signed-in person on the hos
     expect(screen).toContain("void recordKeyLater();");
   });
 
-  it("finishes onboarding through onDone, so the tour is offered the one way it always is", () => {
-    expect(app.match(/offerGuideAfterOnboarding\(\)/g)).toHaveLength(1);
+  it("finishes onboarding through onDone, going straight into Chat", () => {
     const screen = read("components/onboarding-screen.tsx");
     expect(screen).toMatch(/function later\(\) \{[\s\S]*?onLater\(\);\s*onDone\(\);/);
   });

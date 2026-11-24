@@ -114,5 +114,6 @@
     "format": "format {asked} → {used}"
   },
   "sent": "Made at {summary}.",
-  "unverified": "Some values for this model come from the vendor's API, not from the gateway, and have not been checked here yet."
+  "unverified": "Some values for this model come from the vendor's API, not from the gateway, and have not been checked here yet.",
+  "modelLabel": "Model"
 }

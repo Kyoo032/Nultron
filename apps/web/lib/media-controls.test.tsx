@@ -29,13 +29,17 @@ import {
 beforeEach(() => applyLocale("en"));
 afterEach(() => resetLocaleForTests());
 
-/** The `<option>` values of the select with this test id, in order; `null` when the select is not drawn. */
+/** The option values of the `<UiSelect>` trigger with this test id, in order; `null` when not drawn. */
 function optionsOf(html: string, testId: string): string[] | null {
-  const select = new RegExp(`<select[^>]*data-testid="${testId}"[^>]*>(.*?)</select>`, "s").exec(html);
-  if (!select) {
+  const button = new RegExp(`<button[^>]*data-testid="${testId}"[^>]*>`, "s").exec(html)?.[0];
+  if (!button) {
     return null;
   }
-  return [...(select[1] ?? "").matchAll(/<option[^>]*value="([^"]*)"/g)].map((match) => match[1] ?? "");
+  const raw = /data-options="([^"]*)"/.exec(button)?.[1];
+  if (raw === undefined) {
+    return null;
+  }
+  return raw === "" ? [] : raw.split(",");
 }
 
 function videoHtml(model: string, pick?: Partial<VideoPick>): string {
@@ -112,10 +116,10 @@ describe("video controls", () => {
   it("checks the sound toggle only when sound was picked", () => {
     const off = videoHtml("seedance-2.0-fast", { audio: false });
     const on = videoHtml("seedance-2.0-fast", { audio: true });
-    expect(/data-testid="videos-studio-audio"/.test(off) && !/checked/.test(off.split("videos-studio-audio")[0] ?? "")).toBe(
-      true,
-    );
-    expect(on).toMatch(/checked=""[^>]*data-testid="videos-studio-audio"|data-testid="videos-studio-audio"[^>]*checked=""/);
+    const offTag = /<button[^>]*data-testid="videos-studio-audio"[^>]*>/.exec(off)?.[0] ?? "";
+    const onTag = /<button[^>]*data-testid="videos-studio-audio"[^>]*>/.exec(on)?.[0] ?? "";
+    expect(offTag).toContain('aria-checked="false"');
+    expect(onTag).toContain('aria-checked="true"');
   });
 });
 

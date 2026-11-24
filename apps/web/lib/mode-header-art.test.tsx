@@ -76,11 +76,9 @@ describe("mode header structure", () => {
     expect(html).toContain('data-testid="expected-inputs"');
   });
 
-  it("opts Settings and Workspaces out, whose headers are capped at the narrow measure", () => {
-    for (const file of ["settings-page", "workspaces-page"]) {
-      const source = read("components", `${file}.tsx`);
-      expect(source, file).toMatch(/<ModeHeader[^>]*\bshapes=\{false\}/);
-    }
+  it("opts Workspaces out of header art and keeps Settings free of decorative ModeHeader art", () => {
+    expect(read("components", "workspaces-page.tsx")).toMatch(/<ModeHeader[^>]*\bshapes=\{false\}/);
+    expect(read("components", "settings-page.tsx")).not.toContain("<ModeHeader");
   });
 });
 

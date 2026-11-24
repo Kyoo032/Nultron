@@ -15,20 +15,18 @@ const studio = readFileSync(resolve(here, "../components/market-studio.tsx"), "u
 const client = readFileSync(resolve(here, "../lib/market-client.ts"), "utf8");
 
 describe("market studio specialist wiring", () => {
-  it("names the open desk instead of offering a second picker", () => {
+  it("names the open desk and provides a UiSelect specialist pill synced to the URL", () => {
     expect(studio).toContain('data-testid="market-specialist-current"');
-    expect(studio).toContain('aria-label={t("market.studio.specialistAria")}');
-    expect(studio).toContain('{t("market.studio.specialistLabel")}');
+    expect(studio).toContain('testId="market-specialist-select"');
+    expect(studio).toContain('ariaLabel={t("market.studio.specialistAria")}');
+    expect(studio).toContain('prefix={t("market.studio.specialistLabel")}');
     expect(studio).toContain("{specialistName(specialist)}");
+    expect(studio).toContain("navigate(`${MARKET_PATH}?specialist=${encodeURIComponent(next)}`)");
   });
 
-  it("dropped the in-page select: the rail is the only way to pick an agent", () => {
-    expect(studio).not.toContain('data-testid="market-specialist"');
-    expect(studio).not.toContain('id="market-specialist-select"');
-    expect(studio).not.toContain("data-testid={`market-specialist-${id}`}");
-    expect(studio).not.toContain("{MARKET_SPECIALISTS.map((id) => (");
-    expect(studio).not.toContain("onSpecialistChange");
-    expect(studio).not.toContain("setSpecialist(");
+  it("renders no native <select> in the studio (uses UiSelect pills)", () => {
+    expect(studio).not.toContain("<select");
+    expect(studio).toContain("<UiSelect");
   });
 
   it("takes the agent from the URL, validated, with the core default behind it", () => {
@@ -54,17 +52,15 @@ describe("market studio specialist wiring", () => {
     expect(studio).toContain("saveWatchlist(workspaceId, specialist, next);");
   });
 
-  it("renders the provenance badge under the hint, in the one mounted picker", () => {
+  it("renders the provenance badge after the hint in the studio metadata strip", () => {
     expect(studio).toContain('data-testid="market-specialist-sources"');
     expect(studio).toContain("{specialistSources}");
     expect(studio).toContain('prefix: t("market.studio.sourcesLabel")');
     expect(studio).toContain('computedLabel: t("market.studio.sourcesComputed")');
-    // The hint comes first, and the picker is written once for both placements.
     expect(studio.indexOf('data-testid="market-specialist-hint"')).toBeLessThan(
       studio.indexOf('data-testid="market-specialist-sources"'),
     );
     expect(studio.split('data-testid="market-specialist-sources"')).toHaveLength(2);
-    expect(studio.split("const specialistPicker = (")).toHaveLength(2);
   });
 
   it("names each agent from the catalog with the core meta behind it", () => {

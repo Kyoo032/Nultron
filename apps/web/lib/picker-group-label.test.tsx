@@ -12,7 +12,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
-import { ModelSelect } from "@/components/model-select";
+import { ModelSelect, modelSelectGroups } from "@/components/model-select";
 import { applyLocale, resetLocaleForTests, t } from "./i18n";
 import { embeddingsGroupLabel, pickerGroupLabel } from "./picker-group-label";
 
@@ -48,36 +48,36 @@ describe("pickerGroupLabel", () => {
   });
 });
 
-describe("the native model select", () => {
+describe("the custom model select", () => {
   // GPT 6 Astra is the Recommended pick here; a superseded id such as GPT 5.6 Sol would be left out.
   const catalog = [model("gpt-6-astra"), model("gpt-5.2"), model("claude-sonnet-4-5"), model("omni-fast")];
 
   it("shows Indonesian group headings and no English literal when the desk is Indonesian", () => {
     applyLocale("id");
-    const html = renderToStaticMarkup(<ModelSelect models={catalog} value="gpt-5.2" onChange={() => {}} />);
-    expect(html).toContain('label="Disarankan"');
-    expect(html).toContain('label="Lainnya"');
-    expect(html).not.toContain('label="Recommended"');
-    expect(html).not.toContain('label="Other"');
+    const labels = modelSelectGroups(catalog, "gpt-5.2").groups.map((group) => group.label);
+    expect(labels).toContain("Disarankan");
+    expect(labels).toContain("Lainnya");
+    expect(labels).not.toContain("Recommended");
+    expect(labels).not.toContain("Other");
     // Brands are proper nouns.
-    expect(html).toContain('label="GPT"');
-    expect(html).toContain('label="Claude"');
+    expect(labels).toContain("GPT");
+    expect(labels).toContain("Claude");
   });
 
   it("leaves a superseded model out, unless it is the one the desk has selected", () => {
     applyLocale("en");
     const withOld = [...catalog, model("gpt-5.6-sol")];
     const other = renderToStaticMarkup(<ModelSelect models={withOld} value="gpt-5.2" onChange={() => {}} />);
-    expect(other).not.toContain('value="gpt-5.6-sol"');
+    expect(other).not.toContain("gpt-5.6-sol");
     const selected = renderToStaticMarkup(<ModelSelect models={withOld} value="gpt-5.6-sol" onChange={() => {}} />);
-    expect(selected).toContain('value="gpt-5.6-sol"');
+    expect(selected).toContain('data-value="gpt-5.6-sol"');
   });
 
   it("keeps the English headings on an English desk", () => {
     applyLocale("en");
-    const html = renderToStaticMarkup(<ModelSelect models={catalog} value="gpt-5.2" onChange={() => {}} />);
-    expect(html).toContain('label="Recommended"');
-    expect(html).toContain('label="Other"');
+    const labels = modelSelectGroups(catalog, "gpt-5.2").groups.map((group) => group.label);
+    expect(labels).toContain("Recommended");
+    expect(labels).toContain("Other");
   });
 
   it.each([
@@ -85,15 +85,10 @@ describe("the native model select", () => {
     ["id", "Embedding"],
   ] as const)("names the flat embeddings list in %s", (locale, word) => {
     applyLocale(locale);
-    const html = renderToStaticMarkup(
-      <ModelSelect
-        flat
-        models={[model("text-embedding-3-small")]}
-        value="text-embedding-3-small"
-        onChange={() => {}}
-      />,
-    );
-    expect(html).toContain(`label="${word}"`);
+    const labels = modelSelectGroups([model("text-embedding-3-small")], "text-embedding-3-small", {
+      flat: true,
+    }).groups.map((group) => group.label);
+    expect(labels).toEqual([word]);
   });
 });
 
