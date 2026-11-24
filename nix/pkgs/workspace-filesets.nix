@@ -146,7 +146,9 @@ in
       hostFileset
       (existing [
         "scripts/build-sandbox-runtime.mjs"
+        "scripts/sandbox-runtime-lock.mjs"
         "scripts/sandbox-runtime.lock.json"
+        "scripts/sandbox-licenses"
       ])
     ]
   );

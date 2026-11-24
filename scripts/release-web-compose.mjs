@@ -212,8 +212,9 @@ services:
       - sh
       - /app/webapp-deploy/portal-entry.sh
     command:
-      - node
-      - dist/main.mjs
+      - sh
+      - -c
+      - if [ -f dist/main.mjs ]; then exec node dist/main.mjs; else exec ./node_modules/.bin/tsx src/main.ts; fi
     depends_on:
       portal-prepare:
         condition: service_completed_successfully

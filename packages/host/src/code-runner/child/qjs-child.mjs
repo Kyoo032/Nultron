@@ -30,11 +30,18 @@ const LINE_CAP_CHARS = 100_000;
 const DISCARD_WASM_BYTES = 64 * 1024 * 1024;
 
 const t0 = performance.now();
-const mod = await newQuickJSWASMModuleFromVariant(
-  newVariant(releaseSync, {
-    wasmMemory: new WebAssembly.Memory({ initial: 256, maximum: (WASM_MAX_MB * 1048576) / 65536 }),
-  }),
-);
+const wasmMem = new WebAssembly.Memory({ initial: 256, maximum: (WASM_MAX_MB * 1048576) / 65536 });
+let activeWasmCapBytes = null;
+let hitWasmCap = false;
+const origGrow = wasmMem.grow.bind(wasmMem);
+wasmMem.grow = (delta) => {
+  if (activeWasmCapBytes !== null && wasmMem.buffer.byteLength + delta * 65536 > activeWasmCapBytes) {
+    hitWasmCap = true;
+    throw new RangeError("wasm memory cap reached");
+  }
+  return origGrow(delta);
+};
+const mod = await newQuickJSWASMModuleFromVariant(newVariant(releaseSync, { wasmMemory: wasmMem }));
 send({ type: "ready", timings: { totalMs: +(performance.now() - t0).toFixed(0) } });
 
 /** A guest output name becomes the part after `out/`: `/workspace/out/x`, `out/x` and `x` all mean out/x. */
@@ -60,7 +67,9 @@ function runJob(job) {
   const deadlineMs = job.deadlineMs ?? 25_000;
   const stackKb = job.stackKb ?? 256;
   const heapLimitBytes = job.heapLimitBytes ?? 128 * 1024 * 1024;
-  const wasmCapBytes = job.wasmCapBytes ?? (WASM_MAX_MB - 16) * 1024 * 1024;
+  const hardWasmCap = (WASM_MAX_MB - 16) * 1024 * 1024;
+  const wasmCapBytes =
+    job.wasmCapBytes ?? Math.min(hardWasmCap, Math.max(heapLimitBytes, wasmMem.buffer.byteLength + 16 * 1024 * 1024));
   const started = performance.now();
 
   const out = [];
@@ -74,14 +83,14 @@ function runJob(job) {
   rt.setMemoryLimit(heapLimitBytes);
   rt.setMaxStackSize(stackKb * 1024);
   const deadline = Date.now() + deadlineMs;
-  const wasmMem = mod.getWasmMemory();
+  hitWasmCap = false;
   rt.setInterruptHandler(() => {
-    if (Date.now() > deadline) {
-      why = "deadline";
+    if (hitWasmCap || wasmMem.buffer.byteLength > wasmCapBytes) {
+      why = "wasm-memory";
       return true;
     }
-    if (wasmMem.buffer.byteLength > wasmCapBytes) {
-      why = "wasm-memory";
+    if (Date.now() > deadline) {
+      why = "deadline";
       return true;
     }
     return false;
@@ -132,29 +141,35 @@ function runJob(job) {
   let error = null;
   let errorName = null;
   let value = null;
-  const r = vm.evalCode(String(job.code ?? ""), "<exec>");
-  if (r.error) {
-    const e = vm.dump(r.error);
-    errorName = String(e?.name ?? "Error");
-    error = (typeof e === "string" ? e : `${e?.name ?? "Error"}: ${e?.message ?? ""}\n${e?.stack ?? ""}`).slice(
-      -16_000,
-    );
-    r.error.dispose();
-  } else {
-    const jobs = rt.executePendingJobs(10_000);
-    if (jobs.error) {
-      const e = vm.dump(jobs.error);
+  activeWasmCapBytes = wasmCapBytes;
+  try {
+    const r = vm.evalCode(String(job.code ?? ""), "<exec>");
+    if (r.error) {
+      const e = vm.dump(r.error);
       errorName = String(e?.name ?? "Error");
-      error = `${e?.name ?? "Error"}: ${e?.message ?? ""}\n${e?.stack ?? ""}`.slice(-16_000);
-      jobs.error.dispose();
+      error = (typeof e === "string" ? e : `${e?.name ?? "Error"}: ${e?.message ?? ""}\n${e?.stack ?? ""}`).slice(
+        -16_000,
+      );
+      r.error.dispose();
+    } else {
+      const jobs = rt.executePendingJobs(10_000);
+      if (jobs.error) {
+        const e = vm.dump(jobs.error);
+        errorName = String(e?.name ?? "Error");
+        error = `${e?.name ?? "Error"}: ${e?.message ?? ""}\n${e?.stack ?? ""}`.slice(-16_000);
+        jobs.error.dispose();
+      }
+      const v = vm.dump(r.value);
+      r.value.dispose();
+      if (v !== undefined && v !== null) {
+        value = (typeof v === "string" ? v : JSON.stringify(v)).slice(0, 100_000);
+      }
     }
-    const v = vm.dump(r.value);
-    r.value.dispose();
-    if (v !== undefined && v !== null) {
-      value = (typeof v === "string" ? v : JSON.stringify(v)).slice(0, 100_000);
-    }
+  } finally {
+    activeWasmCapBytes = null;
   }
-  if (why || (error && /out of memory|stack overflow|interrupted/i.test(error))) discard = true;
+  if (hitWasmCap && error) why = "wasm-memory";
+  if (hitWasmCap || why || (error && /out of memory|stack overflow|interrupted/i.test(error))) discard = true;
 
   // Outputs: list names and sizes inside the guest first, then pull only what the limits allow.
   const files = {};
@@ -214,7 +229,13 @@ function runJob(job) {
   }
   const ran = performance.now() - started;
   return {
-    error: error ?? (why === "deadline" ? "InternalError: interrupted" : null),
+    error:
+      error ??
+      (why === "wasm-memory"
+        ? "InternalError: wasm memory cap reached"
+        : why === "deadline"
+          ? "InternalError: interrupted"
+          : null),
     errorName: errorName ?? (why ? "InternalError" : null),
     why,
     value,

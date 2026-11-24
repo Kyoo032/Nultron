@@ -55,6 +55,12 @@ describe("classifyGuestError, JavaScript", () => {
     expect(
       classifyGuestError("javascript", result({ error: "InternalError: out of memory", errorName: "InternalError" })),
     ).toBe("memory");
+    expect(
+      classifyGuestError(
+        "javascript",
+        result({ error: "InternalError: out of memory", errorName: "InternalError", why: "deadline" }),
+      ),
+    ).toBe("memory");
     expect(classifyGuestError("javascript", result({ error: "SyntaxError: x", errorName: "SyntaxError" }))).toBe(
       "syntax",
     );
