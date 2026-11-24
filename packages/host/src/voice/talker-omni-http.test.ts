@@ -7,6 +7,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  ACK_RETRY_TTL_MS,
   acknowledgementWords,
   createOmniHttpTalker,
   resetTalkerCachesForTests,
@@ -339,6 +340,40 @@ describe("createOmniHttpTalker answer", () => {
     expect(error).toMatchObject({ code: "failed" });
     expect(chatCalls(calls)).toHaveLength(0);
   });
+
+  it("masks PII in answer text and pending question before sending to the gateway", async () => {
+    const { calls, fetchImpl } = install((call) => {
+      const messages = call.json?.messages;
+      if (chatCalls([call]).length === 1 && Array.isArray(messages) && messages.length === 2) {
+        return sse([
+          chunk({
+            tool_calls: [
+              {
+                index: 0,
+                id: "call_pii",
+                function: {
+                  name: "ask_nultron",
+                  arguments: '{"question":"Email rina@example.com for the total"}',
+                },
+              },
+            ],
+          }),
+          chunk({}, "tool_calls"),
+        ]);
+      }
+      return sse([chunk({ content: "Done." }), chunk({}, "stop", USAGE)]);
+    });
+    const open = session(fetchImpl);
+    const signal = new AbortController().signal;
+    await collect(open.reply(PCM, { signal }));
+    await collect(open.answer("call_pii", "Send to rina@example.com or 081234567890", { signal }));
+    const second = chatCalls(calls)[1];
+    const serialized = JSON.stringify(second?.json);
+    expect(serialized).not.toContain("rina@example.com");
+    expect(serialized).not.toContain("081234567890");
+    expect(serialized).toContain("[email]");
+    expect(serialized).toContain("[phone]");
+  });
 });
 
 describe("createOmniHttpTalker remember", () => {
@@ -621,5 +656,46 @@ describe("acknowledgement", () => {
     expect(acknowledgementWords({ model: MODEL, voice: "MismatchVoice", locale: "en" })).toBe("bukan kalimatnya");
     made.open({ locale: "en", history: [] });
     expect(calls.filter((call) => isAck(call.json))).toHaveLength(1);
+  });
+
+  it("normalizes punctuation and case in sameWords and retries failed ack after backoff TTL", async () => {
+    let now = 1_000_000;
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
+    try {
+      let attempt = 0;
+      const { calls, fetchImpl } = install(
+        () => {
+          attempt += 1;
+          if (attempt === 1) {
+            return new Response("down", { status: 503 });
+          }
+          return sse([
+            chunk({ content: "one moment let me check!" }),
+            chunk({ audio: { data: Buffer.from([1, 2]).toString("base64") } }),
+            chunk({}, "stop"),
+          ]);
+        },
+        { ack: "script" },
+      );
+      const made = talker(fetchImpl, { voice: "RetryVoice" });
+      const first = made.open({ locale: "en", history: [] });
+      await whenAcknowledgementSettled({ model: MODEL, voice: "RetryVoice", locale: "en" });
+      expect(first.acknowledgement()).toBeNull();
+
+      // Within backoff TTL: still skips retry.
+      now += ACK_RETRY_TTL_MS - 1_000;
+      made.open({ locale: "en", history: [] });
+      await whenAcknowledgementSettled({ model: MODEL, voice: "RetryVoice", locale: "en" });
+      expect(calls.filter((call) => isAck(call.json))).toHaveLength(1);
+
+      // Past backoff TTL: retries and caches even with punctuation/case differences.
+      now += 2_000;
+      const second = made.open({ locale: "en", history: [] });
+      await whenAcknowledgementSettled({ model: MODEL, voice: "RetryVoice", locale: "en" });
+      expect(calls.filter((call) => isAck(call.json))).toHaveLength(2);
+      expect(second.acknowledgement()).toEqual({ pcm: Buffer.from([1, 2]), text: ACK_SENTENCE.en });
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });

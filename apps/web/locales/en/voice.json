@@ -18,7 +18,8 @@
     "listening": "Listening",
     "hearing": "Hearing you",
     "thinking": "Thinking",
-    "speaking": "Speaking"
+    "speaking": "Speaking",
+    "muted": "Muted"
   },
   "mode": {
     "handsFree": "Hands-free",
@@ -27,13 +28,21 @@
     "release": "Release to send",
     "switchLabel": "Talking mode"
   },
+  "controls": {
+    "mute": "Mute mic",
+    "unmute": "Unmute mic",
+    "stop": "Stop speaking",
+    "done": "Done"
+  },
   "hint": {
-    "bargeIn": "Just start talking to cut in at any time."
+    "bargeIn": "Just start talking to cut in at any time.",
+    "spaceHold": "Tip: hold Spacebar to talk."
   },
   "card": {
     "label": "Needs your go-ahead",
     "run": "Run in Chat",
-    "started": "Started in Chat"
+    "started": "Started in Chat",
+    "dismiss": "Dismiss"
   },
   "caption": {
     "interrupted": "Cut short"

@@ -18,7 +18,8 @@
     "listening": "Mendengarkan",
     "hearing": "Mendengar Anda",
     "thinking": "Berpikir",
-    "speaking": "Berbicara"
+    "speaking": "Berbicara",
+    "muted": "Mik dibisukan"
   },
   "mode": {
     "handsFree": "Bicara langsung",
@@ -27,13 +28,21 @@
     "release": "Lepas untuk kirim",
     "switchLabel": "Mode bicara"
   },
+  "controls": {
+    "mute": "Bisukan mik",
+    "unmute": "Aktifkan mik",
+    "stop": "Hentikan bicara",
+    "done": "Selesai"
+  },
   "hint": {
-    "bargeIn": "Langsung bicara saja kapan pun Anda ingin menyela."
+    "bargeIn": "Langsung bicara saja kapan pun Anda ingin menyela.",
+    "spaceHold": "Tips: tahan tombol Spasi untuk bicara."
   },
   "card": {
     "label": "Perlu persetujuan Anda",
     "run": "Jalankan di Chat",
-    "started": "Dimulai di Chat"
+    "started": "Dimulai di Chat",
+    "dismiss": "Tutup kartu"
   },
   "caption": {
     "interrupted": "Disela"

@@ -372,6 +372,7 @@ describe("voice relay", () => {
     transcriber = transcribeOk();
     armWiring();
 
+    process.env.AGENTFORGE_VOICE = "off";
     const disabled = await postSession();
     expect(disabled.status).toBe(403);
     expect((disabled as HostJsonResult).body).toMatchObject({ error: { code: "voice_disabled" } });
@@ -529,7 +530,7 @@ describe("voice relay", () => {
     if (!foreign.ok) return;
     expect(await refused(`/api/v1/voice/sessions/${foreign.session.id}/stream`)).toBe(404);
 
-    delete process.env.AGENTFORGE_VOICE;
+    process.env.AGENTFORGE_VOICE = "off";
     expect(await refused(path)).toBe(403);
     enableVoice();
 
@@ -1253,6 +1254,167 @@ describe("voice relay", () => {
     await playOut(box);
   });
 
+  it("handles immediate-onset PTT speech starting loudly on frame 0 and short PTT bursts on commit", async () => {
+    talker = new FakeTalker();
+    transcriber = transcribeOk();
+    armWiring();
+    const { ws, box } = await openReady("push_to_talk");
+    // Loud speech from sample 0 with no leading silence: must NOT raise floor to suppress speech_start.
+    sendPcm(ws, tone(300, 0.25));
+    await until(() => states(box).includes("hearing"), "immediate onset hearing");
+    ws.send(JSON.stringify({ type: "commit" }));
+    await until(() => (talker.sessions[0]?.calls.length ?? 0) === 1, "immediate commit");
+    await playOut(box);
+
+    // Short <120 ms speech energy with commit still commits cleanly via energy fallback.
+    sendPcm(ws, tone(80, 0.15));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    ws.send(JSON.stringify({ type: "commit" }));
+    await until(() => (talker.sessions[0]?.calls.length ?? 0) === 2, "short burst commit");
+    await playOut(box);
+  });
+
+  it("commits PTT barge-in over speaking agent (<700 ms and >=700 ms during waitPlayed) without stranding", async () => {
+    talker = new FakeTalker();
+    let turn = 0;
+    talker.script = async function* (call) {
+      await Promise.resolve();
+      if (call.signal.aborted) return;
+      turn += 1;
+      if (turn === 1 || turn === 3) {
+        yield { type: "text", delta: ANSWER };
+        yield { type: "audio", pcm: tone(3000) };
+        yield { type: "usage", usage: USAGE };
+        await new Promise<void>((resolve) => {
+          if (call.signal.aborted) {
+            resolve();
+            return;
+          }
+          call.signal.addEventListener("abort", () => resolve(), { once: true });
+        });
+        return;
+      }
+      yield { type: "text", delta: "Second reply" };
+      yield { type: "audio", pcm: tone(200) };
+      yield { type: "usage", usage: USAGE };
+      yield { type: "done" };
+    };
+    transcriber = transcribeOk();
+    armWiring();
+    const { ws, box } = await openReady("push_to_talk");
+
+    // Turn 1: trigger agent speaking (3 s audio).
+    sendPcm(ws, tone(200));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    ws.send(JSON.stringify({ type: "commit" }));
+    await until(() => states(box).includes("speaking"), "speaking turn 1");
+
+    // Case A: PTT barge-in <700 ms (barge_in + 300 ms tone + commit).
+    ws.send(JSON.stringify({ type: "barge_in" }));
+    sendPcm(ws, tone(300));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    ws.send(JSON.stringify({ type: "commit" }));
+    await until(() => box.frames.some((frame) => frame.type === "stop_audio"), "stop_audio <700ms");
+    ws.send(JSON.stringify({ type: "played", ms: 200 }));
+    await until(() => (talker.sessions[0]?.calls.length ?? 0) === 2, "committed <700ms PTT barge-in");
+    await until(() => box.frames.some((frame) => frame.type === "caption" && frame.text === "Second reply"), "reply 2");
+    await playOut(box);
+
+    // Case B: PTT barge-in >=700 ms where commit arrives WHILE doInterrupt() is awaiting waitPlayed().
+    sendPcm(ws, tone(200));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    ws.send(JSON.stringify({ type: "commit" }));
+    await until(() => states(box).filter((s) => s === "speaking").length >= 3, "speaking turn 3");
+
+    ws.send(JSON.stringify({ type: "barge_in" }));
+    sendPcm(ws, tone(800));
+    await until(() => box.frames.filter((frame) => frame.type === "stop_audio").length >= 2, "stop_audio >=700ms");
+    // Release Hold (commit) BEFORE sending played (while waitPlayed() is pending!).
+    ws.send(JSON.stringify({ type: "commit" }));
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    ws.send(JSON.stringify({ type: "played", ms: 250 }));
+    await until(() => (talker.sessions[0]?.calls.length ?? 0) === 4, "committed >=700ms PTT barge-in");
+    await playOut(box);
+  });
+
+  it("transitions to thinking after ack during slow ask_nultron and waits for the spoken answer before finalizing", async () => {
+    talker = new FakeTalker();
+    talker.ack = { pcm: tone(1000), text: "One moment, let me check." };
+    talker.script = async function* (call) {
+      await Promise.resolve();
+      if (call.signal.aborted) return;
+      if (call.kind === "reply") {
+        yield { type: "ask", callId: "call-slow", question: "Check my Q3 revenue" };
+        yield { type: "done" };
+        return;
+      }
+      yield { type: "text", delta: "Revenue was twelve million." };
+      yield { type: "audio", pcm: tone(3000) };
+      yield { type: "usage", usage: USAGE };
+      yield { type: "done" };
+    };
+    transcriber = transcribeOk();
+    let resolveAsk!: (value: AskResult) => void;
+    armWiring(
+      () =>
+        new Promise<AskResult>((resolve) => {
+          resolveAsk = resolve;
+        }),
+    );
+    const { ws, box } = await openReady();
+    sendPcm(ws, pcm(tone(200), silence(800)));
+
+    // Ack starts playing -> speaking.
+    await until(() => states(box).includes("speaking"), "ack speaking");
+    // Advance past the 1 s ack while ask_nultron is still running (5 s total delay) -> must move back to thinking.
+    clock.advance(1100);
+    await until(() => states(box).slice(-1)[0] === "thinking", "thinking during slow ask");
+
+    // Finish the remaining ~4 s of the 5 s ask delay and return an answer with PII to verify masking too.
+    clock.advance(3900);
+    resolveAsk({ kind: "answer", text: "Revenue was twelve million, contact rina@example.com.", toolCalls: [] });
+    await until(() => states(box).filter((s) => s === "speaking").length === 2, "answer speaking");
+
+    const answerCall = talker.sessions[0]?.calls.find((call) => call.kind === "answer");
+    expect(answerCall?.text).not.toContain("rina@example.com");
+    expect(answerCall?.text).toContain("[email]");
+
+    // Wait a tick for talker answer `done` to call schedulePlayback().
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    // Must NOT finalize at delay=0 or mid-answer (1.5 s into a 3 s answer).
+    clock.advance(1500);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(box.frames.some((frame) => frame.type === "saved")).toBe(false);
+
+    // Advance past the full 3 s spoken answer -> now finalizes and moves to listening.
+    clock.advance(1600);
+    await until(() => box.frames.some((frame) => frame.type === "saved"), "saved after 3 s answer");
+    await until(() => states(box).slice(-1)[0] === "listening", "listening after answer");
+    expect(states(box)).toEqual(["listening", "hearing", "thinking", "speaking", "thinking", "speaking", "listening"]);
+  });
+
+  it("cuts immediately on barge_in with immediate=true without waiting for speech or resuming", async () => {
+    talker = new FakeTalker();
+    talker.script = async function* (call) {
+      await Promise.resolve();
+      if (call.signal.aborted) return;
+      yield { type: "text", delta: ANSWER };
+      yield { type: "audio", pcm: tone(3000) };
+      yield { type: "usage", usage: USAGE };
+      yield { type: "done" };
+    };
+    transcriber = transcribeOk();
+    armWiring();
+    const { ws, box } = await openReady();
+    sendPcm(ws, pcm(tone(200), silence(800)));
+    await until(() => states(box).includes("speaking"), "speaking");
+    ws.send(JSON.stringify({ type: "barge_in", immediate: true }));
+    await until(() => box.frames.some((frame) => frame.type === "stop_audio"), "immediate stop_audio");
+    expect(box.frames.some((frame) => frame.type === "resume_audio")).toBe(false);
+    ws.send(JSON.stringify({ type: "played", ms: 400 }));
+    await until(() => box.frames.some((frame) => frame.type === "saved"), "saved after immediate interrupt");
+  });
+
   it("ends on connect, idle, max length, and a closed socket", async () => {
     talker = new FakeTalker();
     transcriber = transcribeOk();
@@ -1341,14 +1503,26 @@ describe("voice relay", () => {
         `listening after ${i + 1}`,
       );
     }
+    // Transient errors #1 and #2 emit a retry/status caption instead of dropping silently.
+    const retryCaptions = failing.box.frames.filter(
+      (frame) => frame.type === "caption" && frame.role === "assistant" && frame.text.includes("hiccup"),
+    );
+    expect(retryCaptions).toHaveLength(2);
     await until(() => failing.box.frames.some((frame) => frame.type === "ended" && frame.reason === "error"), "error");
   });
 
-  it("refuses every voice route and the upgrade when the flag is unset", async () => {
+  it("allows voice by default when unset, and refuses every voice route and upgrade when AGENTFORGE_VOICE=off", async () => {
     talker = new FakeTalker();
     transcriber = transcribeOk();
     armWiring();
     delete process.env.AGENTFORGE_VOICE;
+    const defaultOn = await postSession();
+    expect(defaultOn.status).toBe(201);
+    if (defaultOn.status === 201) {
+      await endSession((defaultOn as HostJsonResult & { body: { sessionId: string } }).body.sessionId);
+    }
+
+    process.env.AGENTFORGE_VOICE = "off";
     const created = await postSession();
     expect(created.status).toBe(403);
     const planted = voiceSessions().open({
