@@ -15,7 +15,8 @@
  */
 
 import type Database from "better-sqlite3";
-import { ApiError } from "@agentforge/core";
+import { ApiError, isEnvelope, openPayload, sealPayload } from "@agentforge/core";
+import { getLocalVaultKey } from "@agentforge/db/vault-key";
 import {
   INBOX_CAPS,
   inboxDisplayText,
@@ -147,11 +148,6 @@ export type SendTarget = { conversation: CustomerConversation; endpoint: Endpoin
 
 export type InboundOutcome = { duplicate: boolean; conversationId: string };
 
-/** `LIKE` wildcards in a search box are literal text, not patterns. */
-function likePattern(raw: string): string {
-  return `%${raw.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
-}
-
 export type ConnectEndpointInput = {
   kind: InboxKind;
   externalId: string;
@@ -163,7 +159,54 @@ export type ListFilter = { state?: ConversationState; query?: string; limit?: nu
 
 export type InboxStore = ReturnType<typeof createInboxStore>;
 
-export function createInboxStore(sql: InboxSql, newId: () => string = () => crypto.randomUUID()) {
+export function createInboxStore(
+  sql: InboxSql,
+  newId: () => string = () => crypto.randomUUID(),
+  keyProvider: () => Buffer = getLocalVaultKey,
+) {
+  function sealWithKey(value: string, key: Buffer): string {
+    return JSON.stringify(sealPayload(value, key));
+  }
+
+  function openWithKey(stored: string, getKey: () => Buffer): string {
+    let candidate: unknown = stored;
+    try {
+      candidate = JSON.parse(stored);
+    } catch {
+      return stored;
+    }
+    if (!isEnvelope(candidate)) {
+      return stored;
+    }
+    const key = getKey();
+    try {
+      const opened = openPayload<unknown>(candidate, key);
+      return typeof opened === "string" ? opened : stored;
+    } catch {
+      return stored;
+    }
+  }
+
+  function lazyKey(): () => Buffer {
+    let cached: Buffer | null = null;
+    return () => (cached ??= keyProvider());
+  }
+
+  function openConversation(row: ConversationDb, now: number, getKey: () => Buffer = lazyKey()): CustomerConversation {
+    return conversationOf(
+      {
+        ...row,
+        contact_name: openWithKey(row.contact_name, getKey),
+        last_message_preview: openWithKey(row.last_message_preview, getKey),
+      },
+      now,
+    );
+  }
+
+  function openMessage(row: MessageDb, getKey: () => Buffer = lazyKey()): CustomerMessage {
+    return messageOf({ ...row, text: openWithKey(row.text, getKey) });
+  }
+
   /* ------------------------------------------------------------------------------ endpoints */
 
   function findActiveEndpoint(kind: InboxKind, externalId: string): EndpointRow | null {
@@ -276,6 +319,8 @@ export function createInboxStore(sql: InboxSql, newId: () => string = () => cryp
    * the conversation's newest message) is stored but does not move the preview or the order.
    */
   const recordInbound = sql.transaction((endpoint: EndpointRow, message: InboundMessage, now: number): InboundOutcome => {
+    const key = keyProvider();
+    const getKey = () => key;
     const name = inboxDisplayText(message.contactName, "");
     const existing = sql
       .prepare("SELECT * FROM customer_conversations WHERE endpoint_id = ? AND contact_id = ?")
@@ -290,7 +335,7 @@ export function createInboxStore(sql: InboxSql, newId: () => string = () => cryp
              (id, organization_id, workspace_id, endpoint_id, kind, contact_id, contact_name, state, unread_count,
               last_inbound_at, last_outbound_at, last_message_at, last_message_preview, last_message_direction,
               created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 'needs_you', 0, NULL, NULL, ?, '', 'in', ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'needs_you', 0, NULL, NULL, ?, ?, 'in', ?, ?)`,
         )
         .run(
           conversationId,
@@ -299,8 +344,9 @@ export function createInboxStore(sql: InboxSql, newId: () => string = () => cryp
           endpoint.id,
           endpoint.kind,
           message.contactId,
-          name || message.contactId,
+          sealWithKey(name || message.contactId, key),
           message.at,
+          sealWithKey("", key),
           now,
           now,
         );
@@ -312,34 +358,42 @@ export function createInboxStore(sql: InboxSql, newId: () => string = () => cryp
            (id, workspace_id, conversation_id, direction, sent_by, kind, external_id, text, delivery, delivery_error, created_at)
          VALUES (?, ?, ?, 'in', 'customer', ?, ?, ?, NULL, NULL, ?)`,
       )
-      .run(newId(), endpoint.workspaceId, conversationId, message.kind, message.messageId, message.text, message.at);
+      .run(
+        newId(),
+        endpoint.workspaceId,
+        conversationId,
+        message.kind,
+        message.messageId,
+        sealWithKey(message.text, key),
+        message.at,
+      );
     if (Number(inserted.changes ?? 0) === 0) {
       return { duplicate: true, conversationId };
     }
 
     const newest = !existing || message.at >= existing.last_message_at;
+    const nextContactName = name || (existing ? openWithKey(existing.contact_name, getKey) : message.contactId);
+    const nextPreview = newest ? previewOf(message.text) : openWithKey(existing.last_message_preview, getKey);
     sql
       .prepare(
         `UPDATE customer_conversations SET
-           contact_name = CASE WHEN ? <> '' THEN ? ELSE contact_name END,
+           contact_name = ?,
            state = CASE WHEN state = 'auto' THEN state ELSE 'needs_you' END,
            unread_count = unread_count + 1,
            last_inbound_at = CASE WHEN last_inbound_at IS NULL OR ? > last_inbound_at THEN ? ELSE last_inbound_at END,
            last_message_at = CASE WHEN ? THEN ? ELSE last_message_at END,
-           last_message_preview = CASE WHEN ? THEN ? ELSE last_message_preview END,
+           last_message_preview = ?,
            last_message_direction = CASE WHEN ? THEN 'in' ELSE last_message_direction END,
            updated_at = ?
          WHERE id = ?`,
       )
       .run(
-        name,
-        name,
+        sealWithKey(nextContactName, key),
         message.at,
         message.at,
         newest ? 1 : 0,
         message.at,
-        newest ? 1 : 0,
-        previewOf(message.text),
+        sealWithKey(nextPreview, key),
         newest ? 1 : 0,
         now,
         conversationId,
@@ -380,26 +434,37 @@ export function createInboxStore(sql: InboxSql, newId: () => string = () => cryp
       clauses.push("state = ?");
       params.push(filter.state);
     }
+    const getKey = lazyKey();
     const query = filter.query?.trim();
-    if (query) {
-      clauses.push("(contact_name LIKE ? ESCAPE '\\' OR contact_id LIKE ? ESCAPE '\\')");
-      params.push(likePattern(query), likePattern(query));
-    }
     const limit = Math.min(Math.max(1, filter.limit ?? INBOX_CAPS.maxListed), INBOX_CAPS.maxListed);
+    if (query) {
+      // contact_name is AES-256-GCM sealed at rest, so substring matching runs after decrypting.
+      const needle = query.toLowerCase();
+      const rows = sql
+        .prepare(
+          `SELECT * FROM customer_conversations WHERE ${clauses.join(" AND ")}
+            ORDER BY last_message_at DESC, rowid DESC`,
+        )
+        .all(...params) as ConversationDb[];
+      return rows
+        .map((row) => openConversation(row, now, getKey))
+        .filter((conv) => conv.contactName.toLowerCase().includes(needle) || conv.contactId.toLowerCase().includes(needle))
+        .slice(0, limit);
+    }
     const rows = sql
       .prepare(
         `SELECT * FROM customer_conversations WHERE ${clauses.join(" AND ")}
           ORDER BY last_message_at DESC, rowid DESC LIMIT ?`,
       )
       .all(...params, limit) as ConversationDb[];
-    return rows.map((row) => conversationOf(row, now));
+    return rows.map((row) => openConversation(row, now, getKey));
   }
 
   function getConversation(scope: DeskScope, conversationId: string, now: number): CustomerConversation | null {
     const row = sql
       .prepare("SELECT * FROM customer_conversations WHERE id = ? AND workspace_id = ?")
       .get(conversationId, scope.workspaceId) as ConversationDb | undefined;
-    return row ? conversationOf(row, now) : null;
+    return row ? openConversation(row, now) : null;
   }
 
   function listMessages(scope: DeskScope, conversationId: string): CustomerMessage[] | null {
@@ -415,7 +480,8 @@ export function createInboxStore(sql: InboxSql, newId: () => string = () => cryp
          ) ORDER BY created_at ASC, seq ASC`,
       )
       .all(conversationId, scope.workspaceId, INBOX_CAPS.maxThreadMessages) as MessageDb[];
-    return rows.map(messageOf);
+    const getKey = lazyKey();
+    return rows.map((row) => openMessage(row, getKey));
   }
 
   /**
@@ -467,21 +533,23 @@ export function createInboxStore(sql: InboxSql, newId: () => string = () => cryp
     const endpoint = sql
       .prepare("SELECT * FROM channel_endpoints WHERE id = ? AND workspace_id = ?")
       .get(row.endpoint_id, scope.workspaceId) as EndpointDb | undefined;
-    return endpoint ? { conversation: conversationOf(row, now), endpoint: endpointOf(endpoint) } : null;
+    return endpoint ? { conversation: openConversation(row, now), endpoint: endpointOf(endpoint) } : null;
   }
 
   /** Write the owner's reply as `queued` before the send, so a failed send is visible in the thread. */
   function beginOutbound(scope: DeskScope, conversationId: string, text: string, now: number): CustomerMessage {
     const id = newId();
+    const key = keyProvider();
     sql
       .prepare(
         `INSERT INTO customer_messages
            (id, workspace_id, conversation_id, direction, sent_by, kind, external_id, text, delivery, delivery_error, created_at)
          VALUES (?, ?, ?, 'out', 'owner', 'text', NULL, ?, 'queued', NULL, ?)`,
       )
-      .run(id, scope.workspaceId, conversationId, text, now);
-    return messageOf(
+      .run(id, scope.workspaceId, conversationId, sealWithKey(text, key), now);
+    return openMessage(
       sql.prepare("SELECT * FROM customer_messages WHERE id = ?").get(id) as MessageDb,
+      () => key,
     );
   }
 
@@ -502,6 +570,7 @@ export function createInboxStore(sql: InboxSql, newId: () => string = () => cryp
       if (!row) {
         return null;
       }
+      const getKey = lazyKey();
       if (result.ok) {
         // A status webhook can beat us here with `delivered` or `read`; the id is stored either way
         // and the status only moves forward.
@@ -509,33 +578,37 @@ export function createInboxStore(sql: InboxSql, newId: () => string = () => cryp
         sql
           .prepare("UPDATE customer_messages SET external_id = ?, delivery = ?, delivery_error = NULL WHERE id = ?")
           .run(result.externalId, next, messageId);
-        sql
-          .prepare(
-            `UPDATE customer_conversations SET
-               state = 'with_you', unread_count = 0, last_outbound_at = ?,
-               last_message_at = CASE WHEN ? >= last_message_at THEN ? ELSE last_message_at END,
-               last_message_preview = CASE WHEN ? >= last_message_at THEN ? ELSE last_message_preview END,
-               last_message_direction = CASE WHEN ? >= last_message_at THEN 'out' ELSE last_message_direction END,
-               updated_at = ?
-             WHERE id = ? AND workspace_id = ?`,
-          )
-          .run(
-            row.created_at,
-            row.created_at,
-            row.created_at,
-            row.created_at,
-            previewOf(row.text),
-            row.created_at,
-            now,
-            row.conversation_id,
-            scope.workspaceId,
-          );
+        const conv = sql
+          .prepare("SELECT last_message_at FROM customer_conversations WHERE id = ? AND workspace_id = ?")
+          .get(row.conversation_id, scope.workspaceId) as { last_message_at: number } | undefined;
+        const isNewest = !conv || row.created_at >= conv.last_message_at;
+        if (isNewest) {
+          const preview = sealWithKey(previewOf(openWithKey(row.text, getKey)), getKey());
+          sql
+            .prepare(
+              `UPDATE customer_conversations SET
+                 state = 'with_you', unread_count = 0, last_outbound_at = ?,
+                 last_message_at = ?, last_message_preview = ?, last_message_direction = 'out',
+                 updated_at = ?
+               WHERE id = ? AND workspace_id = ?`,
+            )
+            .run(row.created_at, row.created_at, preview, now, row.conversation_id, scope.workspaceId);
+        } else {
+          sql
+            .prepare(
+              `UPDATE customer_conversations SET
+                 state = 'with_you', unread_count = 0, last_outbound_at = ?,
+                 updated_at = ?
+               WHERE id = ? AND workspace_id = ?`,
+            )
+            .run(row.created_at, now, row.conversation_id, scope.workspaceId);
+        }
       } else {
         sql
           .prepare("UPDATE customer_messages SET delivery = 'failed', delivery_error = ? WHERE id = ?")
           .run(inboxDisplayText(result.error, "The message could not be sent"), messageId);
       }
-      return messageOf(sql.prepare("SELECT * FROM customer_messages WHERE id = ?").get(messageId) as MessageDb);
+      return openMessage(sql.prepare("SELECT * FROM customer_messages WHERE id = ?").get(messageId) as MessageDb, getKey);
     },
   );
 
