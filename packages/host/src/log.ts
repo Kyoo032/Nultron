@@ -14,7 +14,7 @@
  * The call site can still be careless; the logger stays the floor.
  */
 import { AsyncLocalStorage } from "node:async_hooks";
-import { redactSecrets } from "@agentforge/core";
+import { maskPii, redactSecrets } from "@agentforge/core";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -140,10 +140,14 @@ function describeError(error: Error): string {
   return error.message ? `${error.name}: ${error.message}` : error.name;
 }
 
-/** One value, made safe: secrets redacted, forbidden names dropped, depth and width capped. */
+function sanitiseText(text: string): string {
+  return maskPii(redactSecrets(text));
+}
+
+/** One value, made safe: secrets redacted, PII masked, forbidden names dropped, depth and width capped. */
 function sanitiseValue(value: unknown, depth: number, seen: ReadonlySet<object>): unknown {
   if (typeof value === "string") {
-    return redactSecrets(value);
+    return sanitiseText(value);
   }
   if (value === null || typeof value === "number" || typeof value === "boolean") {
     return value;
@@ -155,7 +159,7 @@ function sanitiseValue(value: unknown, depth: number, seen: ReadonlySet<object>)
     return undefined;
   }
   if (value instanceof Error) {
-    return redactSecrets(describeError(value));
+    return sanitiseText(describeError(value));
   }
   if (value instanceof Date) {
     return value.toISOString();
@@ -174,7 +178,7 @@ function sanitiseValue(value: unknown, depth: number, seen: ReadonlySet<object>)
   if (isPlainRecord(value)) {
     return sanitiseFields(value, depth + 1, nested);
   }
-  return redactSecrets(String(value));
+  return sanitiseText(String(value));
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -206,7 +210,7 @@ function sanitiseFields(
 
 function lineFor(level: LogLevel, event: string, fields: Readonly<Record<string, unknown>>): string {
   const safe = sanitiseFields(fields, 0, new Set<object>());
-  const record = { ts: new Date().toISOString(), level, event: redactSecrets(event), ...safe };
+  const record = { ts: new Date().toISOString(), level, event: sanitiseText(event), ...safe };
   try {
     return JSON.stringify(record);
   } catch {

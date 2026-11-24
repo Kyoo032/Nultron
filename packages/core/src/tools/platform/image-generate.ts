@@ -2,6 +2,7 @@ import { z } from "zod";
 import { resolvedGatewayBaseUrl } from "../../gateway";
 import { ApiError } from "../../errors";
 import { currentOutboundGuard, mediaSendRefusal } from "../../security/outbound-guard";
+import { maskPii } from "../../security/pii";
 import { defineTool } from "../define-tool";
 import { gatewayGenerateModel } from "../media-model-choice";
 import { imageInputSchema, mediaReferenceId, resolveImageInput } from "../media-reference";
@@ -143,7 +144,7 @@ export const imageGenerateTool = defineTool({
       return { success: false, error: resolved.error };
     }
     const aspect = imageShape(size, aspect_ratio);
-    const finalPrompt = imagePrompt(prompt, style);
+    const finalPrompt = maskPii(imagePrompt(prompt, style));
     const held = mediaSendRefusal({
       imageUrl: image_url && !mediaReferenceId(image_url) ? image_url : undefined,
       prompt: finalPrompt,

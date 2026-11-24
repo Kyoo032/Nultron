@@ -4,11 +4,8 @@
  * One rule shapes every detector in this file: **money is never masked.** A Finance prompt is mostly
  * long digit runs — a rupiah total is routinely 10 to 16 digits — so a detector may only fire when
  * the text carries something an amount cannot have: a NIK's embedded birth date, an NPWP's dotted
- * shape, the leading `0` of an `08xx` phone, or a label written immediately beside the number.
- *
- * Detectors that need a column header to be safe (a bank account with no label beside it, a person's
- * name) are deliberately not here. They live in `packages/core/src/finance/pii-scan.ts`, which only
- * ever sees a table and can read the header above a cell.
+ * shape, the leading `0` of an `08xx` phone, a bank-style structure, or a label/bank cue beside
+ * the number.
  */
 
 export type IdPiiKind = "nik" | "npwp" | "account" | "phone";
@@ -40,6 +37,40 @@ const FEMALE_DAY_OFFSET = 40;
 
 export function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
+}
+
+/** Luhn checksum — shared with the card detector so unlabelled account detection never steals a PAN. */
+export function passesLuhn(digits: string): boolean {
+  if (!/^\d{13,19}$/.test(digits)) {
+    return false;
+  }
+  let sum = 0;
+  let alternate = false;
+  for (let i = digits.length - 1; i >= 0; i -= 1) {
+    let n = Number(digits[i]);
+    if (alternate) {
+      n *= 2;
+      if (n > 9) {
+        n -= 9;
+      }
+    }
+    sum += n;
+    alternate = !alternate;
+  }
+  return sum % 10 === 0;
+}
+
+const CARD_PREFIX_RE = /^(?:4|5[1-5]|2[2-7]|34|37|6011|64[4-9]|65|35|30[0-5]|36|3[89]|62)/;
+const CARD_ROUND_TAIL_RE = /0{4}$/;
+
+function looksLikeCard(raw: string, digits: string): boolean {
+  if (!passesLuhn(digits)) {
+    return false;
+  }
+  if (/[ -]/.test(raw)) {
+    return true;
+  }
+  return CARD_PREFIX_RE.test(digits) && !CARD_ROUND_TAIL_RE.test(digits);
 }
 
 /**
@@ -106,17 +137,45 @@ const NIK_LABELLED_RE = /\b(?:nik|no\.?\s*ktp|nomor\s*ktp|ktp)\b\s*(?:no\.?|nomo
 const NPWP_LABELLED_RE = /\bnpwp\b\s*(?:no\.?|nomor)?\s*[:#=-]?\s*(\d[\d\s.-]{13,26})/gi;
 
 /**
- * A bank account only when the cue sits immediately before the digits. "Rekening Bank: 1250000000"
- * therefore does not match (the word `Bank` is in the way) and neither does "Accounts payable
- * 450000000" — both are amounts, and an amount that lost its digits is a wrong brief.
+ * Recognized bank names that may sit between an account cue and the digits ("Rekening BCA 1234567890",
+ * "No. Rek Mandiri: 1370004567890"). The generic word "Bank" is deliberately omitted so
+ * "Rekening Bank: 1250000000" (a ledger line) and "Accounts payable 450000000" stay untouched.
  */
-const ACCOUNT_LABELLED_RE =
-  /\b(?:no\.?\s*rek(?:ening)?|nomor\s*rek(?:ening)?|norek|rekening|a\/c|acct\.?|account\s*(?:no\.?|number|#))\s*[:#=-]?\s*(\d[\d\s-]{6,23})(?!\d)/gi;
+const BANK_NAME_PART =
+  "(?:BCA|BRI|BNI|Mandiri|BSI|CIMB(?:\\s+Niaga)?|Permata|Danamon|OCBC(?:\\s+NISP)?|BTN|Panin|Maybank|Mega|UOB|HSBC|Citibank|Jago|SeaBank|Jenius|Blu)";
+
+const ACCOUNT_LABELLED_RE = new RegExp(
+  `\\b(?:no\\.?\\s*rek(?:ening)?|nomor\\s*rek(?:ening)?|norek|rekening|a\\/c|acct\\.?|account\\s*(?:no\\.?|number|#))(?:\\s+${BANK_NAME_PART})?\\s*[:#=-]?\\s*(\\d[\\d\\s-]{6,23})(?!\\d)`,
+  "gi",
+);
+
+const IBAN_LABELLED_RE =
+  /\biban\b\s*[:#=-]?\s*([A-Za-z]{2}\d{2}(?:[ ]?[A-Za-z0-9]{4}){2,7}(?:[ ]?[A-Za-z0-9]{1,4})?)\b/gi;
+
+const IBAN_BARE_RE = /\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?\b/g;
+
+const ACCOUNT_CUE_BEFORE_RE = new RegExp(
+  `\\b(?:transfer(?:\\s+(?:ke|to|via|dari|from))?|ke\\s+rek(?:ening)?|via\\s+(?:bank\\s+)?|${BANK_NAME_PART}|iban)\\b(?:\\s+(?:ke|to|no\\.?|nomor))?[\\s:#=-]{0,20}$`,
+  "i",
+);
+
+const UNLABELLED_ACCOUNT_RE = /(?<![\d.,-])(\d[\d -]{8,20}\d)(?![\d.,-])/g;
+const ROUND_TOTAL_TAIL_RE = /0{4}$/;
+const GROUPED_THOUSANDS_SPACE_RE = /^\d{1,3}(?: \d{3})+$/;
+const BANK_HYPHEN_GROUPING_RE = /^[1-9]\d{1,3}(?:-\d{2,7}){2,3}$/;
+const US_PHONE_HYPHEN_RE = /^\d{3}-\d{3}-\d{4}$/;
 
 const ACCOUNT_MIN_DIGITS = 8;
 const ACCOUNT_MAX_DIGITS = 20;
+const UNLABELLED_ACCOUNT_MIN_DIGITS = 10;
+const UNLABELLED_ACCOUNT_MAX_DIGITS = 16;
 const LOCAL_PHONE_MIN_DIGITS = 10;
 const LOCAL_PHONE_MAX_DIGITS = 13;
+
+function isValidIbanShape(raw: string): boolean {
+  const compact = raw.replace(/\s+/g, "");
+  return compact.length >= 15 && compact.length <= 34 && digitsOnly(compact).length >= 10;
+}
 
 function overlaps(found: ReadonlyArray<IdPiiMatch>, index: number, length: number): boolean {
   return found.some((item) => index < item.index + item.match.length && index + length > item.index);
@@ -159,6 +218,12 @@ function collectLabelled(text: string, found: IdPiiMatch[]): void {
       add(found, { kind: "account", match: span.text, index: span.index });
     }
   }
+  for (const match of text.matchAll(IBAN_LABELLED_RE)) {
+    const span = capturedSpan(match);
+    if (span && isValidIbanShape(span.text)) {
+      add(found, { kind: "account", match: span.text, index: span.index });
+    }
+  }
 }
 
 function collectUnlabelled(text: string, found: IdPiiMatch[]): void {
@@ -181,6 +246,40 @@ function collectUnlabelled(text: string, found: IdPiiMatch[]): void {
     if (match.index !== undefined && digits.length >= LOCAL_PHONE_MIN_DIGITS && digits.length <= LOCAL_PHONE_MAX_DIGITS) {
       add(found, { kind: "phone", match: match[0], index: match.index });
     }
+  }
+  for (const match of text.matchAll(IBAN_BARE_RE)) {
+    if (match.index !== undefined && isValidIbanShape(match[0])) {
+      add(found, { kind: "account", match: match[0], index: match.index });
+    }
+  }
+  for (const match of text.matchAll(UNLABELLED_ACCOUNT_RE)) {
+    if (match.index === undefined) {
+      continue;
+    }
+    const raw = match[1] ?? match[0];
+    const digits = digitsOnly(raw);
+    if (digits.length < UNLABELLED_ACCOUNT_MIN_DIGITS || digits.length > UNLABELLED_ACCOUNT_MAX_DIGITS) {
+      continue;
+    }
+    if (ROUND_TOTAL_TAIL_RE.test(digits) || GROUPED_THOUSANDS_SPACE_RE.test(raw)) {
+      continue;
+    }
+    if (isNikDigits(digits) || looksLikeCard(raw, digits) || /^08/.test(digits)) {
+      continue;
+    }
+    const before = text.slice(Math.max(0, match.index - MONEY_CUE_LOOKBACK), match.index);
+    if (MONEY_CUE_RE.test(before)) {
+      continue;
+    }
+    const hasBankGrouping = BANK_HYPHEN_GROUPING_RE.test(raw) && !US_PHONE_HYPHEN_RE.test(raw);
+    const hasCue = ACCOUNT_CUE_BEFORE_RE.test(before);
+    if (!hasBankGrouping && !hasCue) {
+      continue;
+    }
+    if (hasCue && (/^0\d{2,3}[ -]/.test(raw) || US_PHONE_HYPHEN_RE.test(raw))) {
+      continue;
+    }
+    add(found, { kind: "account", match: raw, index: match.index });
   }
 }
 

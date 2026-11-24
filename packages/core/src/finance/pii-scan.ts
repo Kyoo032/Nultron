@@ -19,7 +19,8 @@
  *  - **A preview is redacted.** A hit reports where something was found, never what it said.
  */
 import { PII_MASK, maskPii, scanPii, type PiiKind } from "../security/pii";
-import { classifyFinanceHeader, pseudonymAllocator, type FinanceColumnKind } from "./pii-columns";
+import { isNikDigits } from "../security/pii-id";
+import { classifyFinanceHeader, financeHeaderIsAmount, pseudonymAllocator, type FinanceColumnKind } from "./pii-columns";
 import { isDerivedLabel } from "./import-table/derived";
 import { findHeaderIndex, splitBlocks } from "./import-table/layout";
 import { cellValue } from "./import-table/numbers";
@@ -153,10 +154,10 @@ function scanRow(row: ReadonlyArray<string>, rowIndex: number, context: RowConte
       return redacted;
     }
     // The column was not named as an identifier, so a cell that reads as a number is a figure and
-    // nothing below may rewrite it. 2024 cost of sales, written `(23.960.000.000)` under a column
-    // headed `2024`, reached the model as `[phone])` before this line existed: no word in that
-    // header says "amount", so the cell fell through to free-text masking and lost its digits.
-    if (parsesAsAmount(cell)) {
+    // nothing below may rewrite it — except a bare 16-digit NIK in a non-amount / headerless column
+    // (SR-187), which cannot be a round rupiah total.
+    const isAmountColumn = rules !== null && financeHeaderIsAmount(rules.header[column] ?? "");
+    if (parsesAsAmount(cell) && (isAmountColumn || !isNikDigits(cell.trim()))) {
       return cell;
     }
     const masked = maskPii(cell);
@@ -220,9 +221,9 @@ function fitsDigitRange(value: string, kind: FinanceColumnKind): boolean {
 function scannablePart(line: string): string | null {
   const at = line.indexOf(":");
   if (at > 0 && parsesAsAmount(line.slice(at + 1))) {
-    return line.slice(0, at);
+    return isNikDigits(line.slice(at + 1).trim()) ? line : line.slice(0, at);
   }
-  return parsesAsAmount(line) ? null : line;
+  return parsesAsAmount(line) && !isNikDigits(line.trim()) ? null : line;
 }
 
 function scanPlainLine(line: string, index: number, hits: FinancePiiHit[]): string {

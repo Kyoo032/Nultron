@@ -3,6 +3,7 @@ import { ApiError, studioVideoFailureStatus } from "@agentforge/core";
 import {
   defaultStudioMusicModel,
   defaultStudioVideoModel,
+  generateStudioVideo,
   listStudioImageModels,
   listStudioMusicModels,
   listStudioVideoModels,
@@ -13,6 +14,8 @@ import {
   studioSpeechUnavailable,
 } from "./studio-generate";
 import { mediaIdFromUrl } from "./media-id";
+import { saveModelCache } from "./model-cache";
+import { getTenant } from "./tenant";
 
 describe("parseImageGenerateBody", () => {
   it("requires a prompt", () => {
@@ -287,5 +290,45 @@ describe("music model lists", () => {
 
   it("explains that the only speech id on this gateway is realtime", () => {
     expect(studioSpeechUnavailable(models)).toBe("realtime_only");
+  });
+});
+
+describe("generateStudioVideo outbound PII masking", () => {
+  it("masks PII in body.prompt before calling renderVideo", async () => {
+    const tenant = await getTenant();
+    saveModelCache(
+      {
+        openai: [
+          {
+            id: "seedance-2.0-fast",
+            label: "Seedance 2.0 Fast",
+            provider: "openai",
+            inputModalities: ["text"],
+          },
+        ],
+      },
+      tenant,
+    );
+    const seenPrompts: string[] = [];
+    const result = await generateStudioVideo(
+      tenant,
+      { prompt: "A title card that says call alex.rivera@example.com for Kirim ke Rina Wijaya" },
+      {
+        renderVideo: async (call) => {
+          seenPrompts.push(call.prompt);
+          return {
+            success: true,
+            video: "data:video/mp4;base64,AAAA",
+            model: call.model,
+          };
+        },
+      },
+    );
+    expect(seenPrompts).toHaveLength(1);
+    expect(seenPrompts[0]).not.toContain("alex.rivera@example.com");
+    expect(seenPrompts[0]).not.toContain("Rina Wijaya");
+    expect(seenPrompts[0]).toContain("[email]");
+    expect(seenPrompts[0]).toContain("[name]");
+    expect(result.prompt).toContain("alex.rivera@example.com");
   });
 });

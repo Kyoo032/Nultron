@@ -4,6 +4,7 @@ import { clampVideoSeconds } from "../../models/video-capabilities";
 import { publishedMediaParamsFor } from "../../models/media-params-source";
 import { ApiError } from "../../errors";
 import { currentOutboundGuard, mediaSendRefusal } from "../../security/outbound-guard";
+import { maskPii } from "../../security/pii";
 import { defineTool } from "../define-tool";
 import { gatewayGenerateModel } from "../media-model-choice";
 import { imageInputSchema, mediaReferenceId, resolveImageInput } from "../media-reference";
@@ -149,9 +150,10 @@ export const videoGenerateTool = defineTool({
       return { success: false, error: resolved.error };
     }
     const sourceImage = resolved.url;
+    const maskedPrompt = maskPii(prompt);
     const held = mediaSendRefusal({
       imageUrl: image_url && !mediaReferenceId(image_url) ? image_url : undefined,
-      prompt,
+      prompt: maskedPrompt,
       thirdParty: route.backend !== "gateway",
     });
     if (held) {
@@ -164,7 +166,7 @@ export const videoGenerateTool = defineTool({
       const generated =
         route.backend === "gateway"
           ? await generateGatewayVideo({
-              prompt,
+              prompt: maskedPrompt,
               aspectRatio: aspect_ratio,
               imageUrl: sourceImage,
               seconds,
@@ -178,7 +180,7 @@ export const videoGenerateTool = defineTool({
             })
           : route.backend === "volcengine"
             ? await generateWithSeedance(
-                prompt,
+                maskedPrompt,
                 sourceImage,
                 aspect,
                 apiKey,
@@ -186,7 +188,7 @@ export const videoGenerateTool = defineTool({
                 fetchImpl,
                 seconds,
               )
-            : await generateWithFal(prompt, sourceImage, aspect, apiKey, fetchImpl);
+            : await generateWithFal(maskedPrompt, sourceImage, aspect, apiKey, fetchImpl);
       currentOutboundGuard()?.noteHostMedia([generated.url]);
       if (route.backend === "gateway") {
         reportModelOutcome({ tenant, model: gatewayModel, kind: "video", ok: true });
@@ -197,7 +199,7 @@ export const videoGenerateTool = defineTool({
         video: generated.url,
         model: generated.model,
         modality: sourceImage ? "image" : "text",
-        prompt,
+        prompt: maskedPrompt,
         // What the request actually carried, and what had to be moved to get there (gateway only).
         ...("sent" in generated ? { sent: generated.sent, adjusted: generated.adjusted } : {}),
       };
