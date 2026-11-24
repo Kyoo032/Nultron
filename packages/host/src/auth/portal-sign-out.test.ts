@@ -53,6 +53,7 @@ function tokensFor(refreshToken: string): PortalTokens {
     orgId: "o",
     tenantId: "t",
     role: null,
+    gatewayEndpoint: null,
   };
 }
 

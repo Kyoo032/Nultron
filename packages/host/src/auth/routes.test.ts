@@ -921,6 +921,7 @@ describe("POST /api/v1/auth/logout ends the portal session with a live token", (
       orgId: "o",
       tenantId: "t",
       role: null,
+      gatewayEndpoint: null,
     };
   }
 
@@ -1209,6 +1210,7 @@ describe("the refresh token at rest", () => {
           orgId: "o",
           tenantId: "t",
           role: null,
+          gatewayEndpoint: null,
         };
       },
       async logout({ accessToken }) {
