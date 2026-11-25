@@ -198,6 +198,12 @@ describe("scanIndonesianIds", () => {
       ]);
     }
 
+    // Non-breaking space inside a labelled account number is still captured as one account.
+    const nbsp = "No. Rekening: 1234\u00a05678\u00a090";
+    expect(scanIndonesianIds(nbsp)).toEqual([
+      { kind: "account", match: "1234\u00a05678\u00a090", index: nbsp.indexOf("1234") },
+    ]);
+
     const weakLines = [
       "Set the budget to\n1234567890",
       "Revenue grew to\n1234567890",

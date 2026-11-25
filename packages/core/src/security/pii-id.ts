@@ -148,7 +148,7 @@ const ACCOUNT_LABEL_PART =
   "(?:no\\.?\\s*rek(?:ening)?|nomor\\s*rek(?:ening)?|norek|rekening|a\\/c|acct\\.?|account(?:\\s*(?:no\\.?|number|#))?)";
 
 const ACCOUNT_LABELLED_RE = new RegExp(
-  `\\b(?:no\\.?[ \\t]*rek(?:ening)?|nomor[ \\t]*rek(?:ening)?|norek|rekening|a\\/c|acct\\.?|account[ \\t]*(?:no\\.?|number|#))(?:[ \\t]+${BANK_NAME_PART})?[ \\t]*[:#=-]?(?:[ \\t]*\\r?\\n[ \\t]*|[ \\t]*)(\\d[\\d \\t-]{6,23})(?!\\d)`,
+  `\\b(?:no\\.?[ \\t]*rek(?:ening)?|nomor[ \\t]*rek(?:ening)?|norek|rekening|a\\/c|acct\\.?|account[ \\t]*(?:no\\.?|number|#))(?:[ \\t]+${BANK_NAME_PART})?[ \\t]*[:#=-]?(?:[ \\t]*\\r?\\n[ \\t]*|[ \\t]*)(\\d(?:[\\d-]|[^\\S\\r\\n]){6,23})(?!\\d)`,
   "gi",
 );
 

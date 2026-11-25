@@ -53,46 +53,67 @@ function mcpOutboundStoppedRefusal(): OutboundRefusal | null {
 }
 
 const runConnectorCalls = new WeakMap<ToolRun, Map<string, number>>();
-const runConnectorResourceIds = new WeakMap<ToolRun, Map<string, Set<string>>>();
+/** Per-run, per-connector map of displayed resourceId -> original wire resourceId returned by the endpoint. */
+const runConnectorResourceIds = new WeakMap<ToolRun, Map<string, Map<string, string>>>();
 const RESOURCE_ID_TOKEN_RE = /\b[A-Za-z0-9_-]{16,80}\b/g;
 const COMPACT_HEX_UUID_RE = /\b([0-9a-f]{8})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{12})\b/gi;
-const HYPHENATED_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function canonicalizeNotionIds(text: string): string {
-  return text.replace(COMPACT_HEX_UUID_RE, "$1-$2-$3-$4-$5");
+function canonicalizeNotionIds(text: string): { text: string; aliases: Array<readonly [string, string]> } {
+  const aliases: Array<readonly [string, string]> = [];
+  const replaced = text.replace(COMPACT_HEX_UUID_RE, (raw, a: string, b: string, c: string, d: string, e: string) => {
+    const hyphenated = `${a}-${b}-${c}-${d}-${e}`;
+    aliases.push([hyphenated, raw]);
+    return hyphenated;
+  });
+  return { text: replaced, aliases };
 }
 
-function rememberConnectorResourceIds(toolRun: ToolRun | undefined, connectorId: string, content: string): void {
+function rememberConnectorResourceIds(
+  toolRun: ToolRun | undefined,
+  connectorId: string,
+  content: string,
+  aliases: ReadonlyArray<readonly [string, string]> = [],
+): void {
   if (!toolRun) {
     return;
   }
   let byConnector = runConnectorResourceIds.get(toolRun);
   if (!byConnector) {
-    byConnector = new Map<string, Set<string>>();
+    byConnector = new Map<string, Map<string, string>>();
     runConnectorResourceIds.set(toolRun, byConnector);
   }
   let known = byConnector.get(connectorId);
   if (!known) {
-    known = new Set<string>();
+    known = new Map<string, string>();
     byConnector.set(connectorId, known);
+  }
+  for (const [displayed, original] of aliases) {
+    if (known.size >= 200) {
+      break;
+    }
+    known.set(displayed, original);
+    known.set(original, original);
   }
   for (const match of content.matchAll(RESOURCE_ID_TOKEN_RE)) {
     if (known.size >= 200) {
       break;
     }
     const token = match[0];
-    known.add(token);
-    if (HYPHENATED_UUID_RE.test(token)) {
-      known.add(token.replaceAll("-", ""));
+    if (!known.has(token)) {
+      known.set(token, token);
     }
   }
 }
 
-function isRememberedResourceId(toolRun: ToolRun | undefined, connectorId: string, resourceId: string): boolean {
+function resolveRememberedResourceId(
+  toolRun: ToolRun | undefined,
+  connectorId: string,
+  resourceId: string,
+): string | undefined {
   if (!toolRun) {
-    return false;
+    return undefined;
   }
-  return runConnectorResourceIds.get(toolRun)?.get(connectorId)?.has(resourceId) ?? false;
+  return runConnectorResourceIds.get(toolRun)?.get(connectorId)?.get(resourceId);
 }
 
 function trackConnectorCall(toolRun: ToolRun | undefined, connectorId: string, maxAllowed: number): boolean {
@@ -235,10 +256,11 @@ export async function runMcpFetch(
       };
     }
   }
+  let wireResourceId = args.resourceId;
   if (args.resourceId !== undefined) {
-    const refusal = isRememberedResourceId(toolRun, args.connector, args.resourceId)
-      ? mcpOutboundStoppedRefusal()
-      : mcpOutboundRefusal(args.resourceId);
+    const rememberedWireId = resolveRememberedResourceId(toolRun, args.connector, args.resourceId);
+    const refusal =
+      rememberedWireId !== undefined ? mcpOutboundStoppedRefusal() : mcpOutboundRefusal(args.resourceId);
     if (refusal) {
       return {
         ok: false,
@@ -246,6 +268,9 @@ export async function runMcpFetch(
         connector: args.connector,
         message: refusal.message,
       };
+    }
+    if (rememberedWireId !== undefined) {
+      wireResourceId = rememberedWireId;
     }
   }
 
@@ -265,9 +290,9 @@ export async function runMcpFetch(
   if (args.query !== undefined) {
     rpcArgs.query = args.query;
   }
-  if (args.resourceId !== undefined) {
-    rpcArgs.id = args.resourceId;
-    rpcArgs.resourceId = args.resourceId;
+  if (wireResourceId !== undefined) {
+    rpcArgs.id = wireResourceId;
+    rpcArgs.resourceId = wireResourceId;
   }
   if (args.limit !== undefined) {
     rpcArgs.limit = args.limit;
@@ -276,9 +301,12 @@ export async function runMcpFetch(
   try {
     const client = new McpHttpClient(args.connector, connection.endpointUrl, connection.token, fetchImpl);
     const result = await client.callReadOnlyTool(args.action, rpcArgs);
-    const preparedContent = args.connector === "notion" ? canonicalizeNotionIds(result.content) : result.content;
-    const redactedContent = redactSecrets(preparedContent);
-    rememberConnectorResourceIds(toolRun, args.connector, redactedContent);
+    const prepared =
+      args.connector === "notion"
+        ? canonicalizeNotionIds(result.content)
+        : { text: result.content, aliases: [] as Array<readonly [string, string]> };
+    const redactedContent = redactSecrets(prepared.text);
+    rememberConnectorResourceIds(toolRun, args.connector, redactedContent, prepared.aliases);
     return {
       ok: true,
       connector: args.connector,

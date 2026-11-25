@@ -480,13 +480,20 @@ describe("MCP connector handlers (endpoint token rule and test write-back)", () 
             expect(found.content).toContain("c77d2a3d-e936-47de-8d7c-a0d97a52a1ba");
           }
           const page = await runMcpFetch(
-            { connector: "notion", action: "get_page", resourceId: "c77d2a3de93647de8d7ca0d97a52a1ba" },
+            { connector: "notion", action: "get_page", resourceId: "c77d2a3d-e936-47de-8d7c-a0d97a52a1ba" },
             tenant,
           );
           expect(page.ok).toBe(true);
           if (page.ok) {
             expect(page.content).toContain("Roadmap priorities");
           }
+          // Passing the displayed hyphenated ID translates back to the exact wire ID the endpoint returned.
+          const lastGetPage = [...server.calls]
+            .reverse()
+            .find((call) => call.path === "/notion" && call.tool === "get_page");
+          expect((lastGetPage?.args as { resourceId?: string } | undefined)?.resourceId).toBe(
+            "c77d2a3de93647de8d7ca0d97a52a1ba",
+          );
           // An arbitrary 32-hex blob never returned by Notion is still refused.
           const arbitrary = await runMcpFetch(
             { connector: "notion", action: "get_page", resourceId: "deadbeefdeadbeefdeadbeefdeadbeef" },
