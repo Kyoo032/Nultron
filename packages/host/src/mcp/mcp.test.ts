@@ -477,7 +477,7 @@ describe("MCP connector handlers (endpoint token rule and test write-back)", () 
           const found = await runMcpFetch({ connector: "notion", action: "search", query: "roadmap" }, tenant);
           expect(found.ok).toBe(true);
           if (found.ok) {
-            expect(found.content).toContain("c77d2a3de93647de8d7ca0d97a52a1ba");
+            expect(found.content).toContain("c77d2a3d-e936-47de-8d7c-a0d97a52a1ba");
           }
           const page = await runMcpFetch(
             { connector: "notion", action: "get_page", resourceId: "c77d2a3de93647de8d7ca0d97a52a1ba" },

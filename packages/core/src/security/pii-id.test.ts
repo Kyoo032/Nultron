@@ -190,6 +190,14 @@ describe("scanIndonesianIds", () => {
       });
     }
 
+    // Wrapped account followed by a separate numeric line must NOT swallow the next line's amount (LF and CRLF).
+    for (const sep of ["\n", "\r\n"]) {
+      const multi = `No. Rekening:${sep}1234567890${sep}1250000000`;
+      expect(scanIndonesianIds(multi)).toEqual([
+        { kind: "account", match: "1234567890", index: multi.indexOf("1234567890") },
+      ]);
+    }
+
     const weakLines = [
       "Set the budget to\n1234567890",
       "Revenue grew to\n1234567890",
