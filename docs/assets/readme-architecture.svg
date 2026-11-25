@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 280" width="880" height="280" role="img" aria-label="Nultron hosted architecture and security flow">
+  <defs>
+    <linearGradient id="archBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f141b"/>
+      <stop offset="100%" stop-color="#131a24"/>
+    </linearGradient>
+    <linearGradient id="accentStroke" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1277C8"/>
+      <stop offset="100%" stop-color="#19BDDC"/>
+    </linearGradient>
+  </defs>
+
+  <style>
+    .hdr { font: 700 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; fill: #f0f6fc; }
+    .meta { font: 500 11px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #9fb8d8; }
+    .tag { font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #19BDDC; }
+    @keyframes dashFlow {
+      to { stroke-dashoffset: -36; }
+    }
+    .flow {
+      stroke-dasharray: 6 6;
+      animation: dashFlow 1.6s linear infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .flow { animation: none; }
+    }
+  </style>
+
+  <rect width="880" height="280" rx="16" fill="url(#archBg)" stroke="#1277C8" stroke-opacity="0.35" stroke-width="1.2"/>
+
+  <!-- Connectors with animated flow -->
+  <path id="pWebHost" d="M 220 140 L 296 140" fill="none" stroke="url(#accentStroke)" stroke-width="2" class="flow"/>
+  <path id="pHostGw" d="M 556 105 C 600 105, 600 52, 646 52" fill="none" stroke="#19BDDC" stroke-width="1.8" class="flow"/>
+  <path id="pHostMcp" d="M 556 128 C 600 128, 600 112, 646 112" fill="none" stroke="#6EA4FF" stroke-width="1.8" class="flow"/>
+  <path id="pHostPortal" d="M 556 152 C 600 152, 600 172, 646 172" fill="none" stroke="#1277C8" stroke-width="1.8" class="flow"/>
+  <path id="pHostDb" d="M 556 175 C 600 175, 600 232, 646 232" fill="none" stroke="#E4D9CD" stroke-width="1.8" class="flow"/>
+
+  <!-- Moving packet dots -->
+  <circle r="3.5" fill="#19BDDC"><animateMotion dur="2.1s" repeatCount="indefinite" path="M 220 140 L 296 140"/></circle>
+  <circle r="3" fill="#19BDDC"><animateMotion dur="2.4s" repeatCount="indefinite" path="M 556 105 C 600 105, 600 52, 646 52"/></circle>
+  <circle r="3" fill="#6EA4FF"><animateMotion dur="2.8s" repeatCount="indefinite" path="M 556 128 C 600 128, 600 112, 646 112"/></circle>
+  <circle r="3" fill="#1277C8"><animateMotion dur="3.0s" repeatCount="indefinite" path="M 556 152 C 600 152, 600 172, 646 172"/></circle>
+  <circle r="3" fill="#E4D9CD"><animateMotion dur="2.6s" repeatCount="indefinite" path="M 556 175 C 600 175, 600 232, 646 232"/></circle>
+
+  <!-- Left: Web App -->
+  <g transform="translate(26, 72)">
+    <rect width="194" height="136" rx="12" fill="#16202e" stroke="#6EA4FF" stroke-opacity="0.55" stroke-width="1.3"/>
+    <text x="16" y="26" class="tag">APPS/WEB</text>
+    <text x="16" y="47" class="hdr">Browser Renderer</text>
+    <text x="16" y="70" class="meta">• Vite + React Router</text>
+    <text x="16" y="88" class="meta">• 14 Chat-First Modes</text>
+    <text x="16" y="106" class="meta">• Voice + Team Sessions</text>
+    <text x="16" y="124" class="meta">• EN / ID (33 catalogs)</text>
+  </g>
+
+  <!-- Center: Express Host & Core -->
+  <g transform="translate(296, 46)">
+    <rect width="260" height="188" rx="12" fill="#162233" stroke="#19BDDC" stroke-opacity="0.7" stroke-width="1.5"/>
+    <text x="16" y="26" class="tag">PACKAGES/HOST + CORE</text>
+    <text x="16" y="48" class="hdr">Express Host &amp; Guardrails</text>
+    <text x="16" y="72" class="meta">• AES-256-GCM At-Rest Vault</text>
+    <text x="16" y="92" class="meta">• Outbound PII &amp; Secret Guard</text>
+    <text x="16" y="112" class="meta">• Deterministic Finance Math</text>
+    <text x="16" y="132" class="meta">• WASM Code Runner (Py/JS)</text>
+    <text x="16" y="152" class="meta">• Local Extract (No Cloud OCR)</text>
+    <text x="16" y="172" class="meta">• Telegram &amp; WhatsApp Inbox</text>
+  </g>
+
+  <!-- Right 1: Gateway -->
+  <g transform="translate(646, 26)">
+    <rect width="208" height="50" rx="10" fill="#152230" stroke="#19BDDC" stroke-opacity="0.5"/>
+    <text x="14" y="22" class="hdr">Toko Token &amp; BYOK</text>
+    <text x="14" y="39" class="meta">HTTPS pinned inference</text>
+  </g>
+
+  <!-- Right 2: MCP Sandbox -->
+  <g transform="translate(646, 86)">
+    <rect width="208" height="50" rx="10" fill="#152230" stroke="#6EA4FF" stroke-opacity="0.5"/>
+    <text x="14" y="22" class="hdr">Read-Only MCP Sandbox</text>
+    <text x="14" y="39" class="meta">Gmail · Drive · OneDrive · Notion</text>
+  </g>
+
+  <!-- Right 3: Portal -->
+  <g transform="translate(646, 146)">
+    <rect width="208" height="50" rx="10" fill="#152230" stroke="#1277C8" stroke-opacity="0.6"/>
+    <text x="14" y="22" class="hdr">Portal Auth (apps/portal)</text>
+    <text x="14" y="39" class="meta">HTTP only · Postgres seats</text>
+  </g>
+
+  <!-- Right 4: SQLite -->
+  <g transform="translate(646, 206)">
+    <rect width="208" height="50" rx="10" fill="#152230" stroke="#E4D9CD" stroke-opacity="0.45"/>
+    <text x="14" y="22" class="hdr">SQLite &amp; AEAD Backups</text>
+    <text x="14" y="39" class="meta">packages/db · secure_delete</text>
+  </g>
+</svg>

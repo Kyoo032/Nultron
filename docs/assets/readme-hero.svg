@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 220" width="880" height="220" role="img" aria-label="Nultron — Chat-first multi-harness workbench">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="55%" stop-color="#131617"/>
+      <stop offset="100%" stop-color="#0d1b2a"/>
+    </linearGradient>
+    <linearGradient id="wordmark" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1277C8">
+        <animate attributeName="stop-color" values="#1277C8;#19BDDC;#6EA4FF;#1277C8" dur="6s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="50%" stop-color="#19BDDC">
+        <animate attributeName="stop-color" values="#19BDDC;#6EA4FF;#1277C8;#19BDDC" dur="6s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="100%" stop-color="#6EA4FF">
+        <animate attributeName="stop-color" values="#6EA4FF;#1277C8;#19BDDC;#6EA4FF" dur="6s" repeatCount="indefinite"/>
+      </stop>
+    </linearGradient>
+    <radialGradient id="glowLeft" cx="18%" cy="35%" r="48%">
+      <stop offset="0%" stop-color="#1277C8" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#1277C8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowRight" cx="84%" cy="55%" r="42%">
+      <stop offset="0%" stop-color="#19BDDC" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#19BDDC" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#6EA4FF" stroke-opacity="0.07" stroke-width="1"/>
+    </pattern>
+    <clipPath id="cardClip">
+      <rect x="0" y="0" width="880" height="220" rx="18"/>
+    </clipPath>
+  </defs>
+
+  <style>
+    .title { font: 800 46px/1.1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; letter-spacing: 3px; }
+    .sub { font: 500 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; fill: #E4D9CD; }
+    .pill-text { font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; fill: #cfe5ff; letter-spacing: 0.6px; }
+    .orb-label { font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; fill: #E4D9CD; }
+    @keyframes floatSlow {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-6px); }
+    }
+    @keyframes pulseRing {
+      0%, 100% { opacity: 0.25; transform: scale(0.96); }
+      50% { opacity: 0.72; transform: scale(1.04); }
+    }
+    @keyframes scanBeam {
+      0% { transform: translateX(-220px); opacity: 0; }
+      20% { opacity: 0.45; }
+      80% { opacity: 0.45; }
+      100% { transform: translateX(920px); opacity: 0; }
+    }
+    @keyframes spinSlow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes spinReverse {
+      from { transform: rotate(360deg); }
+      to { transform: rotate(0deg); }
+    }
+    @keyframes blinkDot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .orbit-outer { transform-origin: 730px 110px; animation: spinSlow 24s linear infinite; }
+    .orbit-inner { transform-origin: 730px 110px; animation: spinReverse 15s linear infinite; }
+    .core-pulse { transform-origin: 730px 110px; animation: pulseRing 3.6s ease-in-out infinite; }
+    .float-badge { animation: floatSlow 4.5s ease-in-out infinite; }
+    .beam { animation: scanBeam 5.5s ease-in-out infinite; }
+    .live-dot { animation: blinkDot 1.8s ease-in-out infinite; }
+    @media (prefers-reduced-motion: reduce) {
+      .orbit-outer, .orbit-inner, .core-pulse, .float-badge, .beam, .live-dot { animation: none; }
+    }
+  </style>
+
+  <g clip-path="url(#cardClip)">
+    <rect width="880" height="220" fill="url(#bg)"/>
+    <rect width="880" height="220" fill="url(#grid)"/>
+    <rect width="880" height="220" fill="url(#glowLeft)"/>
+    <rect width="880" height="220" fill="url(#glowRight)"/>
+
+    <rect class="beam" x="0" y="0" width="140" height="220" fill="url(#wordmark)" opacity="0.06"/>
+
+    <rect x="0.75" y="0.75" width="878.5" height="218.5" rx="17.25" fill="none" stroke="#19BDDC" stroke-opacity="0.28" stroke-width="1.5"/>
+
+    <!-- Status badge -->
+    <g class="float-badge" transform="translate(46, 36)">
+      <rect x="0" y="0" width="296" height="26" rx="13" fill="#0E58F0" fill-opacity="0.18" stroke="#6EA4FF" stroke-opacity="0.45" stroke-width="1"/>
+      <circle class="live-dot" cx="16" cy="13" r="4" fill="#19BDDC"/>
+      <text x="30" y="17" class="pill-text">CLOSED BETA · 14 HARNESSES · OPC DESK</text>
+    </g>
+
+    <!-- Wordmark & tagline -->
+    <text x="46" y="122" class="title" fill="url(#wordmark)">NULTRON</text>
+    <text x="48" y="151" class="sub">Chat-first multi-harness workbench on the Toko Token gateway.</text>
+    <text x="48" y="175" class="sub" opacity="0.78">AES-256-GCM at rest · Outbound PII guard · Read-only MCP sandbox · EN / ID</text>
+
+    <!-- Animated orbital workbench graphic -->
+    <g>
+      <circle class="core-pulse" cx="730" cy="110" r="68" fill="none" stroke="#19BDDC" stroke-opacity="0.25" stroke-width="1.5"/>
+      <g class="orbit-outer">
+        <circle cx="730" cy="110" r="76" fill="none" stroke="#1277C8" stroke-opacity="0.45" stroke-dasharray="6 8" stroke-width="1.5"/>
+        <circle cx="730" cy="34" r="5" fill="#19BDDC"/>
+        <circle cx="806" cy="110" r="4.5" fill="#6EA4FF"/>
+        <circle cx="730" cy="186" r="4" fill="#E4D9CD"/>
+        <circle cx="654" cy="110" r="4.5" fill="#1277C8"/>
+      </g>
+      <g class="orbit-inner">
+        <circle cx="730" cy="110" r="48" fill="none" stroke="#6EA4FF" stroke-opacity="0.5" stroke-dasharray="3 6" stroke-width="1.2"/>
+        <circle cx="764" cy="76" r="3.5" fill="#19BDDC"/>
+        <circle cx="696" cy="144" r="3.5" fill="#E4D9CD"/>
+      </g>
+      <circle cx="730" cy="110" r="28" fill="#1277C8" fill-opacity="0.22" stroke="#19BDDC" stroke-width="1.8"/>
+      <text x="730" y="108" text-anchor="middle" class="orb-label">14</text>
+      <text x="730" y="121" text-anchor="middle" class="orb-label" opacity="0.85">MODES</text>
+    </g>
+
+    <!-- Bottom animated accent strip -->
+    <rect x="46" y="198" width="540" height="3" rx="1.5" fill="url(#wordmark)" opacity="0.85"/>
+  </g>
+</svg>
