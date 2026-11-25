@@ -53,9 +53,10 @@ function mcpOutboundStoppedRefusal(): OutboundRefusal | null {
   return probe?.kind === "stopped" ? probe : null;
 }
 
+type DisplayedToWireIds = Map<string, string>;
+
 const runConnectorCalls = new WeakMap<ToolRun, Map<string, number>>();
-/** Per-run, per-connector map of displayed resourceId -> original wire resourceId returned by the endpoint. */
-const runConnectorResourceIds = new WeakMap<ToolRun, Map<string, Map<string, string>>>();
+const runConnectorResourceIds = new WeakMap<ToolRun, Map<string, DisplayedToWireIds>>();
 const RESOURCE_ID_TOKEN_RE = /\b[A-Za-z0-9_-]{16,80}\b/g;
 const COMPACT_HEX_UUID_V4_RE = /\b([0-9a-f]{8})([0-9a-f]{4})(4[0-9a-f]{3})([89ab][0-9a-f]{3})([0-9a-f]{12})\b/gi;
 const NOTION_URL_BEFORE_RE = /https?:\/\/(?:[a-z0-9-]+\.)*notion\.(?:so|site)\/[^\s?#]*$/i;
@@ -64,16 +65,21 @@ const NOTION_ID_LABEL_BEFORE_RE =
 const SECRET_LABEL_BEFORE_RE =
   /(?:^|[\s,:{[("'_-])(?:secret|token|key|pass(?:word|wd)?|pwd|auth|bearer|cookie|sig(?:nature)?|hash|checksum|md5|sha\d*|hmac|cred(?:ential)?|private|webhook)(?:[_\s-]*id)?["']?[\s:=#-]{0,6}["']?$/i;
 
+function stripMarkdownInlineContext(text: string): string {
+  return text.replace(/[*`]+/g, "").replace(/(^|[\s,:{[("'-])_+|_+(?=[\s:=#-]|$)/g, "$1");
+}
+
 function hasNotionIdContext(text: string, offset: number): boolean {
   const lineStart = text.lastIndexOf("\n", offset - 1) + 1;
   const before = text.slice(Math.max(lineStart, offset - 160), offset);
   if (NOTION_URL_BEFORE_RE.test(before)) {
     return true;
   }
-  if (SECRET_LABEL_BEFORE_RE.test(before)) {
+  const plainBefore = stripMarkdownInlineContext(before);
+  if (SECRET_LABEL_BEFORE_RE.test(plainBefore)) {
     return false;
   }
-  return NOTION_ID_LABEL_BEFORE_RE.test(before);
+  return NOTION_ID_LABEL_BEFORE_RE.test(plainBefore);
 }
 
 function canonicalizeNotionIds(text: string): { text: string; aliases: Array<readonly [string, string]> } {
@@ -116,12 +122,19 @@ function rememberConnectorResourceIds(
   for (const match of rawContent.matchAll(RESOURCE_ID_TOKEN_RE)) {
     rawTokens.add(match[0]);
   }
+  const unchangedRedacted = aliases.length > 0 ? redactSecrets(rawContent) : redactedContent;
+  const survivingRawTokens = new Set<string>();
+  for (const match of unchangedRedacted.matchAll(RESOURCE_ID_TOKEN_RE)) {
+    if (rawTokens.has(match[0])) {
+      survivingRawTokens.add(match[0]);
+    }
+  }
   const visibleTokens = new Set<string>();
   for (const match of redactedContent.matchAll(RESOURCE_ID_TOKEN_RE)) {
     visibleTokens.add(match[0]);
   }
   for (const token of visibleTokens) {
-    if (!rawTokens.has(token)) {
+    if (!survivingRawTokens.has(token)) {
       continue;
     }
     if (!known.has(token) && known.size >= 200) {

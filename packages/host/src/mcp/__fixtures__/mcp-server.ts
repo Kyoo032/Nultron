@@ -184,6 +184,46 @@ export async function startMcpFixtureServer(expectedToken = "mcp_live_test_token
           );
           return;
         }
+        if (body.params?.arguments?.query === "__markdown_notion_id__") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              result: {
+                content: [
+                  {
+                    type: "text",
+                    text:
+                      "- **Page ID:** `c77d2a3de93647de8d7ca0d97a52a1ba`\n" +
+                      "- **api_secret:** `0f3ab19c77de4521bc90ff12ad7e6b48`",
+                  },
+                ],
+              },
+            }),
+          );
+          return;
+        }
+        if (body.params?.arguments?.query === "__redacted_url_notion_id__") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              result: {
+                content: [
+                  {
+                    type: "text",
+                    text:
+                      "Page ID: c77d2a3de93647de8d7ca0d97a52a1ba\n" +
+                      "Link: https://example.com/?p=c77d2a3d-e936-47de-8d7c-a0d97a52a1ba",
+                  },
+                ],
+              },
+            }),
+          );
+          return;
+        }
         const text = fixture.responses[name] ?? `Executed ${name}`;
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(

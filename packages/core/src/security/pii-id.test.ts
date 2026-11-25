@@ -260,10 +260,60 @@ describe("scanIndonesianIds", () => {
       "Payment amount\n1234567890",
       "BCA dividends were\n1234567890",
       "BCA\n1234567890",
+      "CIMB\n1234567890",
+      "CIMB\nNiaga\n1234567890",
+      "CIMB\n\nNiaga 1234567890",
       "Transfer ke rekening BCA:\n\n1234567890",
     ];
     for (const line of weakLines) {
       expect({ line, hits: scanIndonesianIds(line) }).toEqual({ line, hits: [] });
+    }
+  });
+
+  it("masks accounts in tab-separated payment rows without absorbing adjacent amount columns", () => {
+    const rows = [
+      "Transfer ke 1234567890\t1250000000",
+      "Transfer ke 1234567890\t500000",
+      "Transfer ke 1234567890\t150000 rupiah",
+      "Transfer ke 1234567890\t1.500.000",
+      "BCA\t1234567890\t5000000",
+      "No. Rekening:\t1234567890\t12500000000",
+      "No. Rekening: 1234567890\t500000 rupiah",
+      "No. Rekening: 1234567890\t1.500.000",
+      "No. Rekening: 1234567890\t500000",
+      "No. Rekening\t1234567890\tIDR",
+      "No. Rekening: 1234567890  IDR",
+      "Transfer ke 1234567890  IDR",
+      "Transfer ke 1234567890  Rp 500.000",
+      "Transfer ke 1234567890  5000000",
+      "No. Rekening:\t1234567890\t125500123",
+      "No. Rekening: 1234567890  125500123",
+      "BCA account\t1234567890\t125500123",
+    ];
+    for (const line of rows) {
+      expect({ line, hits: scanIndonesianIds(line) }).toEqual({
+        line,
+        hits: [{ kind: "account", match: "1234567890", index: line.indexOf("1234567890") }],
+      });
+    }
+  });
+
+  it("masks accounts when multi-word bank names wrap across a single line break", () => {
+    for (const lineBreak of ["\n", "\r\n", "\u2028"]) {
+      const cases = [
+        `No. Rekening CIMB${lineBreak}Niaga: 1234567890`,
+        `CIMB${lineBreak}Niaga 1234567890`,
+        `Transfer ke CIMB${lineBreak}Niaga 1234567890`,
+        `Transfer ke CIMB${lineBreak}Niaga:${lineBreak}1234567890`,
+        `No. Rekening OCBC${lineBreak}NISP: 1234567890`,
+        `OCBC${lineBreak}NISP 1234567890`,
+      ];
+      for (const line of cases) {
+        expect({ line, hits: scanIndonesianIds(line) }).toEqual({
+          line,
+          hits: [{ kind: "account", match: "1234567890", index: line.indexOf("1234567890") }],
+        });
+      }
     }
   });
 

@@ -575,4 +575,94 @@ describe("MCP connector handlers (endpoint token rule and test write-back)", () 
       ),
     );
   });
+
+  it("canonicalizes Markdown-formatted Notion page IDs while redacting Markdown-formatted secrets", async () => {
+    const { createOutboundGuard, runInToolCall, runOutboundGuarded } = await import("@agentforge/core");
+    const { withToolRun } = await import("../tool-run-context");
+    const { mcpStore } = await import("./store");
+    const { runMcpFetch } = await import("./mcp-tools");
+
+    mcpStore().saveConnection(tenant, {
+      id: "notion",
+      endpointUrl: `${server.baseUrl}/notion`,
+      token: server.token,
+      policy: { accessMode: "read_only", allowSubagents: true, maxCallsPerTurn: 4 },
+    });
+
+    const guard = createOutboundGuard({
+      userText: ["Open the Markdown Notion search result"],
+      privateText: [],
+      locale: "en",
+    });
+
+    const compactId = "c77d2a3de93647de8d7ca0d97a52a1ba";
+    const hyphenatedId = "c77d2a3d-e936-47de-8d7c-a0d97a52a1ba";
+
+    await withToolRun({ runId: "run_notion_markdown_id", mode: "chat" }, () =>
+      runOutboundGuarded(guard, () =>
+        runInToolCall(async () => {
+          const found = await runMcpFetch({ connector: "notion", action: "search", query: "__markdown_notion_id__" }, tenant);
+          expect(found.ok).toBe(true);
+          if (found.ok) {
+            expect(found.content).toContain(`\`${hyphenatedId}\``);
+            expect(found.content).toContain("**api_secret:** `[REDACTED]`");
+            expect(found.content).not.toContain("0f3ab19c");
+          }
+
+          const page = await runMcpFetch({ connector: "notion", action: "get_page", resourceId: hyphenatedId }, tenant);
+          expect(page.ok).toBe(true);
+          const lastGetPage = [...server.calls]
+            .reverse()
+            .find((call) => call.path === "/notion" && call.tool === "get_page");
+          expect(lastGetPage?.args).toMatchObject({ id: compactId, resourceId: compactId });
+        }),
+      ),
+    );
+  });
+
+  it("resolves visible compact Notion aliases even when a redacted URL query carried the hyphenated form", async () => {
+    const { createOutboundGuard, runInToolCall, runOutboundGuarded } = await import("@agentforge/core");
+    const { withToolRun } = await import("../tool-run-context");
+    const { mcpStore } = await import("./store");
+    const { runMcpFetch } = await import("./mcp-tools");
+
+    mcpStore().saveConnection(tenant, {
+      id: "notion",
+      endpointUrl: `${server.baseUrl}/notion`,
+      token: server.token,
+      policy: { accessMode: "read_only", allowSubagents: true, maxCallsPerTurn: 4 },
+    });
+
+    const guard = createOutboundGuard({
+      userText: ["Open the Notion result with a redacted link parameter"],
+      privateText: [],
+      locale: "en",
+    });
+
+    const compactId = "c77d2a3de93647de8d7ca0d97a52a1ba";
+    const hyphenatedId = "c77d2a3d-e936-47de-8d7c-a0d97a52a1ba";
+
+    await withToolRun({ runId: "run_notion_redacted_url_id", mode: "chat" }, () =>
+      runOutboundGuarded(guard, () =>
+        runInToolCall(async () => {
+          const found = await runMcpFetch(
+            { connector: "notion", action: "search", query: "__redacted_url_notion_id__" },
+            tenant,
+          );
+          expect(found.ok).toBe(true);
+          if (found.ok) {
+            expect(found.content).toContain(`Page ID: ${hyphenatedId}`);
+            expect(found.content).toContain("?p=[REDACTED]");
+          }
+
+          const page = await runMcpFetch({ connector: "notion", action: "get_page", resourceId: hyphenatedId }, tenant);
+          expect(page.ok).toBe(true);
+          const lastGetPage = [...server.calls]
+            .reverse()
+            .find((call) => call.path === "/notion" && call.tool === "get_page");
+          expect(lastGetPage?.args).toMatchObject({ id: compactId, resourceId: compactId });
+        }),
+      ),
+    );
+  });
 });
