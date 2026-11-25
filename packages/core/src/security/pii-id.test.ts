@@ -198,13 +198,59 @@ describe("scanIndonesianIds", () => {
       ]);
     }
 
-    // Non-breaking space inside a labelled account number is still captured as one account.
+    // Non-breaking / Unicode horizontal spaces between label and digits or inside digits still mask the account.
     const nbsp = "No. Rekening: 1234\u00a05678\u00a090";
     expect(scanIndonesianIds(nbsp)).toEqual([
       { kind: "account", match: "1234\u00a05678\u00a090", index: nbsp.indexOf("1234") },
     ]);
-    // Non-breaking space before a currency suffix keeps the amount unmasked.
+    for (const line of [
+      "No. Rekening:\u00a01234567890",
+      "No. Rekening\u00a01234567890",
+      "Rekening:\u202f1234567890",
+      "Rekening:\u30001234567890",
+      "Norek:\u20091234567890",
+      "Rekening BCA:\u00a01234567890",
+      "Transfer ke\u00a01234567890",
+    ]) {
+      expect({ line, hits: scanIndonesianIds(line) }).toEqual({
+        line,
+        hits: [{ kind: "account", match: "1234567890", index: line.indexOf("1234567890") }],
+      });
+    }
+    // Non-breaking space or BOM before a currency suffix keeps the amount unmasked.
     expect(scanIndonesianIds("Rekening BCA: 125\u202f000\u202f000\u00a0rupiah")).toEqual([]);
+    expect(scanIndonesianIds("No. Rekening: 1234567890\ufeffrupiah")).toEqual([]);
+    expect(scanIndonesianIds("Transfer ke 125\u202f000\u202f000")).toEqual([]);
+    // Currency/scale text on a new ASCII or Unicode line must never disarm masking of the account above it,
+    // digits on a new Unicode line must never be swallowed into the account number,
+    // and a single vertical/Unicode line break between a label/cue and the digits still masks the account.
+    for (const lineBreak of ["\n", "\r\n", "\v", "\f", "\u0085", "\u2028", "\u2029"]) {
+      const labelThenAccount = `No. Rekening BCA:${lineBreak} 1234567890`;
+      expect({ lineBreak, hits: scanIndonesianIds(labelThenAccount) }).toEqual({
+        lineBreak,
+        hits: [{ kind: "account", match: "1234567890", index: labelThenAccount.indexOf("1234567890") }],
+      });
+      const transferThenAccount = `Mohon transfer ke rekening: ${lineBreak} 1234567890 atas nama Budi`;
+      expect({ lineBreak, hits: scanIndonesianIds(transferThenAccount) }).toEqual({
+        lineBreak,
+        hits: [{ kind: "account", match: "1234567890", index: transferThenAccount.indexOf("1234567890") }],
+      });
+      const accountThenCurrency = `No. Rekening: 1234567890${lineBreak}rupiah`;
+      expect({ lineBreak, hits: scanIndonesianIds(accountThenCurrency) }).toEqual({
+        lineBreak,
+        hits: [{ kind: "account", match: "1234567890", index: accountThenCurrency.indexOf("1234567890") }],
+      });
+      const transferThenCurrency = `Transfer ke 1234567890${lineBreak}USD`;
+      expect({ lineBreak, hits: scanIndonesianIds(transferThenCurrency) }).toEqual({
+        lineBreak,
+        hits: [{ kind: "account", match: "1234567890", index: transferThenCurrency.indexOf("1234567890") }],
+      });
+      const accountThenAmount = `No. Rekening: 1234567890${lineBreak}1250000000`;
+      expect({ lineBreak, hits: scanIndonesianIds(accountThenAmount) }).toEqual({
+        lineBreak,
+        hits: [{ kind: "account", match: "1234567890", index: accountThenAmount.indexOf("1234567890") }],
+      });
+    }
 
     const weakLines = [
       "Set the budget to\n1234567890",

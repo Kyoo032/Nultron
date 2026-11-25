@@ -160,6 +160,30 @@ export async function startMcpFixtureServer(expectedToken = "mcp_live_test_token
           );
           return;
         }
+        if (body.params?.arguments?.query === "__mixed_notion_id__") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              result: {
+                content: [
+                  {
+                    type: "text",
+                    text:
+                      "id: b11a2b3c-d4e5-4f6a-8b9c-0d1e2f3a4b5c, " +
+                      "url: https://www.notion.so/Roadmap-b11a2b3cd4e54f6a8b9c0d1e2f3a4b5c, " +
+                      "secretUrl: https://www.notion.so/Private-e44e5f6a7b8c4d0e9f2a3b4c5d6e7f8a, " +
+                      "api_secret = 0f3ab19c77de4521bc90ff12ad7e6b48, " +
+                      "webhook_secret: 9a8b7c6d5e4f4321a1b2c3d4e5f60718, " +
+                      "checksum: d41d8cd98f00b204e9800998ecf8427e",
+                  },
+                ],
+              },
+            }),
+          );
+          return;
+        }
         const text = fixture.responses[name] ?? `Executed ${name}`;
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(

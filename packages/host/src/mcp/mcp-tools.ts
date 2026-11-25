@@ -13,6 +13,7 @@ import {
   isMcpConnectorId,
   outboundRefusal,
   queryShapeProblem,
+  redactCredentials,
   redactSecrets,
   type OutboundRefusal,
   type TenantContext,
@@ -56,22 +57,46 @@ const runConnectorCalls = new WeakMap<ToolRun, Map<string, number>>();
 /** Per-run, per-connector map of displayed resourceId -> original wire resourceId returned by the endpoint. */
 const runConnectorResourceIds = new WeakMap<ToolRun, Map<string, Map<string, string>>>();
 const RESOURCE_ID_TOKEN_RE = /\b[A-Za-z0-9_-]{16,80}\b/g;
-const COMPACT_HEX_UUID_RE = /\b([0-9a-f]{8})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{12})\b/gi;
+const COMPACT_HEX_UUID_V4_RE = /\b([0-9a-f]{8})([0-9a-f]{4})(4[0-9a-f]{3})([89ab][0-9a-f]{3})([0-9a-f]{12})\b/gi;
+const NOTION_URL_BEFORE_RE = /https?:\/\/(?:[a-z0-9-]+\.)*notion\.(?:so|site)\/[^\s?#]*$/i;
+const NOTION_ID_LABEL_BEFORE_RE =
+  /(?:^|[\s,{[(])["']?(?:(?:page|block|database|db|parent|resource|notion|object|record|workspace)[_\s-]*)?(?:id|page|block|database|resource)["']?[\s:=#-]{1,6}["']?$/i;
+const SECRET_LABEL_BEFORE_RE =
+  /(?:^|[\s,:{[("'_-])(?:secret|token|key|pass(?:word|wd)?|pwd|auth|bearer|cookie|sig(?:nature)?|hash|checksum|md5|sha\d*|hmac|cred(?:ential)?|private|webhook)(?:[_\s-]*id)?["']?[\s:=#-]{0,6}["']?$/i;
+
+function hasNotionIdContext(text: string, offset: number): boolean {
+  const lineStart = text.lastIndexOf("\n", offset - 1) + 1;
+  const before = text.slice(Math.max(lineStart, offset - 160), offset);
+  if (NOTION_URL_BEFORE_RE.test(before)) {
+    return true;
+  }
+  if (SECRET_LABEL_BEFORE_RE.test(before)) {
+    return false;
+  }
+  return NOTION_ID_LABEL_BEFORE_RE.test(before);
+}
 
 function canonicalizeNotionIds(text: string): { text: string; aliases: Array<readonly [string, string]> } {
   const aliases: Array<readonly [string, string]> = [];
-  const replaced = text.replace(COMPACT_HEX_UUID_RE, (raw, a: string, b: string, c: string, d: string, e: string) => {
-    const hyphenated = `${a}-${b}-${c}-${d}-${e}`;
-    aliases.push([hyphenated, raw]);
-    return hyphenated;
-  });
+  const replaced = text.replace(
+    COMPACT_HEX_UUID_V4_RE,
+    (raw, a: string, b: string, c: string, d: string, e: string, offset: number) => {
+      if (!hasNotionIdContext(text, offset)) {
+        return raw;
+      }
+      const hyphenated = `${a}-${b}-${c}-${d}-${e}`;
+      aliases.push([hyphenated, raw]);
+      return hyphenated;
+    },
+  );
   return { text: replaced, aliases };
 }
 
 function rememberConnectorResourceIds(
   toolRun: ToolRun | undefined,
   connectorId: string,
-  content: string,
+  rawContent: string,
+  redactedContent: string,
   aliases: ReadonlyArray<readonly [string, string]> = [],
 ): void {
   if (!toolRun) {
@@ -87,20 +112,33 @@ function rememberConnectorResourceIds(
     known = new Map<string, string>();
     byConnector.set(connectorId, known);
   }
+  const rawTokens = new Set<string>();
+  for (const match of rawContent.matchAll(RESOURCE_ID_TOKEN_RE)) {
+    rawTokens.add(match[0]);
+  }
+  const visibleTokens = new Set<string>();
+  for (const match of redactedContent.matchAll(RESOURCE_ID_TOKEN_RE)) {
+    visibleTokens.add(match[0]);
+  }
+  for (const token of visibleTokens) {
+    if (!rawTokens.has(token)) {
+      continue;
+    }
+    if (!known.has(token) && known.size >= 200) {
+      continue;
+    }
+    known.set(token, token);
+  }
   for (const [displayed, original] of aliases) {
+    if (known.has(displayed) || !redactedContent.includes(displayed)) {
+      continue;
+    }
     if (known.size >= 200) {
       break;
     }
     known.set(displayed, original);
-    known.set(original, original);
-  }
-  for (const match of content.matchAll(RESOURCE_ID_TOKEN_RE)) {
-    if (known.size >= 200) {
-      break;
-    }
-    const token = match[0];
-    if (!known.has(token)) {
-      known.set(token, token);
+    if (!known.has(original) && known.size < 200) {
+      known.set(original, original);
     }
   }
 }
@@ -301,12 +339,13 @@ export async function runMcpFetch(
   try {
     const client = new McpHttpClient(args.connector, connection.endpointUrl, connection.token, fetchImpl);
     const result = await client.callReadOnlyTool(args.action, rpcArgs);
+    const credentialRedacted = redactCredentials(result.content);
     const prepared =
       args.connector === "notion"
-        ? canonicalizeNotionIds(result.content)
-        : { text: result.content, aliases: [] as Array<readonly [string, string]> };
+        ? canonicalizeNotionIds(credentialRedacted)
+        : { text: credentialRedacted, aliases: [] as Array<readonly [string, string]> };
     const redactedContent = redactSecrets(prepared.text);
-    rememberConnectorResourceIds(toolRun, args.connector, redactedContent, prepared.aliases);
+    rememberConnectorResourceIds(toolRun, args.connector, credentialRedacted, redactedContent, prepared.aliases);
     return {
       ok: true,
       connector: args.connector,
