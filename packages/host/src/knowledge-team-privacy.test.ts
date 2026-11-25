@@ -402,6 +402,7 @@ describe("Graph: nodes, edges and counts", () => {
   }
 
   async function writeGraph(c: Company): Promise<Record<string, string>> {
+    hosted(false);
     const { upsertEdges, upsertNodes } = await import("./knowledge-graph");
     const t = c.tenants.owner;
     const id = {
@@ -631,6 +632,7 @@ describe("Personal parity: off server mode nothing changes", () => {
 
   it("draws the whole graph and counts every node and edge", async () => {
     const c = await company("parity-graph");
+    hosted(false);
     const { upsertEdges, upsertNodes, getGraph, graphCounts } = await import("./knowledge-graph");
     upsertNodes(c.tenants.owner, [
       { id: c.cardIds.alice, kind: "source", label: TITLE.alice },
@@ -641,10 +643,10 @@ describe("Personal parity: off server mode nothing changes", () => {
       { from: "topic:parity", to: c.cardIds.alice, kind: "covers" },
       { from: c.cardIds.alice, to: c.threadIds.alice, kind: "cites" },
     ]);
-    hosted(false);
 
     const graph = getGraph(c.tenants.bob);
     expect(graph.nodes).toHaveLength(3);
+    expect(graph.nodes.map((node) => node.label).sort()).toEqual(["Merger only", TITLE.alice, TITLE.alice].sort());
     expect(graph.edges).toHaveLength(2);
     expect(graphCounts(c.tenants.bob)).toEqual({ nodes: 3, edges: 2 });
   });

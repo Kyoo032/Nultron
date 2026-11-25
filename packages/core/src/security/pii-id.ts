@@ -136,19 +136,28 @@ const NIK_LABELLED_RE = /\b(?:nik|no\.?\s*ktp|nomor\s*ktp|ktp)\b\s*(?:no\.?|nomo
 
 const NPWP_LABELLED_RE = /\bnpwp\b\s*(?:no\.?|nomor)?\s*[:#=-]?\s*(\d[\d\s.-]{13,26})/gi;
 
-/**
- * Recognized bank names that may sit between an account cue and the digits ("Rekening BCA 1234567890",
- * "No. Rek Mandiri: 1370004567890"). The generic word "Bank" is deliberately omitted so
- * "Rekening Bank: 1250000000" (a ledger line) and "Accounts payable 450000000" stay untouched.
- */
+const INLINE_SPACE_CLASS = " \\u00a0\\u1680\\u2000-\\u200a\\u202f\\u205f\\u3000\\ufeff";
+const HORIZONTAL_SPACE_CLASS = `\\t${INLINE_SPACE_CLASS}`;
+const LINE_BREAK_PART = "(?:\\r?\\n|[\\v\\f\\u0085\\u2028\\u2029])";
+const SINGLE_WRAP_SPACE_PART = `(?:[${HORIZONTAL_SPACE_CLASS}]*${LINE_BREAK_PART}[${HORIZONTAL_SPACE_CLASS}]*|[${HORIZONTAL_SPACE_CLASS}]+)`;
+
+const MULTI_WORD_BANK_NAMES = [
+  ["CIMB", "Niaga"],
+  ["OCBC", "NISP"],
+] as const;
+
+const MULTI_WORD_BANK_PATTERN = MULTI_WORD_BANK_NAMES.map(
+  ([first, second]) => `${first}(?:${SINGLE_WRAP_SPACE_PART}${second})?`,
+).join("|");
+
 const BANK_NAME_PART =
-  "(?:BCA|BRI|BNI|Mandiri|BSI|CIMB(?:\\s+Niaga)?|Permata|Danamon|OCBC(?:\\s+NISP)?|BTN|Panin|Maybank|Mega|UOB|HSBC|Citibank|Jago|SeaBank|Jenius|Blu)";
+  `(?:BCA|BRI|BNI|Mandiri|BSI|Permata|Danamon|BTN|Panin|Maybank|Mega|UOB|HSBC|Citibank|Jago|SeaBank|Jenius|Blu|${MULTI_WORD_BANK_PATTERN})`;
 
 const ACCOUNT_LABEL_PART =
-  "(?:no\\.?\\s*rek(?:ening)?|nomor\\s*rek(?:ening)?|norek|rekening|a\\/c|acct\\.?|account(?:\\s*(?:no\\.?|number|#))?)";
+  `(?:no\\.?[${HORIZONTAL_SPACE_CLASS}]*rek(?:ening)?|nomor[${HORIZONTAL_SPACE_CLASS}]*rek(?:ening)?|norek|rekening|a\\/c|acct\\.?|account(?:[${HORIZONTAL_SPACE_CLASS}]*(?:no\\.?|number|#))?)`;
 
 const ACCOUNT_LABELLED_RE = new RegExp(
-  `\\b(?:no\\.?[ \\t]*rek(?:ening)?|nomor[ \\t]*rek(?:ening)?|norek|rekening|a\\/c|acct\\.?|account[ \\t]*(?:no\\.?|number|#))(?:[ \\t]+${BANK_NAME_PART})?[ \\t]*[:#=-]?(?:[ \\t]*\\r?\\n[ \\t]*|[ \\t]*)(\\d(?:[\\d-]|[^\\S\\r\\n]){6,23})(?!\\d)`,
+  `\\b(?:no\\.?[${HORIZONTAL_SPACE_CLASS}]*rek(?:ening)?|nomor[${HORIZONTAL_SPACE_CLASS}]*rek(?:ening)?|norek|rekening|a\\/c|acct\\.?|account[${HORIZONTAL_SPACE_CLASS}]*(?:no\\.?|number|#))(?:[${HORIZONTAL_SPACE_CLASS}]+${BANK_NAME_PART})?[${HORIZONTAL_SPACE_CLASS}]*[:#=-]?(?:[${HORIZONTAL_SPACE_CLASS}]*${LINE_BREAK_PART}[${HORIZONTAL_SPACE_CLASS}]*|[${HORIZONTAL_SPACE_CLASS}]*)(\\d(?:[${INLINE_SPACE_CLASS}-]?\\d){7,23})(?!\\d)`,
   "gi",
 );
 
@@ -158,27 +167,27 @@ const IBAN_LABELLED_RE =
 const IBAN_BARE_RE = /\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?\b/g;
 
 const ACCOUNT_CUE_LOOKBACK = 80;
-const BOUNDED_GAP_PART = "(?:[^ \\t,:#=;|!?\\n]+[ \\t,:#=-]+){0,4}";
+const BOUNDED_GAP_PART = `(?:[^${HORIZONTAL_SPACE_CLASS},:#=;|!?\\r\\n\\v\\f\\u0085\\u2028\\u2029]+[${HORIZONTAL_SPACE_CLASS},:#=-]+){0,4}`;
 const EXPLICIT_ACCOUNT_GAP_CUE_RE = new RegExp(
-  `\\b${ACCOUNT_LABEL_PART}[ \\t,:#=-]+(${BOUNDED_GAP_PART})$`,
+  `\\b${ACCOUNT_LABEL_PART}[${HORIZONTAL_SPACE_CLASS},:#=-]+(${BOUNDED_GAP_PART})$`,
   "i",
 );
 const BANK_GAP_CUE_RE = new RegExp(
-  `\\b(?:${BANK_NAME_PART}|iban)[ \\t,:#=-]+(${BOUNDED_GAP_PART})$`,
+  `\\b(?:${BANK_NAME_PART}|iban)[${HORIZONTAL_SPACE_CLASS},:#=-]+(${BOUNDED_GAP_PART})$`,
   "i",
 );
 const TRANSFER_VERB_PART = "(?:transfer|trf|kirim|wire|remit|send|setor)";
 const PAYMENT_VERB_PART = "(?:bayar|pay)";
 const TRANSFER_ACTION_PART = `(?:${TRANSFER_VERB_PART}|${PAYMENT_VERB_PART})`;
 const TRANSFER_EVIDENCE_RE = new RegExp(
-  `\\b${TRANSFER_VERB_PART}\\b|\\b${PAYMENT_VERB_PART}[ \\t]+(?:ke|to)\\b`,
+  `\\b${TRANSFER_VERB_PART}\\b|\\b${PAYMENT_VERB_PART}[${HORIZONTAL_SPACE_CLASS}]+(?:ke|to)\\b`,
   "i",
 );
 const TRANSFER_CUE_RE = new RegExp(
-  `(?:\\b${TRANSFER_ACTION_PART}(?:[ \\t]+(?:ke|to|via|dari|from))?[ \\t,:#=-]+(${BOUNDED_GAP_PART})(?:ke|to)[ \\t,:#=-]*$` +
-    `|\\b${TRANSFER_ACTION_PART}[ \\t]+(?:ke|to|via|dari|from)[ \\t,:#=-]+$` +
-    `|\\bvia[ \\t]+(?:bank[ \\t]+)?(?:ke|to|no\\.?|nomor)?[ \\t,:#=-]{0,20}$` +
-    `|\\bke[ \\t]+rek\\.?[ \\t,:#=-]*$)`,
+  `(?:\\b${TRANSFER_ACTION_PART}(?:[${HORIZONTAL_SPACE_CLASS}]+(?:ke|to|via|dari|from))?[${HORIZONTAL_SPACE_CLASS},:#=-]+(${BOUNDED_GAP_PART})(?:ke|to)[${HORIZONTAL_SPACE_CLASS},:#=-]*$` +
+    `|\\b${TRANSFER_ACTION_PART}[${HORIZONTAL_SPACE_CLASS}]+(?:ke|to|via|dari|from)[${HORIZONTAL_SPACE_CLASS},:#=-]+$` +
+    `|\\bvia[${HORIZONTAL_SPACE_CLASS}]+(?:bank[${HORIZONTAL_SPACE_CLASS}]+)?(?:ke|to|no\\.?|nomor)?[${HORIZONTAL_SPACE_CLASS},:#=-]{0,20}$` +
+    `|\\bke[${HORIZONTAL_SPACE_CLASS}]+rek\\.?[${HORIZONTAL_SPACE_CLASS},:#=-]*$)`,
   "i",
 );
 const LEDGER_ACCOUNT_VETO_RE =
@@ -187,9 +196,12 @@ const NON_TRANSFER_KE_TO_RE =
   /\b(?:up|equal|close|rose|grew|fell|dropped|increased|decreased|naik|turun|meningkat|menurun|mencapai|sampai)\s+(?:ke|to)\s*[:#=-]?\s*$/i;
 const GAP_VETO_RE =
   /\b(?:payable|receivable|balance|saldo|total|subtotal|jumlah|nilai|amount|revenue|pendapatan|profit|laba|loss|rugi|expense|expenses|beban|biaya|budget|anggaran|omzet|omset|kas|cash|equity|ekuitas|asset|assets|aset|liability|liabilities|liabilitas|utang|piutang|hutang|modal|koran|tax|pajak|margin|ebit|ebitda|gdp|cap|volume|price|harga|rate|tarif|fee|invoice|faktur)\b/i;
+const COLUMN_OR_NUMERIC_GAP_VETO_RE = new RegExp(`\\t|[${INLINE_SPACE_CLASS}]{2,}|\\d{6,}`);
 const BANK_ACCOUNT_CONTEXT_RE = /\b(?:rek(?:ening)?|norek|a\/c|acct\.?|accounts?)\b/i;
-const CURRENCY_OR_SCALE_AFTER_RE =
-  /^[^\S\r\n]*(?:rupiah|rp|idr|usd|dollars?|sgd|euros?|eur|myr|jpy|gbp|aud|cny|rmb|juta|miliar|milyar|ribu|triliun|thousand|million|billion|trillion)\b/i;
+const CURRENCY_OR_SCALE_AFTER_RE = new RegExp(
+  `^[${INLINE_SPACE_CLASS}]?(?:rupiah|rp|idr|usd|dollars?|sgd|euros?|eur|myr|jpy|gbp|aud|cny|rmb|juta|miliar|milyar|ribu|triliun|thousand|million|billion|trillion)\\b`,
+  "i",
+);
 
 function hasExplicitAmountTail(afterRaw: string): boolean {
   return (
@@ -198,9 +210,23 @@ function hasExplicitAmountTail(afterRaw: string): boolean {
   );
 }
 
-const UNLABELLED_ACCOUNT_RE = /(?<![\d.,-])(\d[\d -]{6,20}\d)(?![\d-])/g;
+const UNLABELLED_ACCOUNT_RE = new RegExp(
+  `(?<![\\d.,-])(\\d(?:[${INLINE_SPACE_CLASS}-]?\\d){7,20})(?![\\d-])`,
+  "g",
+);
 const ROUND_TOTAL_TAIL_RE = /0{4}$/;
-const GROUPED_THOUSANDS_SPACE_RE = /^\d{1,3}(?: \d{3})+$/;
+const GROUPED_THOUSANDS_SPACE_RE = new RegExp(`^\\d{1,3}(?:[${INLINE_SPACE_CLASS}]\\d{3})+$`);
+const WRAPPED_BANK_BREAK_RE = new RegExp(`[${HORIZONTAL_SPACE_CLASS}]*${LINE_BREAK_PART}[${HORIZONTAL_SPACE_CLASS}]*`);
+const WRAPPED_BANK_NAME_RE = new RegExp(
+  `\\b(?:${MULTI_WORD_BANK_NAMES.map(
+    ([first, second]) => `${first}${WRAPPED_BANK_BREAK_RE.source}${second}`,
+  ).join("|")})\\b`,
+  "gi",
+);
+const WRAPPED_CUE_NEWLINE_RE = new RegExp(
+  `([^\\n\\v\\f\\u0085\\u2028\\u2029])${LINE_BREAK_PART}[${HORIZONTAL_SPACE_CLASS}]*$`,
+);
+const LOCAL_PHONE_PREFIX_RE = new RegExp(`^0\\d{2,3}[${INLINE_SPACE_CLASS}-]`);
 const BANK_HYPHEN_GROUPING_RE = /^[1-9]\d{1,3}(?:-\d{2,7}){2,3}$/;
 const US_PHONE_HYPHEN_RE = /^\d{3}-\d{3}-\d{4}$/;
 const SSN_HYPHEN_RE = /^\d{3}-\d{2}-\d{4}$/;
@@ -219,13 +245,19 @@ function matchAccountCueBefore(clauseBefore: string): { hasCue: boolean; minDigi
     return { hasCue: false, minDigits: UNLABELLED_ACCOUNT_MIN_DIGITS, canWrap: false };
   }
   const explicitMatch = EXPLICIT_ACCOUNT_GAP_CUE_RE.exec(clauseBefore);
-  if (explicitMatch && !GAP_VETO_RE.test(explicitMatch[1] ?? "")) {
+  const explicitGap = explicitMatch?.[1] ?? "";
+  if (explicitMatch && !GAP_VETO_RE.test(explicitGap) && !COLUMN_OR_NUMERIC_GAP_VETO_RE.test(explicitGap)) {
     return { hasCue: true, minDigits: ACCOUNT_MIN_DIGITS, canWrap: true };
   }
   const bankMatch = BANK_GAP_CUE_RE.exec(clauseBefore);
   const bankGap = bankMatch?.[1] ?? "";
   const bankHasAccountContext = BANK_ACCOUNT_CONTEXT_RE.test(bankGap);
-  if (bankMatch && (bankGap.length === 0 || bankHasAccountContext) && !GAP_VETO_RE.test(bankGap)) {
+  if (
+    bankMatch &&
+    (bankGap.length === 0 || bankHasAccountContext) &&
+    !GAP_VETO_RE.test(bankGap) &&
+    !COLUMN_OR_NUMERIC_GAP_VETO_RE.test(bankGap)
+  ) {
     return {
       hasCue: true,
       minDigits: TRANSFER_ACCOUNT_MIN_DIGITS,
@@ -356,9 +388,12 @@ function collectUnlabelled(text: string, found: IdPiiMatch[]): void {
       continue;
     }
     const cueWindow = text.slice(Math.max(0, match.index - ACCOUNT_CUE_LOOKBACK), match.index);
-    const wrappedCueWindow = cueWindow.replace(/([^\n])\r?\n[ \t]*$/, "$1 ");
-    const newlineWrapped = wrappedCueWindow !== cueWindow;
-    const clauseBefore = wrappedCueWindow.replace(/^[\s\S]*[\n;|!?]/, "");
+    const normalizedCueWindow = cueWindow.replace(WRAPPED_BANK_NAME_RE, (wrapped) =>
+      wrapped.replace(WRAPPED_BANK_BREAK_RE, " "),
+    );
+    const wrappedCueWindow = normalizedCueWindow.replace(WRAPPED_CUE_NEWLINE_RE, "$1 ");
+    const newlineWrapped = wrappedCueWindow !== normalizedCueWindow;
+    const clauseBefore = wrappedCueWindow.replace(/^[\s\S]*[\n\v\f\u0085\u2028\u2029;|!?]/, "");
     const accountCue = matchAccountCueBefore(clauseBefore);
     const hasCue = accountCue.hasCue && (!newlineWrapped || accountCue.canWrap);
     const minDigits = accountCue.minDigits;
@@ -369,7 +404,7 @@ function collectUnlabelled(text: string, found: IdPiiMatch[]): void {
     if (!hasBankGrouping && (!hasCue || digits.length < minDigits)) {
       continue;
     }
-    if (hasCue && (/^0\d{2,3}[ -]/.test(raw) || US_PHONE_HYPHEN_RE.test(raw))) {
+    if (hasCue && (LOCAL_PHONE_PREFIX_RE.test(raw) || US_PHONE_HYPHEN_RE.test(raw))) {
       continue;
     }
     add(found, { kind: "account", match: raw, index: match.index });

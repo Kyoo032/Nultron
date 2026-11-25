@@ -30,8 +30,9 @@ fi
 FORMAT="$(backup_format "$TARBALL")"
 PLAIN="$TARBALL"
 
-case "$TARBALL" in
-*.enc)
+TARBALL_LOWER="$(printf '%s' "${TARBALL##*/}" | tr '[:upper:]' '[:lower:]')"
+case "$TARBALL_LOWER" in
+*.enc|*.enc.*)
 	if [ "$FORMAT" = "plain" ]; then
 		echo "error: $TARBALL is expected to be an encrypted backup (.enc) but has no encryption header." >&2
 		exit 1
