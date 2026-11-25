@@ -1,5 +1,5 @@
 {
-  "title": "Keuangan",
+  "title": "Dasbor Keuangan",
   "expectedInputs": "Tambahkan file atau ketik angkanya.",
   "kicker": "Ruang kerja",
   "subtitle": "Masukkan angka Anda ke {productName} dalam bentuk pos. Margin, pertumbuhan, runway, titik impas, dan NPV dihitung oleh kode; model hanya menulis narasinya, dan setiap angka yang tidak bisa dilacak akan dihapus.",

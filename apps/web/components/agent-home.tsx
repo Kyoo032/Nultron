@@ -28,7 +28,7 @@ export function AgentHome({
   const offered = agent.skills.filter((skill) => skill.status !== "off");
   const shown = offered.slice(0, MAX_SKILL_CHIPS);
   const hidden = offered.length - shown.length;
-  const offersStudio = agent.conversation === "studio" && typeof onOpenStudio === "function";
+  const offersStudio = !agent.generalist && typeof onOpenStudio === "function";
 
   return (
     <section className="agent-home" data-testid="agent-home" data-mode={agent.id}>

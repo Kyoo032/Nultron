@@ -16,6 +16,8 @@ export type ChatThread = {
   createdAt: string;
   isDefaultChat: boolean;
   preview?: string | null;
+  subagentCount?: number;
+  activeSubagents?: number;
 };
 
 /**
@@ -46,7 +48,7 @@ function toThread(value: unknown): ChatThread | null {
   if (!isRecord(value)) {
     return null;
   }
-  const { id, title, agentId, agentName, createdAt, isDefaultChat, preview } = value;
+  const { id, title, agentId, agentName, createdAt, isDefaultChat, preview, subagentCount, activeSubagents } = value;
   if (typeof id !== "string" || typeof title !== "string" || typeof createdAt !== "string") {
     return null;
   }
@@ -58,6 +60,8 @@ function toThread(value: unknown): ChatThread | null {
     createdAt,
     isDefaultChat: isDefaultChat === true,
     preview: typeof preview === "string" ? preview : null,
+    subagentCount: typeof subagentCount === "number" && Number.isFinite(subagentCount) ? subagentCount : 0,
+    activeSubagents: typeof activeSubagents === "number" && Number.isFinite(activeSubagents) ? activeSubagents : 0,
   };
 }
 

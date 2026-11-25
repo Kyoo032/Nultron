@@ -112,6 +112,7 @@
   "models.refreshFailed": "Could not check the models. Try again in a moment.",
   "tabs.aria": "Settings sections",
   "tabs.general": "General",
+  "tabs.mcp": "Connectors (MCP)",
   "tabs.agents": "Agents",
   "tabs.team": "Team",
   "tabs.channels": "Channels",

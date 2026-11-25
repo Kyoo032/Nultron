@@ -1,5 +1,6 @@
 import { DEFAULT_CHAT_PROMPT, DEFAULT_CHAT_SLUG } from "./default-chat";
 import { DELEGATE_PER_TURN, DELEGATE_TOOL_KEY, DELEGATION_PROMPT } from "./delegation";
+import { MCP_FETCH_TOOL_KEY, MCP_LIMITS, MCP_LIST_SOURCES_TOOL_KEY, MCP_PROMPT_PARAGRAPH, MCP_TOOL_KEYS } from "../mcp";
 import { PRODUCT_MODE_IDS, productModeLabel, type ProductMode } from "./product-modes";
 import type { HarnessSkill } from "../harness/mode-skills";
 import type { HarnessLoop, RunBudget } from "../harness/spec";
@@ -93,7 +94,11 @@ export const GENERALIST_WORKER_TOOLS: readonly string[] = Object.freeze(Object.k
  * The tools every agent binds beyond Chat's own: the workers, then `delegate`, which asks another agent
  * for its answer (`delegation.ts`). It is not a harness, so it is not in `CHAT_WORKERS`.
  */
-export const GENERALIST_EXTRA_TOOLS: readonly string[] = Object.freeze([...GENERALIST_WORKER_TOOLS, DELEGATE_TOOL_KEY]);
+export const GENERALIST_EXTRA_TOOLS: readonly string[] = Object.freeze([
+  ...GENERALIST_WORKER_TOOLS,
+  DELEGATE_TOOL_KEY,
+  ...MCP_TOOL_KEYS,
+]);
 
 const WORKER_PARAGRAPH: string =
   GENERALIST_WORKER_TOOLS.length === 0
@@ -104,8 +109,8 @@ const WORKER_PARAGRAPH: string =
         ...GENERALIST_WORKER_TOOLS.map((key) => `- ${CHAT_WORKERS[key]?.sentence ?? key}`),
       ].join("\n");
 
-/** The paragraphs every agent's prompt gains for the workers and for asking another agent. */
-export const GENERALIST_WORKER_PROMPT: string = `${WORKER_PARAGRAPH}${DELEGATION_PROMPT}`;
+/** The paragraphs every agent's prompt gains for the workers, asking another agent, and read-only MCP sources. */
+export const GENERALIST_WORKER_PROMPT: string = `${WORKER_PARAGRAPH}${DELEGATION_PROMPT}${MCP_PROMPT_PARAGRAPH}`;
 
 const CHAT_SPEC = MODE_HARNESS_SPECS.chat;
 
@@ -129,6 +134,8 @@ const FULL_CHAT_BUDGET: RunBudget = Object.freeze({
     ...CHAT_SPEC.budget.perTool,
     ...Object.fromEntries(GENERALIST_WORKER_TOOLS.map((key) => [key, CHAT_WORKERS[key]?.perTurn ?? 1])),
     [DELEGATE_TOOL_KEY]: DELEGATE_PER_TURN,
+    [MCP_LIST_SOURCES_TOOL_KEY]: 3,
+    [MCP_FETCH_TOOL_KEY]: MCP_LIMITS.maxCallsPerTurn,
   }),
 });
 

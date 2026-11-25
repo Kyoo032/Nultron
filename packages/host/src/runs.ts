@@ -58,6 +58,7 @@ import {
 import { redactToolEvent } from "./chat-tool-events";
 import { historyMediaPart, historyToolNote } from "./chat-history-note";
 import { ensureToolsRegistered } from "./register-tools";
+import { formatTeamSessionsPrompt } from "./delegation/session-store";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
 import { defaultSelectableModel, listSelectableModels, toolMediaModels } from "./selectable-models";
@@ -270,6 +271,7 @@ export async function prepareChatRun(options: {
   const delegationTargets = runBindings.some((binding) => binding.toolKey === DELEGATE_TOOL_KEY && binding.enabled)
     ? delegationTargetsLine(await delegationRoster(options.tenant))
     : "";
+  const teamSessionsPrompt = defaultChat ? formatTeamSessionsPrompt(options.tenant, thread.id) : "";
   // Paid media asks first (SR-167): the body carries the requests the person pressed Run on, and the model
   // is told to make exactly those on this turn. The note is for this turn's prompt only; it is not stored.
   const mediaPermission = readMediaPermission(options.body);
@@ -280,6 +282,7 @@ export async function prepareChatRun(options: {
     systemPrompt: withChatOutputLanguage(
       agentPrompt +
         (delegationTargets ? `\n\n${delegationTargets}` : "") +
+        teamSessionsPrompt +
         pastHint +
         knowledge.prompt +
         (agentPolicy?.closingPrompt ?? "") +
@@ -313,6 +316,7 @@ export async function prepareChatRun(options: {
     thinkingEnabled,
     wire,
     pastHint,
+    teamSessionsPrompt,
     knowledge,
     locale,
     mediaPermission,
@@ -380,6 +384,7 @@ export async function* startModalityRun(options: {
     thinkingEnabled,
     wire,
     pastHint,
+    teamSessionsPrompt,
     knowledge,
     locale,
     mediaPermission,
@@ -680,12 +685,17 @@ export async function* startModalityRun(options: {
       // tainted when any of them is, and every search or worker in it is checked against that text.
       const outbound = createOutboundGuard({
         userText: userTextOf(history),
-        privateText: [...knowledge.privateText, ...attachedTextsOf(history)],
+        privateText: [
+          ...knowledge.privateText,
+          ...attachedTextsOf(history),
+          ...(teamSessionsPrompt ? [teamSessionsPrompt] : []),
+        ],
         // Earlier-chat titles are short: a five-word window of a title is ordinary words, so they count for
         // their figures and codes only (review M2). A picture or a file part in any message taints the run
-        // even with no text to compare against (review M4c).
+        // even with no text to compare against (review M4c). Subagent team summaries also taint the run
+        // because delegated runs may have read private desk files or MCP sources (SR-112).
         figuresOnlyText: [pastHint],
-        tainted: hasNonTextUserPart(history),
+        tainted: hasNonTextUserPart(history) || teamSessionsPrompt.length > 0,
         locale,
       });
       const inChatRun = <T>(fn: () => Promise<T>): Promise<T> =>

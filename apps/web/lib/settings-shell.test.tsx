@@ -20,7 +20,7 @@ function renderAt(path: string): string {
 }
 
 describe("SettingsShell", () => {
-  it("renders all six settings hub tabs in order", () => {
+  it("renders settings hub tabs excluding Agents and Usage", () => {
     const html = renderAt("/settings");
     expect(html).toContain('data-testid="settings-shell"');
     expect(html).toContain('data-testid="settings-tabs"');
@@ -30,11 +30,12 @@ describe("SettingsShell", () => {
       expect(html).toContain(`href="${tab.href}"`);
     }
     expect(html).toContain(">General<");
-    expect(html).toContain(">Agents<");
     expect(html).toContain(">Team<");
     expect(html).toContain(">Channels<");
     expect(html).toContain(">Customers<");
-    expect(html).toContain(">Usage<");
+    expect(html).toContain(">Connectors (MCP)<");
+    expect(html).not.toContain('data-testid="settings-tab-agents"');
+    expect(html).not.toContain('data-testid="settings-tab-usage"');
   });
 
   it.each(SETTINGS_TABS.map((tab) => [tab.href, tab.testId]))(
@@ -52,18 +53,17 @@ describe("SettingsShell", () => {
     applyLocale("id");
     const html = renderAt("/settings");
     expect(html).toContain(">Umum<");
-    expect(html).toContain(">Agen<");
     expect(html).toContain(">Tim<");
     expect(html).toContain(">Channel<");
     expect(html).toContain(">Pelanggan<");
-    expect(html).toContain(">Pemakaian<");
+    expect(html).toContain(">Konektor (MCP)<");
   });
 
-  it("identifies all Settings hub routes and excludes non-settings routes", () => {
-    for (const path of ["/settings", "/workspaces", "/team", "/channels", "/customers", "/usage", "/settings/more"]) {
+  it("identifies all Settings hub routes and excludes Agents, Usage, and non-settings routes", () => {
+    for (const path of ["/settings", "/team", "/channels", "/customers", "/mcp", "/settings/more"]) {
       expect(isSettingsHubPath(path), path).toBe(true);
     }
-    for (const path of ["/chat", "/knowledge", "/images", "/videos", "/market", "/research"]) {
+    for (const path of ["/chat", "/knowledge", "/workspaces", "/usage", "/images", "/videos", "/market", "/research"]) {
       expect(isSettingsHubPath(path), path).toBe(false);
     }
   });

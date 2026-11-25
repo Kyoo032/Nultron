@@ -117,7 +117,7 @@ export function AgentHarnessPanel({
           <p className="agent-harness-where" data-testid="agent-harness-where">
             {ownRunsHere ? t("harness.panel.runsInChat") : t("harness.panel.runsInStudio", { name })}
           </p>
-          {!ownRunsHere && onOpenStudio ? (
+          {!agent.generalist && onOpenStudio ? (
             <button
               type="button"
               className="btn btn-secondary agent-harness-open-studio"

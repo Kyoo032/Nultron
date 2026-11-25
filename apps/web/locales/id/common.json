@@ -3,6 +3,10 @@
   "language": "Bahasa",
   "english": "English",
   "bahasa": "Bahasa Indonesia",
+  "languageToggle": {
+    "toIndonesian": "Ganti bahasa ke Bahasa Indonesia",
+    "toEnglish": "Ganti bahasa ke Bahasa Inggris"
+  },
   "restartApp": "Mulai ulang Nultron",
   "restartHint": "Mulai ulang Nultron untuk menerapkan bahasa ini.",
   "loading": "Memuat…",

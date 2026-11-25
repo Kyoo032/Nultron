@@ -62,6 +62,7 @@
     "./channels/pinned": "./src/channels/pinned.ts",
     "./inbox": "./src/inbox/index.ts",
     "./inbox/pinned": "./src/inbox/pinned.ts",
+    "./mcp": "./src/mcp/index.ts",
     "./chat-documents": "./src/chat-documents/index.ts",
     "./harness": "./src/harness/index.ts",
     "./judges": "./src/harness/judges/index.ts",

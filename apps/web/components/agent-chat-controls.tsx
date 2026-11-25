@@ -189,6 +189,16 @@ export function AgentHistoryList({
               data-testid="thread-item"
             >
               <span className="truncate">{thread.title}</span>
+              {(thread.subagentCount ?? 0) > 0 ? (
+                <span
+                  className="ml-1.5 shrink-0 rounded-full bg-[var(--accent)]/15 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--accent)]"
+                  data-testid="thread-subagent-badge"
+                >
+                  {(thread.activeSubagents ?? 0) > 0
+                    ? t("agents.teamSessions.badgeRunning", { n: thread.activeSubagents ?? 0 })
+                    : t("agents.teamSessions.badgeCount", { n: thread.subagentCount ?? 0 })}
+                </span>
+              ) : null}
             </Link>
             {onDelete ? (
               <button

@@ -1,4 +1,5 @@
 import type { RunBudget } from "../harness/spec";
+import { MCP_FETCH_TOOL_KEY, MCP_LIMITS, MCP_LIST_SOURCES_TOOL_KEY } from "../mcp";
 import { PRODUCT_MODE_IDS, type ProductMode } from "./product-modes";
 import type { VirtualAgent } from "./virtual-agents";
 
@@ -71,6 +72,8 @@ export const DELEGATE_BUDGET: RunBudget = Object.freeze({
     write_file: 8,
     edit_file: 8,
     delete_file: 2,
+    [MCP_LIST_SOURCES_TOOL_KEY]: 2,
+    [MCP_FETCH_TOOL_KEY]: MCP_LIMITS.subagentMaxCallsPerTurn,
   }),
 });
 
@@ -84,7 +87,7 @@ export function delegateToolKeys(agent: Pick<VirtualAgent, "tools">): string[] {
  * agent cannot see this chat (so the task must carry everything), and says what to do with the answer.
  */
 export const DELEGATION_SENTENCE =
-  "delegate hands one self-contained task to another agent on the owner's desk and returns that agent's answer: ask for research, documents, finance, data, market, legal, meeting, music, edit, presentations or education. The agent cannot see this chat, so put everything it needs in task, paste any text it must work from into context, and name the desk files it should read. Use it when another agent's specialty fits a part of the job, or to run two independent parts at once (call it more than once in the same step). The agent cannot make pictures or clips and cannot delegate further, and each turn allows a few calls. Do not delegate what one or two of your own tool calls would do. Treat the answer as a colleague's draft: check it, and say what you took from it and which agent it came from.";
+  "delegate hands one self-contained task to another agent on the owner's desk and returns that agent's answer: ask for research, documents, finance, data, market, legal, meeting, music, edit, presentations or education. The agent cannot see this chat, so put everything it needs in task, paste any text it must work from into context, and name the desk files it should read. Use it when another agent's specialty fits a part of the job, or to run two independent parts at once (call it more than once in the same step). The agent cannot make pictures or clips and cannot delegate further, and each turn allows a few calls. Do not delegate what one or two of your own tool calls would do. You are the owner's single orchestrator in this chat: synthesize every subagent's findings and results into one unified answer here so the owner gets the full team's knowledge without needing to switch bots, treat each answer as a colleague's draft, check it, and cite which agent produced it.";
 
 /** The paragraph form, for the prompt. */
 export const DELEGATION_PROMPT = `\n\nWorking with other agents:\n- ${DELEGATION_SENTENCE}`;

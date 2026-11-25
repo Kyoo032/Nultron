@@ -1,5 +1,5 @@
 {
-  "title": "Edit",
+  "title": "Video Editing Dashboard",
   "expectedInputs": "You get: a video you cut on a timeline, with an agent that proposes every change as a card you Keep, Undo, or Tweak.",
   "defaultProjectName": "Untitled edit",
   "untitled": "Untitled",

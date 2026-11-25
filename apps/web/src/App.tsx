@@ -27,6 +27,7 @@ import { WorkspacesPage } from "@/components/workspaces-page";
 import { KnowledgePage } from "@/components/knowledge-page";
 import { ChannelsPage } from "@/components/channels-page";
 import { CustomersPage } from "@/components/customers-page";
+import { McpPage } from "@/components/mcp-page";
 import { DeskPane } from "@/components/desk-pane";
 import { WorkModeKeepAlive } from "@/components/work-mode-keep-alive";
 import { OnboardingScreen } from "@/components/onboarding-screen";
@@ -419,9 +420,7 @@ export function AppRoutes() {
               path="/usage"
               element={
                 <DeskPane>
-                  <SettingsShell>
-                    <UsagePage />
-                  </SettingsShell>
+                  <UsagePage />
                 </DeskPane>
               }
             />
@@ -429,9 +428,7 @@ export function AppRoutes() {
               path="/workspaces"
               element={
                 <DeskPane>
-                  <SettingsShell>
-                    {SHELL_LAYOUT === "chat-first" ? <VirtualAgentsPage /> : <WorkspacesPage />}
-                  </SettingsShell>
+                  {SHELL_LAYOUT === "chat-first" ? <VirtualAgentsPage /> : <WorkspacesPage />}
                 </DeskPane>
               }
             />
@@ -469,6 +466,16 @@ export function AppRoutes() {
                 <DeskPane>
                   <SettingsShell>
                     <CustomersPage />
+                  </SettingsShell>
+                </DeskPane>
+              }
+            />
+            <Route
+              path="/mcp"
+              element={
+                <DeskPane>
+                  <SettingsShell>
+                    <McpPage />
                   </SettingsShell>
                 </DeskPane>
               }

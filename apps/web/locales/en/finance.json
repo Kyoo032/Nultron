@@ -1,5 +1,5 @@
 {
-  "title": "Finance",
+  "title": "Finance Dashboard",
   "expectedInputs": "Add your file or type your numbers.",
   "kicker": "Workspace",
   "subtitle": "Give {productName} your figures as line items. Margins, growth, runway, breakeven, and NPV are computed in code; the model only writes the narrative, and any figure it cannot trace is removed.",

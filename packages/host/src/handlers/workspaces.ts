@@ -20,6 +20,8 @@ import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
 import { dropWorkspaceSettings, loadSettings, saveSettings } from "../settings-store";
 import { channelStore } from "../channels/store";
+import { dropDelegationsForWorkspace } from "../delegation/session-store";
+import { mcpStore } from "../mcp/store";
 import { purgeDeskFiles } from "../desk-files/store";
 import { inboxStore } from "../inbox/db";
 import { forgetFolderMount, purgeFolderProposals } from "../folder-root";
@@ -215,6 +217,8 @@ export async function handleDeleteWorkspace(request: HostRequest, deps: Workspac
     // The desk's channels and the conversations stored under them go with it: a deleted desk must
     // not leave an outside conversation on disk that nothing in the app can reach any more.
     channelStore().dropWorkspace(tenant, workspaceId);
+    dropDelegationsForWorkspace(tenant, workspaceId);
+    mcpStore().dropWorkspace(tenant, workspaceId);
     // Customers' numbers and words are stored in the database, not under the channel files: the
     // desk's connected numbers go, and their conversations and messages follow through the keys.
     inboxStore().purgeDesk(workspaceId);

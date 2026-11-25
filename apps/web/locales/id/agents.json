@@ -24,7 +24,7 @@
     "agentsAria": "Agen virtual",
     "accountAria": "Akun",
     "manage": "Agen virtual",
-    "studioBadge": "Membuka studionya"
+    "studioBadge": "Membuka dasbornya"
   },
   "header": {
     "newChat": "Obrolan baru",
@@ -40,9 +40,9 @@
     "badge": "Berjalan dengan harness sendiri",
     "skills": "Yang saya kerjakan",
     "ask": "Kirim pesan ke {name}",
-    "studioTitle": "Studio {name} menjalankan pemeriksaannya sendiri",
-    "studioNote": "Di obrolan ini, tugasnya dikerjakan dengan alat umum. Harness {name} dan pemeriksaannya sendiri belum terhubung ke obrolan. Buka studionya jika Anda membutuhkannya.",
-    "openStudio": "Buka studio {name}",
+    "studioTitle": "Dasbor {name}",
+    "studioNote": "Di obrolan ini, tugas Anda dikerjakan langsung. Aktifkan dan buka Dasbor {name} jika Anda menginginkan kontrol tambahan untuk menyesuaikan prompt dan menjalankan pemeriksaan khusus.",
+    "openStudio": "Buka Dasbor {name}",
     "everything": "Tanyakan apa saja. Saya juga bisa menulis, mencari di web, mengolah file Anda, membuat gambar, klip, dan presentasi."
   },
   "composer": {
@@ -96,6 +96,28 @@
       "failed": "Tugas gagal diselesaikan."
     }
   },
+  "teamSessions": {
+    "toggle": "Sesi tim",
+    "title": "Sesi tim agen",
+    "hint": "Setiap sub-agen yang dijalankan di obrolan ini dilacak di sini dan hasilnya disatukan kembali ke obrolan utama.",
+    "empty": "Belum ada sesi sub-agen yang berjalan di obrolan ini.",
+    "tools": "Alat: {tools}",
+    "openDirect": "Buka obrolan langsung",
+    "badgeCount": "{n} sub-agen",
+    "badgeRunning": "{n} berjalan",
+    "status": {
+      "running": "Berjalan",
+      "completed": "Selesai",
+      "failed": "Gagal",
+      "cancelled": "Dihentikan",
+      "timeout": "Waktu habis"
+    }
+  },
+  "directAdvisory": {
+    "body": "Anda sedang mengobrol langsung dengan {name}. Menggunakan Chat utama bersama {brand} menyatukan seluruh pengetahuan dan hasil tim Anda di satu tempat, tetapi Anda tetap memiliki akses penuh untuk mengobrol langsung dengan {name} di sini.",
+    "backToMain": "Kembali ke Chat {brand}",
+    "dismiss": "Tutup pemberitahuan"
+  },
   "finance": {
     "label": "Keuangan",
     "taskLine": "Keuangan · {task}",
@@ -124,22 +146,24 @@
     "downloadFailed": "File gagal diunduh."
   },
   "page": {
-    "title": "Agen virtual",
-    "lede": "Setiap agen adalah sebuah harness: prompt, alat, batasan, dan pemeriksaan yang diterapkan aplikasi pada setiap proses. Rekrut agen yang dibutuhkan pekerjaan Anda.",
-    "onDesk": "Di meja kerja Anda",
-    "open": "Buka",
-    "available": "Siap direkrut",
-    "noneAvailable": "Semua agen sudah ada di meja kerja Anda.",
-    "hire": "Rekrut",
-    "hiring": "Merekrut",
+    "title": "Agen & Dasbor",
+    "lede": "Aktifkan spesialis di bawah untuk menambahkannya ke meja kerja Anda dan membuka Dasbor khusus demi kustomisasi prompt yang lebih mendalam selain Chat.",
+    "onDesk": "Aktif di meja kerja Anda",
+    "open": "Buka obrolan",
+    "openDashboard": "Buka dasbor",
+    "openDashboardAria": "Buka Dasbor {name}",
+    "available": "Tersedia untuk diaktifkan",
+    "noneAvailable": "Semua agen dan dasbor sudah aktif di meja kerja Anda.",
+    "hire": "Aktifkan",
+    "hiring": "Mengaktifkan",
     "letGo": "Hapus",
     "lettingGo": "Menghapus",
     "always": "Selalu ada di meja kerja Anda",
-    "hireAria": "Rekrut {name}",
+    "hireAria": "Aktifkan {name}",
     "letGoAria": "Hapus {name}",
     "skillsCount": "{n} keahlian",
     "skillsCountOne": "1 keahlian",
-    "converses": "Harness sendiri di obrolan",
-    "studio": "Harness sendiri di studio"
+    "converses": "Chat + Dasbor",
+    "studio": "Dasbor tambahan"
   }
 }

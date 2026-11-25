@@ -1,5 +1,5 @@
 {
-  "title": "Images",
+  "title": "Images Dashboard",
   "expectedInputs": "You get: a generated image, saved to the gallery below.",
   "needsKey": "Add a {gateway} gateway key in {settings} to generate images.",
   "noModels": {
@@ -7,7 +7,7 @@
     "body": "This {gateway} key lists no image model, so nothing can be generated here. Check the Models section in {settings}."
   },
   "settingsLink": "Settings",
-  "loadError": "Could not load image studio",
+  "loadError": "Could not load images dashboard",
   "generateError": "Image generation failed",
   "modelRejected": "That model does not make images.",
   "aspect": {

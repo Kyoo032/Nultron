@@ -108,6 +108,8 @@
     "video_generate": "Membuat klip video",
     "past_sessions": "Obrolan sebelumnya",
     "knowledge_search": "Mencari di Knowledge Base",
+    "mcp_list_sources": "Menampilkan sumber terhubung",
+    "mcp_fetch": "Membaca sumber terhubung",
     "list_files": "Daftar file meja kerja",
     "read_file": "Membaca file",
     "write_file": "Menulis file",
@@ -185,6 +187,6 @@
     "contextUsage": "Konteks dan pemakaian",
     "ownHarness": "Harness {name}",
     "runsInChat": "Berjalan di obrolan ini, lengkap dengan pemeriksaannya.",
-    "runsInStudio": "Berjalan di studio {name}. Di obrolan ini pekerjaan dilakukan dengan alat di atas, tanpa pemeriksaan itu."
+    "runsInStudio": "Berjalan di Dasbor {name}. Buka dasbor ini jika Anda menginginkan kontrol tambahan untuk menyesuaikan prompt dan menjalankan pemeriksaan khusus."
   }
 }

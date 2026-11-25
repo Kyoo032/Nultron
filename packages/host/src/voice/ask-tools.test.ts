@@ -77,7 +77,7 @@ describe("which Chat tools a voice ask may run", () => {
     expect(isVoiceReadTool(DELEGATE_TOOL_KEY)).toBe(false);
     expect(isVoiceRunTool(DELEGATE_TOOL_KEY)).toBe(true);
     expect(VOICE_TAP_TOOLS).not.toContain(DELEGATE_TOOL_KEY);
-    // Nothing else moved: the extras are the workers plus delegate, and only delegate runs.
+    // Nothing else moved: the extras are the workers, MCP tools (kept off voice for privacy), and delegate.
     for (const key of GENERALIST_EXTRA_TOOLS.filter((entry) => entry !== DELEGATE_TOOL_KEY)) {
       expect(isVoiceRunTool(key), key).toBe(false);
     }

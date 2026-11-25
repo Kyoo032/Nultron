@@ -10,6 +10,7 @@ import { registerUniversityTools } from "@agentforge/university";
 import { registerCodeTools } from "./code-runner";
 import { registerDeckTools } from "./deck";
 import { delegateTool } from "./delegation/delegate-tool";
+import { mcpFetchTool, mcpListSourcesTool } from "./mcp/mcp-tools";
 import { resolveHostFileRoot } from "./file-roots";
 import { knowledgeSearchTool } from "./knowledge-search-tool";
 import { marketTools } from "./market/tools";
@@ -49,6 +50,9 @@ export function ensureToolsRegistered(): void {
   registerTool(financeTaskTool);
   // One agent asking another for its answer (`delegation/`).
   registerTool(delegateTool);
+  // Read-only sandboxed MCP connectors (Gmail, Google Drive, OneDrive, Notion).
+  registerTool(mcpListSourcesTool);
+  registerTool(mcpFetchTool);
   registered = true;
   void import("./edit/backend").then((mod) => {
     setEditToolBackend(mod.hostEditBackend);

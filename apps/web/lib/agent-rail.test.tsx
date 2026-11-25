@@ -156,21 +156,42 @@ describe("AgentRailView before the host answers", () => {
 });
 
 describe("AgentRailView account group", () => {
-  it("lists only Knowledge and Settings in the calm account group", () => {
+  it("lists Knowledge, Agents, Usage, and Settings in the account group", () => {
     const html = markup({ pathname: "/settings", activeId: null });
     const group = html.slice(
       html.indexOf('data-testid="rail-account-group"'),
       html.indexOf('data-testid="rail-footer"'),
     );
     const tags = links(group);
-    expect(tags.map((tag) => attr(tag, "data-testid"))).toEqual(["mode-knowledge", "settings-link"]);
-    expect(tags.map((tag) => attr(tag, "href"))).toEqual(["/knowledge", "/settings"]);
+    expect(tags.map((tag) => attr(tag, "data-testid"))).toEqual([
+      "mode-knowledge",
+      "workspaces-link",
+      "usage-link",
+      "settings-link",
+    ]);
+    expect(tags.map((tag) => attr(tag, "href"))).toEqual(["/knowledge", "/workspaces", "/usage", "/settings"]);
     expect(tags.filter((tag) => attr(tag, "aria-current") === "page").map((tag) => attr(tag, "data-testid"))).toEqual([
       "settings-link",
     ]);
   });
 
-  it.each(["/settings", "/workspaces", "/team", "/channels", "/customers", "/usage"])(
+  it("highlights Agents and Usage directly on the rail outside Settings", () => {
+    const agentsHtml = markup({ pathname: "/workspaces", activeId: null });
+    expect(
+      links(agentsHtml)
+        .filter((tag) => attr(tag, "aria-current") === "page")
+        .map((tag) => attr(tag, "data-testid")),
+    ).toEqual(["workspaces-link"]);
+
+    const usageHtml = markup({ pathname: "/usage", activeId: null });
+    expect(
+      links(usageHtml)
+        .filter((tag) => attr(tag, "aria-current") === "page")
+        .map((tag) => attr(tag, "data-testid")),
+    ).toEqual(["usage-link"]);
+  });
+
+  it.each(["/settings", "/team", "/channels", "/customers", "/mcp"])(
     "highlights Settings as active when visiting %s",
     (path) => {
       const html = markup({ pathname: path, activeId: null });

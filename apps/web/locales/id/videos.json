@@ -1,5 +1,5 @@
 {
-  "title": "Video",
+  "title": "Dasbor Video",
   "expectedInputs": "Hasil: klip yang dibuat, tersimpan di galeri di bawah dan bisa diunduh.",
   "needsKey": "Tambahkan kunci gateway {gateway} di {settings} agar bisa membuat video.",
   "noModels": {
@@ -7,7 +7,7 @@
     "body": "Kunci gateway {gateway} ini tidak memuat model video, jadi belum ada yang bisa dibuat di sini. Periksa bagian Model di {settings}."
   },
   "settingsLink": "Pengaturan",
-  "loadError": "Studio video gagal dimuat",
+  "loadError": "Dasbor video gagal dimuat",
   "generateError": "Pembuatan video gagal",
   "clipRejected": "Hasil render tidak berisi file video.",
   "modelNotOnKey": "{model} tidak tersedia di kunci ini. Coba {suggestion}.",
