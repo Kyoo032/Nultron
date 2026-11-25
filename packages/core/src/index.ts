@@ -163,6 +163,8 @@ export {
   assertResolvesPublic,
   fetchPublicHttps,
   nextHopUrl,
+  pinnedAgent,
+  resolvePublicAddresses,
 } from "./security/safe-fetch";
 export type { HostLookup, ResolvedAddress, SafeFetchOptions, SafeFetchResult } from "./security/safe-fetch";
 export {
@@ -780,6 +782,32 @@ export {
   teamProposalModes,
 } from "./agents/team-bots";
 export type { TeamBotProposal, TeamBotView, TeamProposal, TeamRoster } from "./agents/team-bots";
+export {
+  DEFAULT_MCP_POLICY,
+  MCP_BOUNDARY_RULES,
+  MCP_CONNECTOR_IDS,
+  MCP_CONNECTOR_SPECS,
+  MCP_FETCH_TOOL_KEY,
+  MCP_LIMITS,
+  MCP_LIST_SOURCES_TOOL_KEY,
+  MCP_PROMPT_PARAGRAPH,
+  MCP_TOOL_KEYS,
+  assertMcpEndpointSafe,
+  assertMcpTokenShape,
+  filterSafeMcpTools,
+  isAllowedMcpAction,
+  isForbiddenMcpAction,
+  isMcpConnectorId,
+  normalizeMcpPolicy,
+  redactMcpToken,
+} from "./mcp";
+export type {
+  McpAccessMode,
+  McpBoundaryRules,
+  McpConnectorId,
+  McpConnectorPolicy,
+  McpConnectorSpec,
+} from "./mcp";
 export { defineTool, invokeTool } from "./tools/define-tool";
 export type { ToolDefinition, ToolTrust } from "./tools/define-tool";
 export type {

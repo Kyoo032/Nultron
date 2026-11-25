@@ -102,12 +102,12 @@ describe("nextDeskModes", () => {
 });
 
 describe("VirtualAgentsView", () => {
-  it("is the Virtual agents page, with its lede", () => {
+  it("is the Agents & Dashboards page, with its lede", () => {
     const html = view();
     expect(html).toContain('data-testid="virtual-agents-page"');
     expect(html).toContain('data-mode="workspaces"');
-    expect(html).toContain("Virtual agents");
-    expect(html).toContain("Hire the ones your work needs.");
+    expect(html).toContain("Agents &amp; Dashboards");
+    expect(html).toContain("dedicated Dashboard");
   });
 
   it("gives the generalist no let-go button and every other desk agent one", () => {
@@ -126,11 +126,11 @@ describe("VirtualAgentsView", () => {
     expect(pageSource).not.toMatch(/Nultron|Toko Token/);
   });
 
-  it("gives every available agent a hire button", () => {
+  it("gives every available agent an activate button", () => {
     const html = view();
     expect(count(html, 'data-testid="agent-hire"')).toBe(2);
-    expect(html).toContain('aria-label="Hire Finance"');
-    expect(html).toContain('aria-label="Hire Legal"');
+    expect(html).toContain('aria-label="Activate Finance"');
+    expect(html).toContain('aria-label="Activate Legal"');
   });
 
   it("draws one card per agent, each in its own mode colour", () => {
@@ -141,19 +141,21 @@ describe("VirtualAgentsView", () => {
     expect(html).toContain('data-mode="finance"');
   });
 
-  it("says whether an agent converses or opens a studio, and how many skills it has", () => {
+  it("labels specialist surfaces as Dashboard and shows how many skills each has", () => {
     const html = view();
-    expect(html).toContain(">Own harness in chat<");
-    expect(html).toContain(">Own harness in studio<");
+    expect(html).toContain(">Chat + Dashboard<");
+    expect(html).toContain(">Extra Dashboard<");
     // One of the two fixture skills is off.
     expect(html).toContain("1 skill");
   });
 
-  it("labels every Open link as a message to the agent, a studio agent included", () => {
+  it("links active specialists to both their chat and their dedicated Dashboard", () => {
     const html = view();
     expect(html).toContain('aria-label="Message Documents"');
     expect(html).toContain('aria-label="Message Research"');
-    expect(html).not.toContain("Open the Documents studio");
+    expect(html).toContain('data-testid="agent-open-dashboard"');
+    expect(html).toContain('aria-label="Open Research Dashboard"');
+    expect(html).toContain('aria-label="Open Documents Dashboard"');
   });
 
   it("links each desk agent to its conversation", () => {
@@ -162,21 +164,21 @@ describe("VirtualAgentsView", () => {
     expect(html).toContain('href="/chat?agent=research"');
   });
 
-  it("shows the empty line when nothing is left to hire", () => {
+  it("shows the empty line when nothing is left to activate", () => {
     const html = view({ available: [] });
-    expect(html).toContain("Every agent is already on your desk.");
+    expect(html).toContain("Every agent and dashboard is already active on your desk.");
     expect(html).not.toContain('data-testid="agent-hire"');
   });
 
   it("holds back both lists until the catalog has answered", () => {
     const html = view({ loaded: false, agents: [], available: [] });
-    expect(html).not.toContain("Every agent is already on your desk.");
+    expect(html).not.toContain("Every agent and dashboard is already active on your desk.");
     expect(html).not.toContain('data-testid="agent-card"');
   });
 
   it("shows the busy word on the pressed button and disables every button", () => {
     const html = view({ busyId: "finance" });
-    expect(html).toContain(">Hiring<");
+    expect(html).toContain(">Activating<");
     expect(count(html, "disabled")).toBe(4);
     const letting = view({ busyId: "research" });
     expect(letting).toContain(">Deleting<");

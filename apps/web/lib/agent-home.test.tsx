@@ -84,27 +84,32 @@ describe("AgentHome", () => {
     expect(html).not.toContain("agent-home-studio");
   });
 
-  it("shows the studio note and a secondary button for a studio agent that can open its studio", () => {
+  it("shows the Dashboard card and secondary button when onOpenStudio is provided", () => {
     const html = renderToStaticMarkup(<AgentHome agent={LEGAL} name="Legal" onOpenStudio={() => {}} />);
     expect(html).toContain('data-mode="legal"');
     expect(html).toContain('data-testid="agent-home-studio"');
-    expect(html).toContain("The Legal studio runs its own checks");
+    expect(html).toContain("Legal Dashboard");
     expect(html).toContain('data-testid="agent-open-studio"');
     expect(html).toMatch(/class="btn btn-secondary"[^>]*data-testid="agent-open-studio"/);
-    expect(html).toContain("Open the Legal studio");
+    expect(html).toContain("Open Legal Dashboard");
     expect(html).toContain("Open the matter");
   });
 
-  it("draws no studio note and no button for a studio agent without onOpenStudio", () => {
+  it("draws no Dashboard card without onOpenStudio", () => {
     const html = renderToStaticMarkup(<AgentHome agent={LEGAL} name="Legal" />);
     expect(html).not.toContain("agent-home-studio");
     expect(html).not.toContain("agent-open-studio");
-    expect(html).not.toContain("studio runs its own checks");
+    expect(html).not.toContain("Open Legal Dashboard");
   });
 
-  it("draws no studio note for a harness agent even when handed onOpenStudio", () => {
+  it("offers the Research Dashboard button when onOpenStudio is provided, never for the generalist", () => {
     const html = renderToStaticMarkup(<AgentHome agent={RESEARCH} name="Research" onOpenStudio={() => {}} />);
-    expect(html).not.toContain("agent-open-studio");
+    expect(html).toContain('data-testid="agent-open-studio"');
+    expect(html).toContain("Open Research Dashboard");
+    const chat: VirtualAgentInfo = { ...LEGAL, id: "chat", generalist: true, conversation: "harness" };
+    expect(renderToStaticMarkup(<AgentHome agent={chat} name="Nultron" onOpenStudio={() => {}} />)).not.toContain(
+      "agent-open-studio",
+    );
   });
 
   it("says on every agent that it does everything else too", () => {
@@ -198,7 +203,7 @@ describe("AgentHarnessPanel", () => {
     expect(own).not.toContain("enforces");
   });
 
-  it("says where the agent's own harness runs: in this chat, or in its studio without these checks", () => {
+  it("says where the agent's own harness runs: in this chat, or in its Dashboard", () => {
     const wired = renderToStaticMarkup(<AgentHarnessPanel agent={RESEARCH} name="Research" onClose={() => {}} />);
     expect(wired).toContain('data-runs="chat"');
     expect(wired).toContain("Runs in this chat, with its checks.");
@@ -206,25 +211,23 @@ describe("AgentHarnessPanel", () => {
 
     const studio = renderToStaticMarkup(<AgentHarnessPanel agent={LEGAL} name="Legal" onClose={() => {}} />);
     expect(studio).toContain('data-runs="studio"');
-    expect(studio).toContain(
-      "Runs in the Legal studio. In this chat the work is done with the tools above, without these checks.",
-    );
+    expect(studio).toContain("Runs in the Legal Dashboard.");
     expect(studio).not.toContain("Runs in this chat, with its checks.");
   });
 
-  it("keeps the way into the studio in the panel, where it outlasts the empty conversation", () => {
+  it("keeps the way into the Dashboard in the panel for specialist agents", () => {
     const withWay = renderToStaticMarkup(
       <AgentHarnessPanel agent={LEGAL} name="Legal" onClose={() => {}} onOpenStudio={() => {}} />,
     );
     expect(withWay).toContain('data-testid="agent-harness-open-studio"');
-    expect(withWay).toContain("Open the Legal studio");
-    // No way in is drawn when the caller has none, or for an agent whose harness runs in the chat.
+    expect(withWay).toContain("Open Legal Dashboard");
     const without = renderToStaticMarkup(<AgentHarnessPanel agent={LEGAL} name="Legal" onClose={() => {}} />);
     expect(without).not.toContain('data-testid="agent-harness-open-studio"');
     const wired = renderToStaticMarkup(
       <AgentHarnessPanel agent={RESEARCH} name="Research" onClose={() => {}} onOpenStudio={() => {}} />,
     );
-    expect(wired).not.toContain('data-testid="agent-harness-open-studio"');
+    expect(wired).toContain('data-testid="agent-harness-open-studio"');
+    expect(wired).toContain("Open Research Dashboard");
   });
 
   it("says so when the agent binds no tools and repairs nothing", () => {

@@ -108,6 +108,8 @@
     "video_generate": "Make a video clip",
     "past_sessions": "Earlier chats",
     "knowledge_search": "Search the Knowledge Base",
+    "mcp_list_sources": "List connected sources",
+    "mcp_fetch": "Read a connected source",
     "list_files": "List desk files",
     "read_file": "Read a file",
     "write_file": "Write a file",
@@ -185,6 +187,6 @@
     "contextUsage": "Context and usage",
     "ownHarness": "The {name} harness",
     "runsInChat": "Runs in this chat, with its checks.",
-    "runsInStudio": "Runs in the {name} studio. In this chat the work is done with the tools above, without these checks."
+    "runsInStudio": "Runs in the {name} Dashboard. Open it when you want extra controls to customize your prompt and run dedicated checks."
   }
 }

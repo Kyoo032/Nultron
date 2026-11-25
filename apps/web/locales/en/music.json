@@ -3,7 +3,7 @@
   "expectedInputs": "You get: a finished song, saved to the library below and downloadable.",
   "needsKey": "Add a {gateway} gateway key in {settings} to generate music.",
   "settingsLink": "Settings",
-  "loadError": "Could not load music studio",
+  "loadError": "Could not load music dashboard",
   "generateError": "Music generation failed",
   "lyricsError": "Lyrics generation failed",
   "modeLabel": "How to write it",

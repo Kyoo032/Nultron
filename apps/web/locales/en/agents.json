@@ -24,7 +24,7 @@
     "agentsAria": "Virtual agents",
     "accountAria": "Account",
     "manage": "Virtual agents",
-    "studioBadge": "Opens its studio"
+    "studioBadge": "Opens its dashboard"
   },
   "header": {
     "newChat": "New chat",
@@ -40,9 +40,9 @@
     "badge": "Runs on its own harness",
     "skills": "What I do",
     "ask": "Message {name}",
-    "studioTitle": "The {name} studio runs its own checks",
-    "studioNote": "This chat does the work with the general tools. The {name} harness, with its own checks, is not connected to the chat yet: open the studio when you need that run.",
-    "openStudio": "Open the {name} studio",
+    "studioTitle": "{name} Dashboard",
+    "studioNote": "This chat handles your requests directly. Activate and open the {name} Dashboard when you want extra controls to customize your prompt and run dedicated checks.",
+    "openStudio": "Open {name} Dashboard",
     "everything": "Ask me anything. I can also write, research, work with your files, and make pictures, clips and decks."
   },
   "composer": {
@@ -96,6 +96,28 @@
       "failed": "Could not finish the task."
     }
   },
+  "teamSessions": {
+    "toggle": "Team sessions",
+    "title": "Agent team sessions",
+    "hint": "Every subagent spawned in this chat is tracked here and synthesized back into this main chat.",
+    "empty": "No subagent sessions have run in this chat yet.",
+    "tools": "Tools: {tools}",
+    "openDirect": "Open direct chat",
+    "badgeCount": "{n} subagents",
+    "badgeRunning": "{n} running",
+    "status": {
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Stopped",
+      "timeout": "Timed out"
+    }
+  },
+  "directAdvisory": {
+    "body": "You are chatting directly with {name}. Using main Chat with {brand} keeps your whole team's knowledge and results in one place, though you still have full access to message {name} directly here.",
+    "backToMain": "Back to {brand} Chat",
+    "dismiss": "Dismiss advisory"
+  },
   "finance": {
     "label": "Finance",
     "taskLine": "Finance · {task}",
@@ -124,22 +146,24 @@
     "downloadFailed": "Could not download the file."
   },
   "page": {
-    "title": "Virtual agents",
-    "lede": "Every agent is a harness: a prompt, tools, limits and checks that the app enforces on each run. Hire the ones your work needs.",
-    "onDesk": "On your desk",
-    "open": "Open",
-    "available": "Ready to hire",
-    "noneAvailable": "Every agent is already on your desk.",
-    "hire": "Hire",
-    "hiring": "Hiring",
+    "title": "Agents & Dashboards",
+    "lede": "Activate any specialist below to add it to your desk and unlock its dedicated Dashboard for deeper prompt customization beyond Chat.",
+    "onDesk": "Active on your desk",
+    "open": "Open chat",
+    "openDashboard": "Open dashboard",
+    "openDashboardAria": "Open {name} Dashboard",
+    "available": "Available to activate",
+    "noneAvailable": "Every agent and dashboard is already active on your desk.",
+    "hire": "Activate",
+    "hiring": "Activating",
     "letGo": "Delete",
     "lettingGo": "Deleting",
     "always": "Always on your desk",
-    "hireAria": "Hire {name}",
+    "hireAria": "Activate {name}",
     "letGoAria": "Delete {name}",
     "skillsCount": "{n} skills",
     "skillsCountOne": "1 skill",
-    "converses": "Own harness in chat",
-    "studio": "Own harness in studio"
+    "converses": "Chat + Dashboard",
+    "studio": "Extra Dashboard"
   }
 }

@@ -242,8 +242,20 @@ import {
   handlePostSettings,
   handleResetApp,
 } from "./handlers/settings";
-import { handleDeleteThread, handleGetThread, handleGetThreads, handlePostThreads } from "./handlers/threads";
+import {
+  handleDeleteThread,
+  handleGetThread,
+  handleGetThreads,
+  handleGetThreadSubagents,
+  handlePostThreads,
+} from "./handlers/threads";
 import { handlePostVoiceSession, handlePostVoiceSessionEnd } from "./handlers/voice";
+import {
+  handleDeleteMcpConnector,
+  handleGetMcpConnectors,
+  handlePostMcpConnector,
+  handlePostMcpConnectorTest,
+} from "./handlers/mcp";
 import { handleGetUsage } from "./handlers/usage";
 import { handleGetStorageUsage } from "./handlers/storage";
 import { handleGetVideoExampleFile, handleGetVideoExamples } from "./handlers/video-examples";
@@ -383,9 +395,14 @@ const routes: Route[] = [
   compile("GET", "/api/v1/threads", handleGetThreads),
   compile("POST", "/api/v1/threads", handlePostThreads),
   compile("GET", "/api/v1/threads/:threadId", handleGetThread),
+  compile("GET", "/api/v1/threads/:threadId/subagents", handleGetThreadSubagents),
   compile("DELETE", "/api/v1/threads/:threadId", handleDeleteThread),
   compile("POST", "/api/v1/voice/sessions", handlePostVoiceSession),
   compile("POST", "/api/v1/voice/sessions/:id/end", handlePostVoiceSessionEnd),
+  compile("GET", "/api/v1/mcp/connectors", handleGetMcpConnectors),
+  compile("POST", "/api/v1/mcp/connectors/:connectorId", (req) => handlePostMcpConnector(req)),
+  compile("DELETE", "/api/v1/mcp/connectors/:connectorId", handleDeleteMcpConnector),
+  compile("POST", "/api/v1/mcp/connectors/:connectorId/test", (req) => handlePostMcpConnectorTest(req)),
   compile("POST", "/api/v1/threads/:threadId/runs/text", (req) => handleRun(req, "text")),
   compile("POST", "/api/v1/threads/:threadId/runs/image", (req) => handleRun(req, "image")),
   compile("POST", "/api/v1/threads/:threadId/runs/video", (req) => handleRun(req, "video")),

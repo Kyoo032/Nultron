@@ -8,6 +8,7 @@ import { isSealedThreadTitle, openThreadTitle, sealThreadTitle } from "./thread-
 import { localeForRun } from "./run-context";
 import { deleteSourceByOrigin } from "./knowledge";
 import { removeGraphForThread } from "./knowledge-graph-prune";
+import { dropDelegationsForThread } from "./delegation/session-store";
 import { messageText } from "./message-text";
 import { log } from "./log";
 
@@ -151,6 +152,7 @@ export async function deleteThread(tenant: TenantContext, threadId: string): Pro
   try {
     deleteSourceByOrigin(tenant, { kind: "thread", id: threadId });
     removeGraphForThread(tenant, threadId);
+    dropDelegationsForThread(tenant, threadId);
   } catch (error) {
     log.warn("threads_knowledge_card_not_dropped", {
       threadId,

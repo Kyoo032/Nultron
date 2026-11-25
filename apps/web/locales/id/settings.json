@@ -112,6 +112,7 @@
   "models.refreshFailed": "Tidak bisa memeriksa model. Coba lagi sebentar lagi.",
   "tabs.aria": "Bagian pengaturan",
   "tabs.general": "Umum",
+  "tabs.mcp": "Konektor (MCP)",
   "tabs.agents": "Agen",
   "tabs.team": "Tim",
   "tabs.channels": "Channel",

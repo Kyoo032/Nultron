@@ -65,6 +65,11 @@ export type StoredSecrets = {
    * server environment.
    */
   whatsappAccessToken?: string;
+  /**
+   * Per-connector MCP access tokens (gmail, google_drive, onedrive, notion), encrypted inside the
+   * same settings.enc envelope as gateway/Telegram/WhatsApp tokens and never returned to the renderer.
+   */
+  mcpTokens?: Record<string, string>;
 };
 
 /** The retrieval engines a desk may select. */
@@ -179,6 +184,25 @@ export function mergeSecrets(current: StoredSecrets, patch: SecretPatch): Stored
       next.toolKeys = toolKeys;
     } else {
       delete next.toolKeys;
+    }
+  }
+  if (patch.mcpTokens !== undefined) {
+    const mcpTokens = { ...current.mcpTokens };
+    for (const [name, value] of Object.entries(patch.mcpTokens)) {
+      if (typeof value !== "string") {
+        continue;
+      }
+      const trimmed = value.trim();
+      if (trimmed.length === 0) {
+        delete mcpTokens[name];
+      } else {
+        mcpTokens[name] = trimmed;
+      }
+    }
+    if (Object.keys(mcpTokens).length > 0) {
+      next.mcpTokens = mcpTokens;
+    } else {
+      delete next.mcpTokens;
     }
   }
   if (patch.toolBackends) {

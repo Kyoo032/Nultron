@@ -24,8 +24,8 @@ describe("the agent pane", () => {
     expect(pane).toContain("virtualAgentName(agent, assistantNameOf(brand))");
   });
 
-  it("hands over the studio way in only for a studio agent that is not the default one", () => {
-    expect(pane).toMatch(/const openStudio =\s*agent\.conversation === "studio" && !agent\.generalist\s*\?/);
+  it("hands over the Dashboard way in for every non-generalist specialist agent", () => {
+    expect(pane).toMatch(/const openStudio =\s*!agent\.generalist\s*\?/);
     expect(pane).toContain("studioHref(agentKey)");
     // The same way in goes to the empty conversation and to the panel, which stays after the first message.
     expect(pane).toContain("onOpenStudio: openStudio");

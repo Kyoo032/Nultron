@@ -1,5 +1,5 @@
 {
-  "title": "Gambar",
+  "title": "Dasbor Gambar",
   "expectedInputs": "Hasil: gambar yang dibuat, tersimpan di galeri di bawah.",
   "needsKey": "Tambahkan kunci gateway {gateway} di {settings} agar bisa membuat gambar.",
   "noModels": {
@@ -7,7 +7,7 @@
     "body": "Kunci gateway {gateway} ini tidak memuat model gambar, jadi belum ada yang bisa dibuat di sini. Periksa bagian Model di {settings}."
   },
   "settingsLink": "Pengaturan",
-  "loadError": "Studio gambar gagal dimuat",
+  "loadError": "Dasbor gambar gagal dimuat",
   "generateError": "Pembuatan gambar gagal",
   "modelRejected": "Model itu tidak bisa membuat gambar.",
   "aspect": {

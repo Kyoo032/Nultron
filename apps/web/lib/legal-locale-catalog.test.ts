@@ -18,7 +18,7 @@ describe("legal locale catalogs", () => {
   });
 
   it("keeps English Legal chrome as the source of truth", () => {
-    expect(en.studio.title).toBe("Legal");
+    expect(en.studio.title).toBe("Legal Dashboard");
     expect(en.studio.run).toBe("Run matter");
     expect(en.errors.stub).toMatch(/live gateway/);
   });

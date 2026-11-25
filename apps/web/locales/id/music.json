@@ -3,7 +3,7 @@
   "expectedInputs": "Hasil: lagu jadi, tersimpan di pustaka di bawah dan bisa diunduh.",
   "needsKey": "Tambahkan kunci gateway {gateway} di {settings} agar bisa membuat musik.",
   "settingsLink": "Pengaturan",
-  "loadError": "Studio musik gagal dimuat",
+  "loadError": "Dasbor musik gagal dimuat",
   "generateError": "Pembuatan musik gagal",
   "lyricsError": "Pembuatan lirik gagal",
   "modeLabel": "Cara menulis lirik",

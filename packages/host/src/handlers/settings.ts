@@ -521,6 +521,8 @@ export const HOST_RESET_ENTRIES = [
   // Desk channels: the bot token lives in settings.enc, but the channel list and the stored
   // conversation are files here, and they are the host's own writes like everything else on this list.
   "channels",
+  "delegations",
+  "mcp",
   "models-cache.json",
   "models-dev-cache.json",
   // Its freshness sidecar (one timestamp), written beside it on every registry refresh.

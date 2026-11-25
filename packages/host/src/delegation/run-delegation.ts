@@ -33,6 +33,7 @@ import { delegationRoster, resolveDelegatable } from "../team-bots";
 import { VOICE_TAP_TOOLS, isVoiceReadTool } from "../voice/ask-tools";
 import { currentWorkerChannel, runWithWorkerProgress, withWorkerChannel, WORKER_MAX_MS } from "../workers/worker-channel";
 import { currentDelegation, withDelegation } from "./delegation-context";
+import { recordDelegationFinish, recordDelegationStart } from "./session-store";
 
 const VOICE_TAP_TOOL_SET: ReadonlySet<string> = new Set(VOICE_TAP_TOOLS);
 
@@ -203,9 +204,31 @@ export async function runDelegation(args: DelegateArgs, tenant: TenantContext): 
   if (!thread) {
     return refused("failed", "The task could not be started.", agentKey, agentName);
   }
-  await insertMessage(tenant, thread.id, "user", [{ type: "text", text: message }]);
-  const run = await insertRun(tenant, thread.id, published.version.id, "text");
+  recordDelegationStart(tenant, {
+    parentThreadId: asking.threadId,
+    childThreadId: thread.id,
+    agentKey,
+    agentKind: target.kind,
+    agentName,
+    task: args.task,
+  });
+  let run: Awaited<ReturnType<typeof insertRun>> | undefined;
+  try {
+    await insertMessage(tenant, thread.id, "user", [{ type: "text", text: message }]);
+    run = await insertRun(tenant, thread.id, published.version.id, "text");
+  } catch (setupError) {
+    const detail = redactSecrets(setupError instanceof Error ? setupError.message : "The task could not be started.");
+    recordDelegationFinish(tenant, asking.threadId, thread.id, {
+      status: "failed",
+      error: detail,
+    });
+    return refused("failed", detail, agentKey, agentName);
+  }
   if (!run) {
+    recordDelegationFinish(tenant, asking.threadId, thread.id, {
+      status: "failed",
+      error: "The task could not be started.",
+    });
     return refused("failed", "The task could not be started.", agentKey, agentName);
   }
 
@@ -339,18 +362,34 @@ export async function runDelegation(args: DelegateArgs, tenant: TenantContext): 
     await persist("failed", stopped ?? detail).catch(() => undefined);
     const threadRef = { id: thread.id };
     if (stopped === "cancelled") {
+      recordDelegationFinish(tenant, asking.threadId, thread.id, {
+        status: "cancelled",
+        toolsUsed: [...used],
+        error: "The run was stopped.",
+      });
       return { ok: false, reason: "cancelled", message: "The run was stopped.", agent: agentKey, agentName, thread: threadRef };
     }
     if (stopped === "timeout") {
+      const timeoutMsg = `The ${label} did not finish in time. Whatever it had done is in its conversation.`;
+      recordDelegationFinish(tenant, asking.threadId, thread.id, {
+        status: "timeout",
+        toolsUsed: [...used],
+        error: timeoutMsg,
+      });
       return {
         ok: false,
         reason: "timeout",
-        message: `The ${label} did not finish in time. Whatever it had done is in its conversation.`,
+        message: timeoutMsg,
         agent: agentKey,
         agentName,
         thread: threadRef,
       };
     }
+    recordDelegationFinish(tenant, asking.threadId, thread.id, {
+      status: "failed",
+      toolsUsed: [...used],
+      error: detail,
+    });
     return { ok: false, reason: "failed", message: detail, agent: agentKey, agentName, thread: threadRef };
   }
 
@@ -363,9 +402,20 @@ export async function runDelegation(args: DelegateArgs, tenant: TenantContext): 
           ? `The ${label} used all its steps without writing an answer. What it did is in its conversation.`
           : `The ${label} did not write an answer.`;
     await persist("failed", message);
+    recordDelegationFinish(tenant, asking.threadId, thread.id, {
+      status: "failed",
+      toolsUsed: [...used],
+      error: message,
+    });
     return { ok: false, reason: failure !== "" ? "failed" : "no_answer", message, agent: agentKey, agentName, thread: { id: thread.id } };
   }
   await persist("completed");
+  recordDelegationFinish(tenant, asking.threadId, thread.id, {
+    status: "completed",
+    summary,
+    truncated,
+    toolsUsed: [...used],
+  });
   return {
     ok: true,
     agent: agentKey,

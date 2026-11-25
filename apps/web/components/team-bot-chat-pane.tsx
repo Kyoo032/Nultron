@@ -3,7 +3,9 @@
 import { useEffect } from "react";
 import "@/components/agent-chat.css";
 import { ChatSession } from "@/components/chat-session";
+import { DirectChatAdvisory } from "@/components/direct-chat-advisory";
 import { useRouter } from "@/lib/nav";
+import { assistantNameOf, useProductBrand } from "@/lib/product-brand";
 import { teamBotHref, useTeam, type TeamBotSlug } from "@/lib/team";
 
 type Props = {
@@ -19,6 +21,7 @@ type Props = {
  */
 export function TeamBotChatPane({ slug, threadId }: Props) {
   const router = useRouter();
+  const brand = useProductBrand();
   const { roster, loaded } = useTeam();
   const bot = roster.bots.find((entry) => entry.slug === slug);
   const missing = loaded && !bot;
@@ -37,6 +40,7 @@ export function TeamBotChatPane({ slug, threadId }: Props) {
   return (
     <div className="agent-chat-pane" data-testid="team-bot-chat-pane" data-bot={bot.slug}>
       <div className="agent-chat-main">
+        <DirectChatAdvisory agentName={bot.name} brandName={assistantNameOf(brand)} />
         <ChatSession
           key={bot.id}
           agentId={bot.id}

@@ -9,6 +9,7 @@ import { BrandMark } from "@/components/brand-mark";
 import { DeskBuddyChip, DeskBuddyDock } from "@/components/desk-buddy";
 import { ModeIcon, isModeIconName, type ModeIconName } from "@/components/mode-icons";
 import { isSettingsHubPath } from "@/components/settings-shell";
+import { LanguageToggle } from "@/components/language-toggle";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { productMonogram } from "@/components/app-shell";
 import { t } from "@/lib/i18n";
@@ -23,6 +24,8 @@ import {
   type VirtualAgentInfo,
 } from "@/lib/virtual-agents";
 import { isTeamBotParam, teamBotHref, useTeam, type TeamBotView } from "@/lib/team";
+import { useChatThreads, type ChatThread } from "@/lib/use-chat-threads";
+import { Link } from "@/lib/nav";
 import "./agent-rail.css";
 
 type Props = {
@@ -53,6 +56,10 @@ export type AgentRailViewProps = {
   activeBotSlug?: string | null;
   /** Hired team bots shown under the virtual agents. */
   bots?: readonly TeamBotView[];
+  /** Recent primary Chat sessions shown in the expanded rail with subagent tracking badges. */
+  sessions?: readonly ChatThread[];
+  /** Currently open thread id from `?thread=`. */
+  activeThreadId?: string | null;
   pathname: string;
   productName: string;
   /** The default agent's name: the brand's character (`assistantNameOf`). Left out, the product's name. */
@@ -70,11 +77,13 @@ export type AgentRailViewProps = {
 };
 
 /**
- * Minimal bottom account group: Knowledge Base and the unified Settings hub (which hosts General,
- * Agents, Team, Channels, Customers, and Usage under one entry point).
+ * Bottom account group: Knowledge Base, Agents, Usage, and Settings outside the Settings hub
+ * so Agents and Usage stay one click away on the rail.
  */
 const ACCOUNT_LINKS: ReadonlyArray<{ href: string; icon: ModeIconName; testId: string; labelKey: string }> = [
   { href: "/knowledge", icon: "knowledge", testId: "mode-knowledge", labelKey: "rail.knowledge" },
+  { href: "/workspaces", icon: "workspaces", testId: "workspaces-link", labelKey: "rail.agents" },
+  { href: "/usage", icon: "usage", testId: "usage-link", labelKey: "rail.usage" },
   { href: "/settings", icon: "settings", testId: "settings-link", labelKey: "rail.settings" },
 ];
 
@@ -104,6 +113,8 @@ export function AgentRailView({
   activeId,
   activeBotSlug = null,
   bots = [],
+  sessions = [],
+  activeThreadId = null,
   pathname,
   productName,
   assistantName,
@@ -208,6 +219,43 @@ export function AgentRailView({
           onScroll={onTipEnd}
         >
           {list.filter((agent) => agent.generalist).map(renderAgent)}
+          {!collapsed && sessions.length > 0 ? (
+            <div className="agent-rail-team" data-testid="rail-chat-sessions">
+              <p className="agent-rail-team-title">{t("rail.chatSessions")}</p>
+              {sessions.slice(0, 5).map((session) => {
+                const isCurrent = pathname === "/chat" && activeId === "chat" && activeThreadId === session.id;
+                const subCount = session.subagentCount ?? 0;
+                const activeSubs = session.activeSubagents ?? 0;
+                return (
+                  <Link
+                    key={session.id}
+                    href={virtualAgentHref("chat", session.id)}
+                    aria-current={isCurrent ? "true" : undefined}
+                    data-testid="rail-session-item"
+                    title={session.title}
+                    className="agent-rail-link justify-between px-2 text-xs"
+                  >
+                    <span className="truncate">{session.title}</span>
+                    {subCount > 0 ? (
+                      <span
+                        className="ml-1 shrink-0 rounded-full bg-[var(--accent)]/15 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--accent)]"
+                        data-testid="rail-session-subagents"
+                        aria-label={
+                          activeSubs > 0
+                            ? t("agents.teamSessions.badgeRunning", { n: activeSubs })
+                            : t("agents.teamSessions.badgeCount", { n: subCount })
+                        }
+                      >
+                        {activeSubs > 0
+                          ? t("agents.teamSessions.badgeRunning", { n: activeSubs })
+                          : subCount}
+                      </span>
+                    ) : null}
+                  </Link>
+                );
+              })}
+            </div>
+          ) : null}
           {list.filter((agent) => !agent.generalist).map(renderAgent)}
           {waiting
             ? SKELETON_KEYS.map((key) => (
@@ -293,12 +341,14 @@ export function AgentRail(_props: Props) {
   const brand = useProductBrand();
   const { agents, loaded } = useVirtualAgents();
   const { roster } = useTeam();
+  const { threads: chatSessions } = useChatThreads({ scope: "chat" });
   const phone = useMatchMedia(RAIL_PHONE_QUERY);
   const desk = useRailCollapse(false);
   const drawer = useRailDrawer(phone, `${pathname}?${searchParams.toString()}`);
   const collapsed = phone ? !drawer.open : desk.collapsed;
   const agentParam = searchParams.get("agent");
   const activeBotSlug = agentParam && isTeamBotParam(agentParam) ? agentParam : null;
+  const activeThreadId = searchParams.get("thread");
 
   return (
     <AgentRailView
@@ -307,6 +357,8 @@ export function AgentRail(_props: Props) {
       activeId={activeBotSlug ? null : activeAgentId(pathname, searchParams)}
       activeBotSlug={activeBotSlug}
       bots={roster.bots}
+      sessions={chatSessions}
+      activeThreadId={activeThreadId}
       pathname={pathname}
       productName={brand.productName}
       assistantName={assistantNameOf(brand)}
@@ -327,6 +379,7 @@ export function AgentRail(_props: Props) {
           </div>
           <DeskBuddyChip />
           <ThemeToggle />
+          <LanguageToggle />
           <AppUpdatesButton collapsed />
         </>
       }

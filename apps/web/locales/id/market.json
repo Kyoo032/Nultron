@@ -1,6 +1,6 @@
 {
   "studio": {
-    "title": "Pantauan Pasar",
+    "title": "Dasbor Riset Pasar",
     "expectedInputs": "Hasil: harga langsung dan grafik per ticker, ditambah briefing tertulis. Ketik sampai 15 ticker, tanpa perlu mengunggah file. Ini analisis, bukan saran investasi.",
     "download": "Unduh DOCX",
     "building": "Menyusun…",

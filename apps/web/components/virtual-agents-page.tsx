@@ -11,6 +11,7 @@ import { assistantNameOf, useProductBrand } from "@/lib/product-brand";
 import {
   fetchVirtualAgentCatalog,
   notifyVirtualAgentsChanged,
+  studioHref,
   virtualAgentHref,
   virtualAgentName,
   virtualAgentTagline,
@@ -86,15 +87,26 @@ function AgentCard({ agent, productName, busyId, kind, onHire, onLetGo }: CardPr
       </p>
       <div className="va-actions">
         {kind === "desk" ? (
-          // Every agent converses, so the link always opens its chat; the accessible name says whose.
-          <Link
-            href={virtualAgentHref(agent.id)}
-            className="va-open"
-            data-testid="agent-open"
-            aria-label={t("agents.home.ask", { name })}
-          >
-            {t("agents.page.open")}
-          </Link>
+          <>
+            <Link
+              href={virtualAgentHref(agent.id)}
+              className="va-open"
+              data-testid="agent-open"
+              aria-label={t("agents.home.ask", { name })}
+            >
+              {t("agents.page.open")}
+            </Link>
+            {!agent.generalist ? (
+              <Link
+                href={studioHref(agent.id)}
+                className="va-open"
+                data-testid="agent-open-dashboard"
+                aria-label={t("agents.page.openDashboardAria", { name })}
+              >
+                {t("agents.page.openDashboard")}
+              </Link>
+            ) : null}
+          </>
         ) : null}
         {kind === "available" ? (
           <button

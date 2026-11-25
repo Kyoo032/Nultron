@@ -10,6 +10,7 @@ import {
   listWorkspaceThreads,
   type WorkspaceThreadScope,
 } from "../threads";
+import { listDelegatedSessions, summarizeDelegationCounts } from "../delegation/session-store";
 import { isDefaultThreadTitle, THREAD_TITLE_MAX } from "../thread-title";
 
 function parseScope(value: string | undefined): WorkspaceThreadScope {
@@ -31,17 +32,25 @@ export async function handleGetThreads(request: HostRequest): Promise<HostResult
       }
     }
     const rows = await listWorkspaceThreads(tenant, { scope, agentId });
+    const visible = rows.filter((row) => !isDefaultThreadTitle(row.title));
+    const counts = summarizeDelegationCounts(
+      tenant,
+      visible.map((row) => row.id),
+    );
     return jsonOk({
-      threads: rows
-        .filter((row) => !isDefaultThreadTitle(row.title))
-        .map((row) => ({
+      threads: visible.map((row) => {
+        const sub = counts.get(row.id);
+        return {
           id: row.id,
           title: row.title,
           agentId: row.agentId,
           agentName: row.agentName,
           createdAt: row.createdAt,
           isDefaultChat: isDefaultChatAgent({ slug: row.agentSlug }),
-        })),
+          subagentCount: sub?.total ?? 0,
+          activeSubagents: sub?.active ?? 0,
+        };
+      }),
     });
   } catch (error) {
     return jsonError(error);
@@ -79,7 +88,23 @@ export async function handleGetThread(request: HostRequest): Promise<HostResult>
       return jsonOk({ error: { code: "not_found", message: "Thread not found" } }, 404);
     }
     const messages = await listMessages(tenant, threadId);
-    return jsonOk({ thread, messages });
+    const subagents = listDelegatedSessions(tenant, threadId);
+    return jsonOk({ thread, messages, subagents });
+  } catch (error) {
+    return jsonError(error);
+  }
+}
+
+export async function handleGetThreadSubagents(request: HostRequest): Promise<HostResult> {
+  try {
+    const tenant = await getTenant(request);
+    const threadId = request.params.threadId;
+    const thread = await getThread(tenant, threadId);
+    if (!thread) {
+      return jsonOk({ error: { code: "not_found", message: "Thread not found" } }, 404);
+    }
+    const sessions = listDelegatedSessions(tenant, threadId);
+    return jsonOk({ parentThreadId: threadId, sessions });
   } catch (error) {
     return jsonError(error);
   }
