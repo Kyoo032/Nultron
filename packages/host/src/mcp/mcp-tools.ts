@@ -6,32 +6,130 @@ import {
   MCP_FETCH_TOOL_KEY,
   MCP_LIMITS,
   MCP_LIST_SOURCES_TOOL_KEY,
+  currentOutboundGuard,
   defineTool,
+  inToolCall,
   isAllowedMcpAction,
   isMcpConnectorId,
+  outboundRefusal,
+  queryShapeProblem,
   redactSecrets,
+  type OutboundRefusal,
   type TenantContext,
 } from "@agentforge/core";
 import { currentDelegation } from "../delegation/delegation-context";
-import { currentToolRun } from "../tool-run-context";
+import { currentToolRun, type ToolRun } from "../tool-run-context";
 import { McpHttpClient } from "./client";
 import { mcpStore } from "./store";
 
-const runConnectorCalls = new Map<string, number>();
+/**
+ * The outbound-guard verdict for text an MCP call would carry off this machine (SR-112).
+ *
+ * `mcp_fetch` is a sender in the same sense as web search: the query and the resource id leave the
+ * host on a third-party server, so a tainted run must never pack the person's private text into
+ * either. The contract of `security/outbound-guard.ts` is mirrored exactly: inside a guarded run the
+ * guard judges the text; inside a model's tool call with no guard open the send is refused closed;
+ * anywhere else (a host route, a test) the shape rules still apply and nothing is counted.
+ */
+function mcpOutboundRefusal(text: string): OutboundRefusal | null {
+  const guard = currentOutboundGuard();
+  if (guard) {
+    return guard.judgeQuery(text);
+  }
+  if (inToolCall()) {
+    return outboundRefusal("unguarded", "en");
+  }
+  const shape = queryShapeProblem(text);
+  return shape ? outboundRefusal(shape, "en") : null;
+}
 
-function trackConnectorCall(runId: string | undefined, connectorId: string, maxAllowed: number): boolean {
-  if (!runId) {
+function mcpOutboundStoppedRefusal(): OutboundRefusal | null {
+  const guard = currentOutboundGuard();
+  if (!guard) {
+    return inToolCall() ? outboundRefusal("unguarded", "en") : null;
+  }
+  const probe = guard.judgeQuery("ok");
+  return probe?.kind === "stopped" ? probe : null;
+}
+
+const runConnectorCalls = new WeakMap<ToolRun, Map<string, number>>();
+/** Per-run, per-connector map of displayed resourceId -> original wire resourceId returned by the endpoint. */
+const runConnectorResourceIds = new WeakMap<ToolRun, Map<string, Map<string, string>>>();
+const RESOURCE_ID_TOKEN_RE = /\b[A-Za-z0-9_-]{16,80}\b/g;
+const COMPACT_HEX_UUID_RE = /\b([0-9a-f]{8})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{12})\b/gi;
+
+function canonicalizeNotionIds(text: string): { text: string; aliases: Array<readonly [string, string]> } {
+  const aliases: Array<readonly [string, string]> = [];
+  const replaced = text.replace(COMPACT_HEX_UUID_RE, (raw, a: string, b: string, c: string, d: string, e: string) => {
+    const hyphenated = `${a}-${b}-${c}-${d}-${e}`;
+    aliases.push([hyphenated, raw]);
+    return hyphenated;
+  });
+  return { text: replaced, aliases };
+}
+
+function rememberConnectorResourceIds(
+  toolRun: ToolRun | undefined,
+  connectorId: string,
+  content: string,
+  aliases: ReadonlyArray<readonly [string, string]> = [],
+): void {
+  if (!toolRun) {
+    return;
+  }
+  let byConnector = runConnectorResourceIds.get(toolRun);
+  if (!byConnector) {
+    byConnector = new Map<string, Map<string, string>>();
+    runConnectorResourceIds.set(toolRun, byConnector);
+  }
+  let known = byConnector.get(connectorId);
+  if (!known) {
+    known = new Map<string, string>();
+    byConnector.set(connectorId, known);
+  }
+  for (const [displayed, original] of aliases) {
+    if (known.size >= 200) {
+      break;
+    }
+    known.set(displayed, original);
+    known.set(original, original);
+  }
+  for (const match of content.matchAll(RESOURCE_ID_TOKEN_RE)) {
+    if (known.size >= 200) {
+      break;
+    }
+    const token = match[0];
+    if (!known.has(token)) {
+      known.set(token, token);
+    }
+  }
+}
+
+function resolveRememberedResourceId(
+  toolRun: ToolRun | undefined,
+  connectorId: string,
+  resourceId: string,
+): string | undefined {
+  if (!toolRun) {
+    return undefined;
+  }
+  return runConnectorResourceIds.get(toolRun)?.get(connectorId)?.get(resourceId);
+}
+
+function trackConnectorCall(toolRun: ToolRun | undefined, connectorId: string, maxAllowed: number): boolean {
+  if (!toolRun) {
     return true;
   }
-  if (runConnectorCalls.size > 500) {
-    runConnectorCalls.clear();
+  let counts = runConnectorCalls.get(toolRun);
+  if (!counts) {
+    counts = new Map<string, number>();
+    runConnectorCalls.set(toolRun, counts);
   }
-  const key = `${runId}:${connectorId}`;
-  const used = runConnectorCalls.get(key) ?? 0;
+  const used = counts.get(connectorId) ?? 0;
   if (used >= maxAllowed) {
     return false;
   }
-  runConnectorCalls.set(key, used + 1);
+  counts.set(connectorId, used + 1);
   return true;
 }
 
@@ -142,10 +240,44 @@ export async function runMcpFetch(
     };
   }
 
+  const toolRun = currentToolRun();
+  // The egress check comes before the turn counter: a query the guard refuses never leaves the
+  // machine, so it must not spend one of the turn's calls either.
+  // Exact resourceIds returned earlier in this run by the SAME connector (e.g. Notion page UUIDs)
+  // are permitted back to that connector unless the outbound guard has stopped the turn.
+  if (args.query !== undefined) {
+    const refusal = mcpOutboundRefusal(args.query);
+    if (refusal) {
+      return {
+        ok: false,
+        reason: "outbound_blocked",
+        connector: args.connector,
+        message: refusal.message,
+      };
+    }
+  }
+  let wireResourceId = args.resourceId;
+  if (args.resourceId !== undefined) {
+    const rememberedWireId = resolveRememberedResourceId(toolRun, args.connector, args.resourceId);
+    const refusal =
+      rememberedWireId !== undefined ? mcpOutboundStoppedRefusal() : mcpOutboundRefusal(args.resourceId);
+    if (refusal) {
+      return {
+        ok: false,
+        reason: "outbound_blocked",
+        connector: args.connector,
+        message: refusal.message,
+      };
+    }
+    if (rememberedWireId !== undefined) {
+      wireResourceId = rememberedWireId;
+    }
+  }
+
   const effectiveLimit = delegated
     ? Math.min(connection.policy.maxCallsPerTurn, MCP_LIMITS.subagentMaxCallsPerTurn)
     : connection.policy.maxCallsPerTurn;
-  if (!trackConnectorCall(currentToolRun()?.runId, args.connector, effectiveLimit)) {
+  if (!trackConnectorCall(toolRun, args.connector, effectiveLimit)) {
     return {
       ok: false,
       reason: "turn_limit_reached",
@@ -158,9 +290,9 @@ export async function runMcpFetch(
   if (args.query !== undefined) {
     rpcArgs.query = args.query;
   }
-  if (args.resourceId !== undefined) {
-    rpcArgs.id = args.resourceId;
-    rpcArgs.resourceId = args.resourceId;
+  if (wireResourceId !== undefined) {
+    rpcArgs.id = wireResourceId;
+    rpcArgs.resourceId = wireResourceId;
   }
   if (args.limit !== undefined) {
     rpcArgs.limit = args.limit;
@@ -169,6 +301,12 @@ export async function runMcpFetch(
   try {
     const client = new McpHttpClient(args.connector, connection.endpointUrl, connection.token, fetchImpl);
     const result = await client.callReadOnlyTool(args.action, rpcArgs);
+    const prepared =
+      args.connector === "notion"
+        ? canonicalizeNotionIds(result.content)
+        : { text: result.content, aliases: [] as Array<readonly [string, string]> };
+    const redactedContent = redactSecrets(prepared.text);
+    rememberConnectorResourceIds(toolRun, args.connector, redactedContent, prepared.aliases);
     return {
       ok: true,
       connector: args.connector,
@@ -176,7 +314,7 @@ export async function runMcpFetch(
       action: args.action,
       boundary: "read_only_sandbox",
       callerRole: delegated ? "delegated_subagent" : "primary_agent",
-      content: redactSecrets(result.content),
+      content: redactedContent,
     };
   } catch (error) {
     return {

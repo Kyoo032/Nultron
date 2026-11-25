@@ -13,6 +13,7 @@ import type { EditScope } from "./ffmpeg/paths";
 import { log } from "../log";
 
 const DEV_RELATIVE = path.join("assets", "starters");
+const LEGACY_RELATIVE = path.join("apps", "desktop", "resources", "starters");
 /** Bundled clips are small; anything larger is not a starter file we shipped. */
 export const STARTER_MEDIA_MAX_BYTES = 200 * 1024 * 1024;
 
@@ -38,6 +39,48 @@ export function starterMediaDir(): string | null {
     return path.resolve(fromEnv);
   }
   return findUp(process.cwd(), DEV_RELATIVE);
+}
+
+export type StarterMediaResolution = {
+  dir: string | null;
+  path: string | null;
+  problem: string | null;
+};
+
+/** The env dir when set, otherwise the current starter dir followed by the legacy generated-clip dir. */
+function starterMediaDirs(): string[] {
+  const fromEnv = process.env.AGENTFORGE_STARTER_MEDIA_DIR?.trim();
+  if (fromEnv) {
+    return [path.resolve(fromEnv)];
+  }
+  const dirs: string[] = [];
+  for (const relative of [DEV_RELATIVE, LEGACY_RELATIVE]) {
+    const found = findUp(process.cwd(), relative);
+    if (found && !dirs.includes(found)) {
+      dirs.push(found);
+    }
+  }
+  return dirs;
+}
+
+/**
+ * Resolve one starter file independently. A clip present in `assets/starters` wins; the legacy
+ * desktop resources directory is consulted only when that copy is absent. An env dir is authoritative
+ * and never falls through, so a packaged install cannot pick up a clip the operator did not ship there.
+ */
+export function resolveStarterMediaFile(name: string): StarterMediaResolution {
+  const dirs = starterMediaDirs();
+  if (dirs.length === 0) {
+    return { dir: null, path: null, problem: "no starter dir" };
+  }
+  for (const dir of dirs) {
+    const candidate = path.join(dir, name);
+    if (existsSync(candidate)) {
+      return { dir, path: candidate, problem: starterFileProblem(dir, name) };
+    }
+  }
+  const dir = dirs[0] ?? null;
+  return { dir, path: dir ? path.join(dir, name) : null, problem: "missing" };
 }
 
 /**
@@ -177,7 +220,6 @@ export async function seedStarterMedia(
   if (refs.length === 0) {
     return { doc, placed: [], missing: [] };
   }
-  const dir = starterMediaDir();
   const placed: string[] = [];
   const missing: string[] = [];
   const storedFiles: StoredFile[] = [];
@@ -198,12 +240,12 @@ export async function seedStarterMedia(
 
   async function placeOne(name: string): Promise<EditProject> {
     const file = starterMediaFile(name);
-    const problem = dir ? starterFileProblem(dir, name) : "no starter dir";
-    if (!file || !dir || problem) {
-      missing.push(problem && problem !== "missing" ? `${name} (${problem})` : name);
+    const resolved = resolveStarterMediaFile(name);
+    if (!file || !resolved.path || resolved.problem) {
+      missing.push(resolved.problem && resolved.problem !== "missing" ? `${name} (${resolved.problem})` : name);
       return next;
     }
-    const stored = await copyIntoMediaRoot(tenant, path.join(dir, name), file);
+    const stored = await copyIntoMediaRoot(tenant, resolved.path, file);
     storedFiles.push({ id: stored.id, key: stored.relative });
     const probed = await probeOrManifest(stored.fullPath, { tenantId: tenant.tenantId, projectId: next.id }, file);
     const durationFrames = Math.max(1, secondsToFrames(probed.durationSeconds, probed.fps));

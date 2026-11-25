@@ -4,6 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import { THREADS_CHANGED_EVENT } from "@/lib/threads-events";
 
+export const SUBAGENTS_CHANGED_EVENT = "agentforge:subagents-changed";
+
+export function notifySubagentsChanged() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.dispatchEvent(new Event(SUBAGENTS_CHANGED_EVENT));
+}
+
 export type DelegatedSessionStatus = "running" | "completed" | "failed" | "cancelled" | "timeout";
 
 export type DelegatedSessionInfo = {
@@ -78,7 +87,7 @@ export async function fetchThreadSubagents(threadId: string): Promise<DelegatedS
   return rows.map(parseSession).filter((entry): entry is DelegatedSessionInfo => entry !== null);
 }
 
-export function useThreadSubagents(threadId?: string) {
+export function useThreadSubagents(threadId?: string, { open = false }: { open?: boolean } = {}) {
   const [sessions, setSessions] = useState<DelegatedSessionInfo[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -103,20 +112,31 @@ export function useThreadSubagents(threadId?: string) {
       void reload();
     };
     window.addEventListener(THREADS_CHANGED_EVENT, onChanged);
-    return () => window.removeEventListener(THREADS_CHANGED_EVENT, onChanged);
+    window.addEventListener(SUBAGENTS_CHANGED_EVENT, onChanged);
+    return () => {
+      window.removeEventListener(THREADS_CHANGED_EVENT, onChanged);
+      window.removeEventListener(SUBAGENTS_CHANGED_EVENT, onChanged);
+    };
   }, [reload]);
 
+  useEffect(() => {
+    if (open) {
+      void reload();
+    }
+  }, [open, reload]);
+
   const hasActive = sessions.some((session) => session.status === "running");
+  const polling = hasActive || open;
 
   useEffect(() => {
-    if (!threadId || !hasActive) {
+    if (!threadId || !polling) {
       return;
     }
     const timer = window.setInterval(() => {
       void reload();
     }, 3000);
     return () => window.clearInterval(timer);
-  }, [threadId, hasActive, reload]);
+  }, [threadId, polling, reload]);
 
   return { sessions, loaded, hasActive, reload };
 }

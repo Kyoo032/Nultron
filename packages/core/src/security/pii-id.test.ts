@@ -139,6 +139,118 @@ describe("scanIndonesianIds", () => {
     expect(scanIndonesianIds("Call 415-555-2671 or 021-5551234")).toEqual([]);
   });
 
+  it("keeps financial figures out of transfer and bank account cues", () => {
+    const amounts = [
+      "Set the budget to 125500123 rupiah",
+      "Set the budget to 125500123",
+      "Pay 125500123 rupiah to the supplier",
+      "Pay 125500123",
+      "BCA dividends were 125500123 rupiah",
+      "BCA dividends were 125500123",
+      "Transfer ke 125500123 rupiah",
+      "Rekening 125500123 rupiah",
+      "Transfer 125500123",
+      "Wire 125500123 usd",
+      "Send 125500123 dollars",
+      "Transfer 125500123 juta",
+      "Transfer 125500123 miliar",
+      "Transfer 125500123 ribu",
+    ];
+    for (const line of amounts) {
+      expect({ line, hits: scanIndonesianIds(line) }).toEqual({ line, hits: [] });
+    }
+
+    expect(scanIndonesianIds("Pay to 125500123")).toEqual([
+      { kind: "account", match: "125500123", index: "Pay to ".length },
+    ]);
+    expect(scanIndonesianIds("BCA account 125500123")).toEqual([
+      { kind: "account", match: "125500123", index: "BCA account ".length },
+    ]);
+    const mixed = "Transfer 125500123 rupiah ke 987654321";
+    expect(scanIndonesianIds(mixed)).toEqual([
+      { kind: "account", match: "987654321", index: mixed.indexOf("987654321") },
+    ]);
+  });
+
+  it("recognizes a transfer cue wrapped across one newline without trusting weak line endings", () => {
+    const wrapped = [
+      "Transfer ke:\n1234567890",
+      "Transfer ke BCA:\n1234567890",
+      "Transfer ke rekening BCA:\n1234567890",
+      "No. Rekening:\n1234567890",
+      "No. Rekening:\n1234560000",
+      "BCA account\n1234567890",
+      "transfer Rp 1.500.000 ke\n1234567890",
+    ];
+    for (const line of wrapped) {
+      const expectedMatch = line.endsWith("1234560000") ? "1234560000" : "1234567890";
+      expect({ line, hits: scanIndonesianIds(line) }).toEqual({
+        line,
+        hits: [{ kind: "account", match: expectedMatch, index: line.indexOf(expectedMatch) }],
+      });
+    }
+
+    // Wrapped account followed by a separate numeric line must NOT swallow the next line's amount (LF and CRLF).
+    for (const sep of ["\n", "\r\n"]) {
+      const multi = `No. Rekening:${sep}1234567890${sep}1250000000`;
+      expect(scanIndonesianIds(multi)).toEqual([
+        { kind: "account", match: "1234567890", index: multi.indexOf("1234567890") },
+      ]);
+    }
+
+    // Non-breaking space inside a labelled account number is still captured as one account.
+    const nbsp = "No. Rekening: 1234\u00a05678\u00a090";
+    expect(scanIndonesianIds(nbsp)).toEqual([
+      { kind: "account", match: "1234\u00a05678\u00a090", index: nbsp.indexOf("1234") },
+    ]);
+    // Non-breaking space before a currency suffix keeps the amount unmasked.
+    expect(scanIndonesianIds("Rekening BCA: 125\u202f000\u202f000\u00a0rupiah")).toEqual([]);
+
+    const weakLines = [
+      "Set the budget to\n1234567890",
+      "Revenue grew to\n1234567890",
+      "Invoice total:\n1234567890",
+      "Pay\n1234567890",
+      "Payment amount\n1234567890",
+      "BCA dividends were\n1234567890",
+      "BCA\n1234567890",
+      "Transfer ke rekening BCA:\n\n1234567890",
+    ];
+    for (const line of weakLines) {
+      expect({ line, hits: scanIndonesianIds(line) }).toEqual({ line, hits: [] });
+    }
+  });
+
+  it("finds the abbreviated ke rek transfer cue", () => {
+    for (const line of ["ke rek 1234567890", "ke rek. 1234567890", "Ke Rek: 1234567890"]) {
+      expect({ line, hits: scanIndonesianIds(line) }).toEqual({
+        line,
+        hits: [{ kind: "account", match: "1234567890", index: line.indexOf("1234567890") }],
+      });
+    }
+    expect(scanIndonesianIds("ke reksa 1234567890")).toEqual([]);
+    expect(scanIndonesianIds("ke rek 12345678")).toEqual([]);
+  });
+
+  it("keeps sentence punctuation with a transfer account but rejects decimal and grouped figures", () => {
+    for (const line of ["Transfer ke 123456789.", "Transfer ke 123456789,", "Wire to 123456789."]) {
+      expect({ line, hits: scanIndonesianIds(line) }).toEqual({
+        line,
+        hits: [{ kind: "account", match: "123456789", index: line.indexOf("123456789") }],
+      });
+    }
+
+    for (const line of [
+      "Transfer ke 123456789.50",
+      "Transfer ke 123456789,50",
+      "Transfer ke rekening 123456789.50",
+      "Rekening 123456789,50",
+      "Transfer ke 123,456,789",
+    ]) {
+      expect({ line, hits: scanIndonesianIds(line) }).toEqual({ line, hits: [] });
+    }
+  });
+
   it("leaves money alone in every shape Finance writes it", () => {
     const money = [
       "Pendapatan 2024: 1.250.000.000",

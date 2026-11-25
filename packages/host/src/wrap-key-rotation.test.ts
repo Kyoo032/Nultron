@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { decryptJson, encryptJson, LOCAL_TENANT_ID, wrappingKeyFromSecret } from "@agentforge/core";
+import { decryptJson, encryptJson, LOCAL_TENANT_ID, type TenantContext, wrappingKeyFromSecret } from "@agentforge/core";
 import { ensureSchema } from "@agentforge/db/ensure-schema";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "agentforge-rotate-"));
@@ -502,6 +502,32 @@ describe("rotating every encrypted database store and desk file object", () => {
       )
       .run("thread-legacy", "org-1", "ws-1", "agent-1", "user-1", "Legacy plaintext title", now);
     sqlite
+      .prepare(
+        `INSERT INTO knowledge_sources
+           (id, workspace_id, name, type, status, chunks, error, created_at, origin_kind, origin_id)
+         VALUES (?, ?, ?, 'Chat', 'Indexed', 1, NULL, ?, 'thread', ?)`,
+      )
+      .run("source-thread-1", "ws-1", sealStr("Encrypted chat work card", keySecret), now, "thread-1");
+    sqlite
+      .prepare(
+        `INSERT INTO knowledge_sources
+           (id, workspace_id, name, type, status, chunks, error, created_at, origin_kind, origin_id)
+         VALUES (?, ?, ?, 'Chat', 'Indexed', 1, NULL, ?, 'thread', ?)`,
+      )
+      .run("source-thread-legacy", "ws-1", "Legacy plaintext work card", now, "thread-legacy");
+    sqlite
+      .prepare(
+        `INSERT INTO knowledge_graph_nodes (id, workspace_id, kind, label, payload, updated_at)
+         VALUES (?, ?, 'thread', ?, NULL, ?)`,
+      )
+      .run("thread-1", "ws-1", sealStr("Encrypted graph thread label", keySecret), now);
+    sqlite
+      .prepare(
+        `INSERT INTO knowledge_graph_nodes (id, workspace_id, kind, label, payload, updated_at)
+         VALUES (?, ?, 'thread', ?, NULL, ?)`,
+      )
+      .run("thread-legacy", "ws-1", "Legacy plaintext graph label", now);
+    sqlite
       .prepare("INSERT INTO messages (id, organization_id, thread_id, role, content, created_at) VALUES (?, ?, ?, ?, ?, ?)")
       .run("msg-1", "org-1", "thread-1", "user", sealStr([{ type: "text", text: "secret message" }], keySecret), now);
     sqlite
@@ -619,6 +645,8 @@ describe("rotating every encrypted database store and desk file object", () => {
         customerConversations: 1,
         customerMessages: 1,
         deskFiles: 1,
+        knowledgeSources: 1,
+        knowledgeGraphNodes: 1,
       });
 
       const msg = sqlite.prepare("SELECT content FROM messages WHERE id = 'msg-1'").get() as { content: string };
@@ -650,6 +678,26 @@ describe("rotating every encrypted database store and desk file object", () => {
         title: string;
       };
       expect(thrLegacy.title).toBe("Legacy plaintext title");
+
+      const source = sqlite.prepare("SELECT name FROM knowledge_sources WHERE id = 'source-thread-1'").get() as {
+        name: string;
+      };
+      expect(openStr(source.name, NEW_KEY)).toBe("Encrypted chat work card");
+      expect(() => openStr(source.name, OLD_KEY)).toThrow();
+      const sourceLegacy = sqlite.prepare("SELECT name FROM knowledge_sources WHERE id = 'source-thread-legacy'").get() as {
+        name: string;
+      };
+      expect(sourceLegacy.name).toBe("Legacy plaintext work card");
+
+      const graphNode = sqlite.prepare("SELECT label FROM knowledge_graph_nodes WHERE id = 'thread-1'").get() as {
+        label: string;
+      };
+      expect(openStr(graphNode.label, NEW_KEY)).toBe("Encrypted graph thread label");
+      expect(() => openStr(graphNode.label, OLD_KEY)).toThrow();
+      const graphLegacy = sqlite.prepare("SELECT label FROM knowledge_graph_nodes WHERE id = 'thread-legacy'").get() as {
+        label: string;
+      };
+      expect(graphLegacy.label).toBe("Legacy plaintext graph label");
 
       const conv = sqlite
         .prepare("SELECT contact_name, last_message_preview FROM customer_conversations WHERE id = 'conv-1'")
@@ -731,6 +779,49 @@ describe("rotating every encrypted database store and desk file object", () => {
       expect(readFileSync(deskObjectPath, "utf8")).toBe(deskBefore);
     } finally {
       rmSync(deskMediaRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("reads a rotated Chat work-card name through Knowledge under the new key", async () => {
+    const { sql: knowledgeSql } = await import("@agentforge/db");
+    stateStore.registerTenantStateSql(knowledgeSql as unknown as Parameters<typeof stateStore.registerTenantStateSql>[0]);
+    const workspaceId = "ws-rotate-read";
+    const threadId = "thread-rotate-read";
+    const title = "Rotation-sensitive chat work card 7701";
+    knowledgeSql
+      .prepare(
+        `INSERT INTO knowledge_sources
+           (id, workspace_id, name, type, status, chunks, error, created_at, origin_kind, origin_id)
+         VALUES (?, ?, ?, 'Chat', 'Indexed', 1, NULL, ?, 'thread', ?)`,
+      )
+      .run("source-rotate-read", workspaceId, sealStr(title, OLD_KEY), Date.now(), threadId);
+
+    const previousSecretsKey = process.env.AGENTFORGE_SECRETS_KEY;
+    try {
+      rotateWrapKey({ from: OLD_KEY, to: NEW_KEY, backend: stateStore.dbTenantStateBackend });
+      process.env.AGENTFORGE_SECRETS_KEY = NEW_KEY;
+
+      const { findSourceByOrigin } = await import("./knowledge");
+      const tenant: TenantContext = {
+        tenantId: A,
+        organizationId: "org-rotate-read",
+        workspaceId,
+        userId: "user-rotate-read",
+        role: "owner",
+      };
+      expect(findSourceByOrigin(tenant, { kind: "thread", id: threadId })?.name).toBe(title);
+      const raw = knowledgeSql.prepare("SELECT name FROM knowledge_sources WHERE id = 'source-rotate-read'").get() as {
+        name: string;
+      };
+      expect(openStr(raw.name, NEW_KEY)).toBe(title);
+      expect(() => openStr(raw.name, OLD_KEY)).toThrow();
+    } finally {
+      if (previousSecretsKey === undefined) {
+        delete process.env.AGENTFORGE_SECRETS_KEY;
+      } else {
+        process.env.AGENTFORGE_SECRETS_KEY = previousSecretsKey;
+      }
+      knowledgeSql.close();
     }
   });
 });

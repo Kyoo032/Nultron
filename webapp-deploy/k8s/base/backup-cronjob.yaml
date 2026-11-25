@@ -5,7 +5,7 @@
 # Same recipe as webapp-deploy/scripts/backup.sh (security spec S6), so webapp-deploy/scripts/restore.sh's
 # archive layout and cipher still apply:
 #   1. init container (the APP image: it has better-sqlite3) -> VACUUM INTO a consistent snapshot;
-#   2. main container (an image with tar and openssl)        -> tar + openssl enc -aes-256-cbc -pbkdf2.
+#   2. main container (an image with node and GNU tar)       -> tar + AES-256-GCM via aead-crypt.mjs (SR-171).
 # The data volume is ReadWriteOnce: the pod prefers the app's node, which is the only node that can
 # attach it. The archive lands on the nultron-backups volume. Upload to COS is NOT done here.
 apiVersion: batch/v1
@@ -75,8 +75,10 @@ spec:
                 - {name: scripts, mountPath: /scripts, readOnly: true}
           containers:
             - name: archive
-              # Used only for tar and openssl. The Postgres image is already pulled for the portal database.
-              image: postgres:16
+              # Node for aead-crypt.mjs and GNU tar for encrypt.sh's --exclude/-C ordering. The same
+              # pin the app image builds from (webapp-deploy/Dockerfile's NODE_VERSION); its base is
+              # the Debian slim variant production already archives with inside the app container.
+              image: node:22.23.4-bookworm-slim
               imagePullPolicy: IfNotPresent
               command: ["sh", "/scripts/encrypt.sh"]
               env:

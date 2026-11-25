@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import type { AppLocale } from "@agentforge/core/locale";
-import { getLocale, t } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
+import { useLocale } from "@/lib/locale-context";
 import { switchAppLocale } from "@/lib/switch-locale";
 
 export function LanguageToggle({ className }: { className?: string }) {
   const [busy, setBusy] = useState(false);
-  const current: AppLocale = getLocale();
+  const current: AppLocale = useLocale();
   const next: AppLocale = current === "en" ? "id" : "en";
   const label = current === "en" ? t("common.languageToggle.toIndonesian") : t("common.languageToggle.toEnglish");
 

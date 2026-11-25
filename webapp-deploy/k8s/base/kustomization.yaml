@@ -76,3 +76,7 @@ configMapGenerator:
     files:
       - snapshot.mjs=scripts/snapshot.mjs
       - encrypt.sh=scripts/encrypt.sh
+      # A byte-for-byte copy of webapp-deploy/scripts/aead-crypt.mjs. Kustomize refuses files outside
+      # its root, so the copy lives here and webapp-deploy/scripts/backup-restore.test.mjs fails the
+      # moment the two drift apart.
+      - aead-crypt.mjs=scripts/aead-crypt.mjs

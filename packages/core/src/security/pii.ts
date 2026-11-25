@@ -65,6 +65,7 @@ const NAME_STOPLIST: ReadonlySet<string> = new Set([
   "corp", "gmbh", "group", "holdings", "ventures", "capital", "partners",
   "nultron", "agentforge", "toko", "token", "enterprise", "personal", "desktop", "web", "api", "sdk",
   "openai", "anthropic", "google", "deepmind", "gemini", "claude", "gpt", "deepseek", "qwen",
+  "microsoft", "adobe",
   "minimax", "kimi", "seedance", "suno", "tavily", "brave", "metranet", "aihub", "weknora",
   // Finance, document, business, tech & common nouns/adjectives
   "revenue", "total", "subtotal", "summary", "ringkasan", "laporan", "report", "draft", "memo",
@@ -130,8 +131,21 @@ const NAME_STOPLIST: ReadonlySet<string> = new Set([
 ]);
 
 const HONORIFIC_PART = "(?:bpk|bapak|ibu|pak|bu|sdr|sdri|tn|ny|nn|mr|mrs|ms|miss|dr|prof|ir)\\.?";
-const SELF_INTRO_CUE_PART =
-  "(?:nama[ \\t]+(?:lengkap[ \\t]+)?saya(?:[ \\t]+adalah)?|my[ \\t]+(?:full[ \\t]+)?name[ \\t]+is|(?:perkenalkan|kenalkan)(?:[, \\t]+(?:nama[ \\t]+)?saya(?:[ \\t]+adalah)?)?)";
+const EXPLICIT_SELF_INTRO_PART =
+  "(?:nama[ \\t]+(?:lengkap[ \\t]+)?saya(?:[ \\t]+adalah)?|my[ \\t]+(?:full[ \\t]+)?name[ \\t]+is|(?:perkenalkan|kenalkan)[, \\t]+(?:nama[ \\t]+)?saya(?:[ \\t]+adalah)?)";
+const BARE_SELF_INTRO_PART = "(?:perkenalkan|kenalkan)";
+const SELF_INTRO_CUE_PART = `(?:${EXPLICIT_SELF_INTRO_PART}|${BARE_SELF_INTRO_PART})`;
+const EXPLICIT_SELF_INTRO_START_RE = new RegExp(`^${EXPLICIT_SELF_INTRO_PART}`, "i");
+const BARE_SELF_INTRO_START_RE = /^(?:perkenalkan|kenalkan)\b/i;
+const BARE_INTRO_HONORIFIC_RE = new RegExp(`\\b${HONORIFIC_PART}[ \\t]+$`, "i");
+const PERSON_ROLE_PART =
+  "(?:teman|rekan|kolega|saudara|karyawan|pegawai|staf|tetangga|kerabat|adik|kakak|kontak|manajer|manager|direktur|director|guru|murid|mahasiswa|dokter|pemilik|owner|ketua|sekretaris|bendahara|engineer|insinyur|developer|analis|consultant|konsultan)";
+const AFFILIATION_PART =
+  "(?:tim|team|divisi|division|departemen|department|perusahaan|company|kantor|office|cabang|branch|pt|cv|inc|ltd|llc|sekolah|universitas|kampus|komunitas|keluarga)";
+const BARE_INTRO_PERSON_CONTEXT_RE = new RegExp(
+  `^[ \\t]*[,;]?[ \\t]*(?:(?:dari|from)\\b[^\\n.,;]{0,32}\\b(?:${AFFILIATION_PART})\\b|(?:sebagai[ \\t]+|as[ \\t]+)?(?:${PERSON_ROLE_PART})\\b)`,
+  "i",
+);
 const LABEL_CUE_PART =
   "(?:nama(?:\\s+(?:lengkap|karyawan|pegawai|penerima|pemilik|nasabah|pic|kontak))?|name|full\\s+name|contact\\s+person|a\\.?\\s*n\\.?|atas\\s+nama|penerima|payee|signed\\s+by|ditandatangani\\s+oleh)";
 const PREP_CUE_PART =
@@ -147,10 +161,15 @@ const TITLE_NAME_SPAN_RE =
   /^([A-Z][a-z'’-]{1,24}(?:[ \t]+(?:[A-Z]\.?|[A-Z][a-z'’-]{1,24})){0,2}[ \t]+[A-Z][a-z'’-]{1,24})(?![A-Za-z])/;
 
 function extractSafePersonName(rawSpan: string): string | null {
-  const tokens = rawSpan.split(/[ \t]+/);
-  const kept: string[] = [];
+  const tokens: Array<{ text: string; end: number }> = [];
+  for (const tokenMatch of rawSpan.matchAll(/[^ \t]+/g)) {
+    if (tokenMatch.index !== undefined) {
+      tokens.push({ text: tokenMatch[0], end: tokenMatch.index + tokenMatch[0].length });
+    }
+  }
+  const kept: typeof tokens = [];
   for (const token of tokens) {
-    const normalized = token.replace(/\.$/, "").toLowerCase();
+    const normalized = token.text.replace(/\.$/, "").toLowerCase();
     if (NAME_STOPLIST.has(normalized)) {
       break;
     }
@@ -159,16 +178,17 @@ function extractSafePersonName(rawSpan: string): string | null {
   // Require at least two tokens and at least two multi-letter words (no trailing initial-only span).
   while (kept.length > 0) {
     const last = kept[kept.length - 1];
-    if (!last || last.replace(/\./g, "").length >= 2) {
+    if (!last || last.text.replace(/\./g, "").length >= 2) {
       break;
     }
     kept.pop();
   }
-  const fullWords = kept.filter((token) => token.replace(/\./g, "").length >= 2);
-  if (kept.length < 2 || fullWords.length < 2) {
+  const fullWords = kept.filter((token) => token.text.replace(/\./g, "").length >= 2);
+  const last = kept[kept.length - 1];
+  if (kept.length < 2 || fullWords.length < 2 || !last) {
     return null;
   }
-  return kept.join(" ");
+  return rawSpan.slice(0, last.end);
 }
 
 function pushUnique(findings: PiiFinding[], finding: PiiFinding): void {
@@ -202,6 +222,7 @@ const ROUND_TOTAL_RE = /^\d+0{4}$/;
  * by 3-4 and stop at fifteen digits, so no real number reaches four uniform groups.
  */
 const GROUPED_THOUSANDS_RE = /^\d{1,3}(?:[.,\u00a0 ]\d{3})+(?:[.,]\d{1,2})?$/;
+const PLAIN_DECIMAL_RE = /^\d+[.,]\d{1,2}$/;
 
 /**
  * The wrapper a sheet puts around a figure, taken off before the grouping is judged: accounting
@@ -230,7 +251,7 @@ function amountBody(raw: string): string {
  */
 function looksLikeAmount(raw: string): boolean {
   const body = amountBody(raw);
-  return GROUPED_THOUSANDS_RE.test(body) || ROUND_TOTAL_RE.test(body);
+  return GROUPED_THOUSANDS_RE.test(body) || ROUND_TOTAL_RE.test(body) || PLAIN_DECIMAL_RE.test(body);
 }
 
 /**
@@ -361,6 +382,15 @@ export function scanPii(text: string): PiiFinding[] {
     }
     const candidate = extractSafePersonName(rawCandidate);
     if (!candidate) {
+      continue;
+    }
+    const cueText = cueMatch[0];
+    const isBareIntro = BARE_SELF_INTRO_START_RE.test(cueText) && !EXPLICIT_SELF_INTRO_START_RE.test(cueText);
+    if (
+      isBareIntro &&
+      !BARE_INTRO_HONORIFIC_RE.test(cueText) &&
+      !BARE_INTRO_PERSON_CONTEXT_RE.test(text.slice(start + candidate.length))
+    ) {
       continue;
     }
     if (overlapsFinding(findings, start, candidate.length)) {

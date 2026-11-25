@@ -273,6 +273,11 @@ export type IndexSourceInput = {
   origin?: SourceOrigin | null;
 };
 
+export type FailedSourceInput = Omit<IndexSourceInput, "text"> & {
+  /** Keep the row's stored name representation when the caller could not open it into plaintext. */
+  preserveStoredName?: boolean;
+};
+
 const INSERT_SOURCE = `INSERT INTO knowledge_sources
   (id, workspace_id, name, type, status, chunks, error, created_at, origin_kind, origin_id, external_id)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
@@ -312,7 +317,7 @@ export function nextCreatedAt(): number {
 /** One transaction: drop the old row + chunks for this id, write the new row + chunks. */
 function replaceSourceRows(
   tenant: TenantContext,
-  input: Omit<IndexSourceInput, "text">,
+  input: FailedSourceInput,
   chunks: string[],
   error: string | null,
   createdAt: number,
@@ -327,6 +332,13 @@ function replaceSourceRows(
   let carriedExternalId = externalIdOf(ws, input.id);
   let orphanedExternalId: string | null = null;
   const tx = sql.transaction(() => {
+    const preservedName = input.preserveStoredName
+      ? (
+          sql.prepare("SELECT name FROM knowledge_sources WHERE workspace_id = ? AND id = ?").get(ws, input.id) as
+            | { name: string }
+            | undefined
+        )?.name
+      : undefined;
     if (input.origin) {
       // Another row may already own this origin (a concurrent writer for the same thread / media).
       // Fold it into this write so the unique origin index never throws and no card is lost.
@@ -349,7 +361,7 @@ function replaceSourceRows(
     }
     sql.prepare("DELETE FROM knowledge_chunks WHERE workspace_id = ? AND source_id = ?").run(ws, input.id);
     sql.prepare("DELETE FROM knowledge_sources WHERE workspace_id = ? AND id = ?").run(ws, input.id);
-    const storedName = input.origin?.kind === "thread" ? sealThreadTitle(input.name) : input.name;
+    const storedName = preservedName ?? (input.origin?.kind === "thread" ? sealThreadTitle(input.name) : input.name);
     sql
       .prepare(INSERT_SOURCE)
       .run(
@@ -446,7 +458,7 @@ export async function indexKnowledgeSource(tenant: TenantContext, raw: IndexSour
 /** Record a source that could not be indexed. The work that produced it still succeeded. */
 export function markSourceFailed(
   tenant: TenantContext,
-  raw: Omit<IndexSourceInput, "text">,
+  raw: FailedSourceInput,
   reason: string,
 ): KnowledgeSource {
   const input = withSafeName(raw);

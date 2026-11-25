@@ -19,6 +19,7 @@ import {
   upsertEdges,
   upsertNodes,
 } from "./knowledge-graph";
+import { isSealedThreadTitle, sealThreadTitle } from "./thread-title-seal";
 
 /**
  * The Graph stage of the knowledge loop. Both projections are recomputed from their source of
@@ -42,6 +43,38 @@ function seedSource(ctx: TenantContext, id: string, name: string): void {
        VALUES (?, ?, ?, 'Paste', 'Indexed', 1, NULL, ?)`,
     )
     .run(id, ctx.workspaceId, name, Date.now());
+}
+
+function seedThreadSource(ctx: TenantContext, id: string, threadId: string, name: string): void {
+  sql
+    .prepare(
+      `INSERT INTO knowledge_sources
+         (id, workspace_id, name, type, status, chunks, error, created_at, origin_kind, origin_id)
+       VALUES (?, ?, ?, 'Chat', 'Indexed', 1, NULL, ?, 'thread', ?)`,
+    )
+    .run(id, ctx.workspaceId, sealThreadTitle(name), Date.now(), threadId);
+}
+
+function seedThread(ctx: TenantContext, id: string, title: string): void {
+  const agentId = `agent-${id}`;
+  sql
+    .prepare("INSERT OR IGNORE INTO organizations (id, name, slug, industry_pack, created_at) VALUES (?, ?, ?, ?, ?)")
+    .run(ctx.organizationId, "Graph org", ctx.organizationId, "generic", Date.now());
+  sql
+    .prepare("INSERT OR IGNORE INTO workspaces (id, organization_id, name, slug, created_at) VALUES (?, ?, ?, ?, ?)")
+    .run(ctx.workspaceId, ctx.organizationId, "Graph ws", ctx.workspaceId, Date.now());
+  sql
+    .prepare(
+      `INSERT OR IGNORE INTO agents (id, organization_id, workspace_id, name, slug, created_by_user_id, created_at, updated_at)
+       VALUES (?, ?, ?, 'Chat', ?, ?, ?, ?)`,
+    )
+    .run(agentId, ctx.organizationId, ctx.workspaceId, agentId, ctx.userId, Date.now(), Date.now());
+  sql
+    .prepare(
+      `INSERT INTO threads (id, organization_id, workspace_id, agent_id, user_id, title, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(id, ctx.organizationId, ctx.workspaceId, agentId, ctx.userId, sealThreadTitle(title), Date.now());
 }
 
 function recordRetrieval(ctx: TenantContext, sourceId: string, threadId: string): void {
@@ -115,6 +148,33 @@ describe("knowledge graph", () => {
     ]);
     expect(graph.edges.filter((edge) => edge.kind === "covers")).toHaveLength(2);
     expect(graph.edges.every((edge) => edge.from === topic?.id)).toBe(true);
+  });
+
+  it("seals source and thread labels at rest while getGraph returns them opened", () => {
+    const ctx = tenant();
+    const sourceId = crypto.randomUUID();
+    const threadId = crypto.randomUUID();
+    const workCardName = "Private work card total review 4922";
+    const chatTitle = "Private chat title 4922";
+    seedThreadSource(ctx, sourceId, threadId, workCardName);
+    seedThread(ctx, threadId, chatTitle);
+    recordRetrieval(ctx, sourceId, threadId);
+
+    projectRetrievalsToGraph(ctx, [sourceId]);
+
+    const rows = sql
+      .prepare("SELECT id, label FROM knowledge_graph_nodes WHERE workspace_id = ? AND id IN (?, ?) ORDER BY id")
+      .all(ctx.workspaceId, sourceId, threadId) as Array<{ id: string; label: string }>;
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(isSealedThreadTitle(row.label)).toBe(true);
+      expect(row.label).not.toContain(workCardName);
+      expect(row.label).not.toContain(chatTitle);
+    }
+
+    const graph = getGraph(ctx, { limit: 50 });
+    expect(graph.nodes.find((node) => node.id === sourceId)?.label).toBe(workCardName);
+    expect(graph.nodes.find((node) => node.id === threadId)?.label).toBe(chatTitle);
   });
 
   it("is idempotent: a second projection of the same map changes nothing", () => {

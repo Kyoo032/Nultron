@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { TenantContext } from "@agentforge/core";
+import { encryptJson, type TenantContext, wrappingKeyFromSecret } from "@agentforge/core";
 import { buildGarbagePdf } from "@agentforge/core/pdf/test-fixtures";
 import { createLocalWorkspace, db, deleteLocalWorkspace, sql } from "@agentforge/db";
 import { STUB_EMBED_MODEL } from "./knowledge-embed";
@@ -242,6 +242,90 @@ describe("reindexSource", () => {
     // No accumulation: one row per chunk in each table.
     expect(chunkBodies(ctx, id)).toHaveLength(first.chunks.length);
     expect(vectorRows(ctx, id)).toHaveLength(first.chunks.length);
+  });
+
+  it("keeps a multiline work-card field contiguous so a money total survives reindexing", async () => {
+    const ctx = tenant();
+    const total = "3273011505900001";
+    const body = [
+      "# Finance totals",
+      "Mode: Finance",
+      "Pointer: artifact:artifact-multiline",
+      "Prompt: Compare this total:",
+      total,
+      "",
+      "The comparison is ready.",
+    ].join("\n");
+    const id = seedSource(ctx, {
+      name: "Finance totals",
+      type: "Finance",
+      chunkBodies: chunkKnowledgeText(body),
+      origin: { kind: "artifact", id: "artifact-multiline" },
+    });
+
+    const outcome = await reindexSource(ctx, id);
+
+    expect(outcome.status).toBe("reindexed");
+    const reindexed = chunkBodies(ctx, id).join("\n");
+    expect(reindexed).toContain(total);
+    expect(reindexed).not.toContain("[nik]");
+    expect(reindexed).toContain("Pointer: artifact:artifact-multiline");
+  });
+
+  it("leaves an unopenable sealed thread-card name byte-for-byte unchanged", async () => {
+    const ctx = tenant();
+    const currentKey = "3f8a1c05d97e26b4084fa3c1e5d7290b6c48af13e02d95b7ca6318fd4e7092a5";
+    const otherKey = "11aa22bb33cc44dd55ee66ff7788990011aa22bb33cc44dd55ee66ff77889900";
+    const previousSecretsKey = process.env.AGENTFORGE_SECRETS_KEY;
+    process.env.AGENTFORGE_SECRETS_KEY = currentKey;
+    try {
+      const sealedName = JSON.stringify(encryptJson("Sealed chat title", wrappingKeyFromSecret(otherKey)));
+      const id = seedSource(ctx, {
+        name: sealedName,
+        type: "Chat",
+        chunkBodies: chunkKnowledgeText("User: hello"),
+        origin: { kind: "thread", id: "thread-unopenable" },
+      });
+
+      const outcome = await reindexSource(ctx, id);
+
+      expect(outcome.status).toBe("reindexed");
+      expect(sourceRow(ctx, id)?.name).toBe(sealedName);
+    } finally {
+      if (previousSecretsKey === undefined) {
+        delete process.env.AGENTFORGE_SECRETS_KEY;
+      } else {
+        process.env.AGENTFORGE_SECRETS_KEY = previousSecretsKey;
+      }
+    }
+  });
+
+  it("keeps an unopenable sealed thread-card name byte-for-byte unchanged when reindexing fails", async () => {
+    const ctx = tenant();
+    const currentKey = "3f8a1c05d97e26b4084fa3c1e5d7290b6c48af13e02d95b7ca6318fd4e7092a5";
+    const otherKey = "11aa22bb33cc44dd55ee66ff7788990011aa22bb33cc44dd55ee66ff77889900";
+    const previousSecretsKey = process.env.AGENTFORGE_SECRETS_KEY;
+    process.env.AGENTFORGE_SECRETS_KEY = currentKey;
+    try {
+      const sealedName = JSON.stringify(encryptJson("Sealed chat title", wrappingKeyFromSecret(otherKey)));
+      const id = seedSource(ctx, {
+        name: sealedName,
+        type: "Chat",
+        chunkBodies: [],
+        origin: { kind: "thread", id: "thread-unopenable-failed" },
+      });
+
+      const outcome = await reindexSource(ctx, id);
+
+      expect(outcome.status).toBe("failed");
+      expect(sourceRow(ctx, id)?.name).toBe(sealedName);
+    } finally {
+      if (previousSecretsKey === undefined) {
+        delete process.env.AGENTFORGE_SECRETS_KEY;
+      } else {
+        process.env.AGENTFORGE_SECRETS_KEY = previousSecretsKey;
+      }
+    }
   });
 
   it("re-indexes a File source from its stored upload, not from its old chunks", async () => {

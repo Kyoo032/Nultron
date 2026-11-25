@@ -44,7 +44,8 @@ import {
 } from "@/lib/gateway-gate";
 import { isHostedBuild } from "@/lib/hosted-build";
 import { canOfferKeyLater, deskDeferral, recordKeyLater } from "@/lib/key-later";
-import { applyLocale, freezeLocale, LOCALE_RESTART_EVENT, t } from "@/lib/i18n";
+import { applyLocale, freezeLocale, t } from "@/lib/i18n";
+import { LocaleProvider, useLocaleEpoch } from "@/lib/locale-context";
 import { useAmbientMotion } from "@/lib/use-ambient-motion";
 import { useProductBrand } from "@/lib/product-brand";
 import { WorkspaceScope } from "@/lib/workspace-scope";
@@ -214,9 +215,11 @@ export function App() {
   // One switch for every looping decoration: paused while the window is hidden, blurred or idle.
   useAmbientMotion();
   return (
-    <SessionProvider>
-      <AppRoutes />
-    </SessionProvider>
+    <LocaleProvider>
+      <SessionProvider>
+        <AppRoutes />
+      </SessionProvider>
+    </LocaleProvider>
   );
 }
 
@@ -227,7 +230,7 @@ export function AppRoutes() {
   const view = bootView(session.status);
   const [gate, setGate] = useState<GateView | "loading">("loading");
   const [gateway, setGateway] = useState<GatewayGatePayload | null>(null);
-  const [localeEpoch, setLocaleEpoch] = useState(0);
+  const localeEpoch = useLocaleEpoch();
   // Nultron Enterprise only: whether the host says this signed-in person chose "Add it later". Always
   // false off the hosted build, so every Personal path resolves its gate exactly as it did.
   const [keyLater, setKeyLater] = useState(false);
@@ -239,12 +242,6 @@ export function AppRoutes() {
   // that lands before the host has stored it must not send the person back to the welcome they just left.
   const choseLaterRef = useRef(false);
   deferralRef.current = canLater ? { hasSession: true, later: keyLater } : NO_KEY_DEFERRAL;
-
-  useEffect(() => {
-    const onRestart = () => setLocaleEpoch((n) => n + 1);
-    window.addEventListener(LOCALE_RESTART_EVENT, onRestart);
-    return () => window.removeEventListener(LOCALE_RESTART_EVENT, onRestart);
-  }, []);
 
   // Settings can hand the app a gate the host just reported (sign out of the
   // gateway). The host still decides; this only re-renders its answer.
@@ -384,7 +381,7 @@ export function AppRoutes() {
      * rather than by the refusal happening to arrive at the right moment.
      */
     <PlanBlockBoundary>
-      <Shell key={localeEpoch}>
+      <Shell>
         <div className="relative h-full min-h-0 overflow-hidden">
           {/* An owner who onboarded long ago never sees the setup panel; this runs it with no UI. */}
           <ComponentSetupSilent />

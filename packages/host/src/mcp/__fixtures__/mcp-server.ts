@@ -9,7 +9,7 @@ import type { AddressInfo } from "node:net";
 export type McpFixtureServer = {
   readonly baseUrl: string;
   readonly token: string;
-  readonly calls: Array<{ path: string; method: string; tool?: string; args?: unknown }>;
+  readonly calls: Array<{ path: string; method: string; tool?: string; args?: unknown; sessionId?: string }>;
   close(): Promise<void>;
 };
 
@@ -60,7 +60,7 @@ const FIXTURE_DATA: Record<string, { tools: Array<{ name: string }>; responses: 
       { name: "delete_block" },
     ],
     responses: {
-      search: "Notion page pg_77: Nultron Product Roadmap 2026",
+      search: "Notion page c77d2a3de93647de8d7ca0d97a52a1ba (pg_77): Nultron Product Roadmap 2026",
       get_page: "Roadmap priorities: Omnichannel, Voice Mode, MCP Sandbox Connectors.",
       query_database: "3 active launch milestones found.",
     },
@@ -69,6 +69,9 @@ const FIXTURE_DATA: Record<string, { tools: Array<{ name: string }>; responses: 
 
 export async function startMcpFixtureServer(expectedToken = "mcp_live_test_token_987654"): Promise<McpFixtureServer> {
   const calls: McpFixtureServer["calls"] = [];
+  /** Issued session id -> whether `notifications/initialized` has arrived for it. */
+  const sessions = new Map<string, boolean>();
+  let nextSession = 1;
   const server = http.createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -87,21 +90,46 @@ export async function startMcpFixtureServer(expectedToken = "mcp_live_test_token
         return;
       }
       const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
-        id: number;
+        id?: number;
         method: string;
-        params?: { name?: string; arguments?: unknown };
+        params?: { name?: string; arguments?: { query?: unknown } };
       };
+      // Node lowercases every incoming header name, so this read is the wire casing already normalised.
+      const sessionHeader = typeof req.headers["mcp-session-id"] === "string" ? req.headers["mcp-session-id"] : undefined;
       calls.push({
         path: route,
         method: body.method,
         tool: body.params?.name,
         args: body.params?.arguments,
+        ...(sessionHeader !== undefined ? { sessionId: sessionHeader } : {}),
       });
 
       if (body.method === "initialize") {
-        res.writeHead(200, { "Content-Type": "application/json" });
+        // A strict stateful Streamable HTTP server: a session id is issued here and every later
+        // method is refused until `notifications/initialized` arrives carrying it.
+        const sessionId = `fixture-session-${nextSession++}`;
+        sessions.set(sessionId, false);
+        res.writeHead(200, { "Content-Type": "application/json", "Mcp-Session-Id": sessionId });
         res.end(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: { protocolVersion: "2024-11-05" } }));
         return;
+      }
+      if (body.method === "notifications/initialized") {
+        if (!sessionHeader || !sessions.has(sessionHeader)) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "unknown_session" }));
+          return;
+        }
+        sessions.set(sessionHeader, true);
+        res.writeHead(202, { "Content-Type": "application/json" });
+        res.end();
+        return;
+      }
+      if (body.method === "tools/list" || body.method === "tools/call") {
+        if (!sessionHeader || sessions.get(sessionHeader) !== true) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "session_not_initialized" }));
+          return;
+        }
       }
       if (body.method === "tools/list") {
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -110,6 +138,28 @@ export async function startMcpFixtureServer(expectedToken = "mcp_live_test_token
       }
       if (body.method === "tools/call") {
         const name = body.params?.name ?? "";
+        if (body.params?.arguments?.query === "__trigger_tool_error__") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              result: { isError: true, content: [{ type: "text", text: "fixture tool failure: the upstream read failed" }] },
+            }),
+          );
+          return;
+        }
+        if (body.params?.arguments?.query === "__large_response__") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: body.id,
+              result: { content: [{ type: "text", text: "x".repeat(1_100_000) }] },
+            }),
+          );
+          return;
+        }
         const text = fixture.responses[name] ?? `Executed ${name}`;
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(
@@ -122,7 +172,7 @@ export async function startMcpFixtureServer(expectedToken = "mcp_live_test_token
         return;
       }
       res.writeHead(400, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ jsonrpc: "2.0", id: body.id, error: { code: -32601, message: "Unknown method" } }));
+      res.end(JSON.stringify({ jsonrpc: "2.0", id: body.id ?? null, error: { code: -32601, message: "Unknown method" } }));
     });
   });
 

@@ -271,6 +271,57 @@ describe("POST /api/v1/settings/reset with scope tenant", () => {
     expect(report.usedBytes).toBe(0);
   });
 
+  it("deletes the erased tenant's delegations and mcp trees, and keeps the other tenant's", async () => {
+    const { recordDelegationStart } = await import("./delegation/session-store");
+    const { mcpStore } = await import("./mcp/store");
+    const { tenantScopedRoot } = await import("./tenant-paths");
+    const betaOwner: TenantContext = {
+      tenantId: BETA.tenantId,
+      organizationId: BETA.orgId,
+      workspaceId: "reset-desk-b",
+      userId: BETA.userId,
+      role: "owner",
+    };
+
+    // Real records through the real stores: the delegation ledger and the connector config are
+    // exactly the files an erase has to take with it.
+    for (const [who, child] of [
+      [ALPHA_OWNER, "reset-child-a"],
+      [betaOwner, "reset-child-b"],
+    ] as const) {
+      recordDelegationStart(who, {
+        parentThreadId: "reset-parent-thread",
+        childThreadId: child,
+        agentKey: "research",
+        agentKind: "mode",
+        agentName: "Research",
+        task: "Seed delegation for the erase test",
+      });
+      mcpStore().saveConnection(who, {
+        id: "gmail",
+        endpointUrl: "https://mcp.example.com/gmail",
+        token: `erase-test-token-for-${who.tenantId}`,
+      });
+    }
+    const alphaDelegations = tenantScopedRoot(join(dataDir, "delegations"), ALPHA.tenantId);
+    const alphaMcp = tenantScopedRoot(join(dataDir, "mcp"), ALPHA.tenantId);
+    const betaDelegations = tenantScopedRoot(join(dataDir, "delegations"), BETA.tenantId);
+    const betaMcp = tenantScopedRoot(join(dataDir, "mcp"), BETA.tenantId);
+    for (const dir of [alphaDelegations, alphaMcp, betaDelegations, betaMcp]) {
+      expect(existsSync(dir), dir).toBe(true);
+    }
+
+    const result = await send("alpha", resetBody("tenant", TENANT_ERASE_CONFIRM_WORD));
+    expect(json(result).status).toBe(200);
+
+    expect(existsSync(alphaDelegations)).toBe(false);
+    expect(existsSync(alphaMcp)).toBe(false);
+    // Another company's subagent sessions and connector files are exactly as they were.
+    expect(existsSync(betaDelegations)).toBe(true);
+    expect(existsSync(betaMcp)).toBe(true);
+    expect(mcpStore().getConnection(betaOwner, "gmail")).not.toBeNull();
+  });
+
   it("leaves every other tenant's rows, bytes and signed-in browsers exactly as they were", async () => {
     await seed("alpha", ALPHA);
     const beta = await seed("beta", BETA);

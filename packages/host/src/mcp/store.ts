@@ -163,6 +163,38 @@ export class McpStore {
     return updated;
   }
 
+  /**
+   * Record the tools a connector test just discovered — and nothing else.
+   *
+   * The config file is re-read inside this write, so a policy, endpoint or token change the owner
+   * made while the test was in flight is never overwritten by the stale copy the test started
+   * with (the TOCTOU the `saveConnection` write-back had). A connector that was disconnected —
+   * or whose token was cleared — while its test ran is left alone: writing here would resurrect
+   * the record the owner just removed. And when `expectedEndpointUrl` no longer matches, the
+   * connector was repointed mid-test and these tools belong to an endpoint it is not any more.
+   */
+  updateDiscoveredTools(
+    tenant: TenantContext,
+    id: McpConnectorId,
+    discoveredTools: readonly string[],
+    expectedEndpointUrl?: string,
+  ): void {
+    const current = readConfig(tenant);
+    const existing = current.connectors[id];
+    if (!existing?.endpointUrl) {
+      return;
+    }
+    if (expectedEndpointUrl !== undefined && existing.endpointUrl !== expectedEndpointUrl) {
+      return;
+    }
+    const token = loadSettings(tenant).mcpTokens?.[id];
+    if (!token) {
+      return;
+    }
+    current.connectors[id] = { ...existing, discoveredTools: [...discoveredTools] };
+    writeConfig(tenant, current);
+  }
+
   disconnect(tenant: TenantContext, id: McpConnectorId): McpConnectorView {
     saveSettings({ mcpTokens: { [id]: "" } }, tenant);
     const current = readConfig(tenant);

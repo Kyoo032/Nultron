@@ -16,6 +16,7 @@ import { StudioEmptyDesk } from "@/components/studio-empty-desk";
 import { WorkingStatus } from "@/components/working-status";
 import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { t } from "@/lib/i18n";
+import { useLocale } from "@/lib/locale-context";
 import { modelPickBody, studioModelPick } from "@/lib/model-choice";
 import { Link } from "@/lib/nav";
 import { researchChecksNote, type ResearchChecksNoteModel } from "@/lib/research-checks-view";
@@ -66,7 +67,8 @@ export function ResearchStudio() {
   const [landed, setLanded] = useState(0);
   const error = job.error?.message ?? null;
 
-  const starters = useMemo(() => localizedLibrary("research"), []);
+  const locale = useLocale();
+  const starters = useMemo(() => localizedLibrary("research", locale), [locale]);
 
   async function onGenerate(event: FormEvent) {
     event.preventDefault();

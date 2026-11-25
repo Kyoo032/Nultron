@@ -2,6 +2,10 @@
 # Shared helpers. Sourced by the other scripts; not meant to be run directly.
 set -eu
 
+# The backup cipher helpers (backup_format, backup_decrypt). Every script lives in this same
+# directory, so $0's dirname is where the fragment sits even inside a sourced file.
+. "$(dirname "$0")/_backup-crypt.sh"
+
 DEPLOY_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
 COMPOSE_FILE="$DEPLOY_DIR/compose.yml"

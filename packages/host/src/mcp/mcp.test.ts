@@ -1,8 +1,9 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { TenantContext } from "@agentforge/core";
+import type { HostRequest, HostResult } from "../types";
 import { startMcpFixtureServer, type McpFixtureServer } from "./__fixtures__/mcp-server";
 
 const dataDir = mkdtempSync(join(tmpdir(), "agentforge-mcp-test-"));
@@ -31,7 +32,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await server.close();
-  rmSync(dataDir, { recursive: true, force: true });
+  // The handler tests resolve a tenant through the real local database, and Windows will not
+  // unlink a sqlite file a process still holds — close it before the sweep.
+  try {
+    const { sql } = await import("@agentforge/db");
+    sql.close();
+  } catch {
+    // The database was never opened in this process, or was already closed.
+  }
+  rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 describe("MCP connectors (Gmail, Google Drive, OneDrive, Notion) and sandbox boundaries", () => {
@@ -164,5 +173,338 @@ describe("MCP connectors (Gmail, Google Drive, OneDrive, Notion) and sandbox bou
         expect(r3.reason).toBe("turn_limit_reached");
       }
     });
+  });
+
+  it("completes the Streamable HTTP handshake before any other method, against a strict stateful server", async () => {
+    const { McpHttpClient } = await import("./client");
+
+    // The fixture is strict on purpose: a bare tools/list with no session is refused, so the
+    // handshake below is what the passing call actually proves.
+    const bare = await fetch(`${server.baseUrl}/notion`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${server.token}` },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 99, method: "tools/list", params: {} }),
+    });
+    expect(bare.status).toBe(400);
+
+    // No explicit initialize(): the client must run the handshake on its own first.
+    const client = new McpHttpClient("notion", `${server.baseUrl}/notion`, server.token);
+    const safeTools = await client.listSafeTools();
+    expect(safeTools).toContain("get_page");
+
+    const notionCalls = server.calls.filter((call) => call.path === "/notion");
+    const lastThree = notionCalls.slice(-3);
+    expect(lastThree.map((call) => call.method)).toEqual(["initialize", "notifications/initialized", "tools/list"]);
+    // The initialize POST cannot carry a session yet; everything after it carries the issued one.
+    expect(lastThree[0]?.sessionId).toBeUndefined();
+    expect(lastThree[1]?.sessionId).toMatch(/^fixture-session-/);
+    expect(lastThree[2]?.sessionId).toBe(lastThree[1]?.sessionId);
+  });
+
+  it("returns ok:false with fetch_failed when the MCP tool itself reports isError", async () => {
+    const { mcpStore } = await import("./store");
+    const { runMcpFetch } = await import("./mcp-tools");
+    mcpStore().saveConnection(tenant, {
+      id: "notion",
+      endpointUrl: `${server.baseUrl}/notion`,
+      token: server.token,
+      policy: { accessMode: "read_only", allowSubagents: true, maxCallsPerTurn: 6 },
+    });
+    const result = await runMcpFetch({ connector: "notion", action: "get_page", query: "__trigger_tool_error__" }, tenant);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("fetch_failed");
+      expect(result.message).toContain("fixture tool failure");
+    }
+  });
+
+  it("bounds an oversized MCP response instead of hanging on it", async () => {
+    const { mcpStore } = await import("./store");
+    const { runMcpFetch } = await import("./mcp-tools");
+    mcpStore().saveConnection(tenant, {
+      id: "notion",
+      endpointUrl: `${server.baseUrl}/notion`,
+      token: server.token,
+      policy: { accessMode: "read_only", allowSubagents: true, maxCallsPerTurn: 6 },
+    });
+    const result = await runMcpFetch({ connector: "notion", action: "get_page", query: "__large_response__" }, tenant);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("fetch_failed");
+      expect(result.message).toContain("1 MB");
+    }
+  });
+
+  it("refuses to carry private desk text into an MCP query or resource id in a tainted run", async () => {
+    const { createOutboundGuard, runInToolCall, runOutboundGuarded } = await import("@agentforge/core");
+    const { mcpStore } = await import("./store");
+    const { runMcpFetch } = await import("./mcp-tools");
+
+    mcpStore().saveConnection(tenant, {
+      id: "notion",
+      endpointUrl: `${server.baseUrl}/notion`,
+      token: server.token,
+      policy: { accessMode: "read_only", allowSubagents: true, maxCallsPerTurn: 6 },
+    });
+
+    const guard = createOutboundGuard({
+      userText: ["what did the vendor say about renewal?"],
+      privateText: ["The halimun renewal invoice total is 8,243,117 rupiah due Friday"],
+      locale: "en",
+    });
+
+    await runOutboundGuarded(guard, async () => {
+      // Control: a general query carries nothing private and reaches the server.
+      const beforeClean = server.calls.length;
+      const clean = await runMcpFetch({ connector: "notion", action: "search", query: "quarterly planning milestones" }, tenant);
+      expect(clean.ok).toBe(true);
+      expect(server.calls.length).toBeGreaterThan(beforeClean);
+
+      // The figure is lifted straight out of the private text: refused before any network use.
+      const beforeBlocked = server.calls.length;
+      const leakyQuery = await runMcpFetch(
+        { connector: "notion", action: "search", query: "invoice total is 8,243,117 rupiah" },
+        tenant,
+      );
+      expect(leakyQuery.ok).toBe(false);
+      if (!leakyQuery.ok) {
+        expect(leakyQuery.reason).toBe("outbound_blocked");
+      }
+      const leakyId = await runMcpFetch(
+        { connector: "notion", action: "get_page", resourceId: "page-8243117" },
+        tenant,
+      );
+      expect(leakyId.ok).toBe(false);
+      if (!leakyId.ok) {
+        expect(leakyId.reason).toBe("outbound_blocked");
+      }
+      expect(server.calls.length).toBe(beforeBlocked);
+    });
+
+    // Fail closed per the outbound-guard contract: a model's tool call with no guard open at all
+    // is refused rather than sent.
+    const beforeUnguarded = server.calls.length;
+    await runInToolCall(async () => {
+      const unguarded = await runMcpFetch({ connector: "notion", action: "search", query: "ordinary market terms" }, tenant);
+      expect(unguarded.ok).toBe(false);
+      if (!unguarded.ok) {
+        expect(unguarded.reason).toBe("outbound_blocked");
+      }
+    });
+    expect(server.calls.length).toBe(beforeUnguarded);
+  });
+});
+
+describe("MCP connector handlers (endpoint token rule and test write-back)", () => {
+  function request(method: string, path: string, params: Record<string, string>, body?: unknown): HostRequest {
+    return { method, path, query: {}, params, headers: {}, body };
+  }
+
+  function json(result: HostResult): { status: number; body: Record<string, unknown> } {
+    if (result.type !== "json") {
+      throw new Error(`expected a json result, got ${result.type}`);
+    }
+    return { status: result.status, body: result.body as Record<string, unknown> };
+  }
+
+  function errorCode(result: HostResult): string | undefined {
+    const payload = json(result).body.error as { code?: string } | string | undefined;
+    return typeof payload === "string" ? payload : payload?.code;
+  }
+
+  /** The tenant the handlers resolve for a desk-mode request, so seeds and assertions line up. */
+  async function handlerTenant(): Promise<TenantContext> {
+    const { getTenant } = await import("../tenant");
+    return getTenant();
+  }
+
+  it("refuses an endpoint change without a fresh token before any outbound call, and keeps the old endpoint", async () => {
+    const { handlePostMcpConnector } = await import("../handlers/mcp");
+    const { mcpStore } = await import("./store");
+    const tenant = await handlerTenant();
+    const originalUrl = `${server.baseUrl}/gmail`;
+    mcpStore().saveConnection(tenant, {
+      id: "gmail",
+      endpointUrl: originalUrl,
+      token: server.token,
+      policy: { accessMode: "read_only", allowSubagents: true, maxCallsPerTurn: 4 },
+    });
+
+    const spyFetch = vi.fn();
+    const moved = await handlePostMcpConnector(
+      request("POST", "/api/v1/mcp/connectors/gmail", { connectorId: "gmail" }, { endpointUrl: `${server.baseUrl}/google-drive` }),
+      spyFetch as unknown as typeof fetch,
+    );
+    expect(json(moved).status).toBe(400);
+    expect(errorCode(moved)).toBe("invalid_request");
+    expect(((json(moved).body.error as { message?: string })?.message) ?? "").toContain("access token");
+    // Not one outbound request was made with the previously saved token — verify included.
+    expect(spyFetch).not.toHaveBeenCalled();
+    // And nothing was saved: the connector still points where it always did.
+    expect(mcpStore().getConnection(tenant, "gmail")?.endpointUrl).toBe(originalUrl);
+
+    // Control: the same change with a fresh token alongside it is accepted and verified.
+    const accepted = await handlePostMcpConnector(
+      request("POST", "/api/v1/mcp/connectors/gmail", { connectorId: "gmail" }, {
+        endpointUrl: `${server.baseUrl}/google-drive`,
+        token: server.token,
+      }),
+    );
+    expect(json(accepted).status).toBe(200);
+    expect(mcpStore().getConnection(tenant, "gmail")?.endpointUrl).toBe(`${server.baseUrl}/google-drive`);
+  });
+
+  it("does not overwrite an owner who disables access while a connector test is in flight", async () => {
+    const { handlePostMcpConnectorTest } = await import("../handlers/mcp");
+    const { mcpStore } = await import("./store");
+    const { runMcpFetch } = await import("./mcp-tools");
+    const tenant = await handlerTenant();
+    const endpointUrl = `${server.baseUrl}/notion`;
+    mcpStore().saveConnection(tenant, {
+      id: "notion",
+      endpointUrl,
+      token: server.token,
+      policy: { accessMode: "read_only", allowSubagents: true, maxCallsPerTurn: 4 },
+    });
+
+    // A fetch that parks inside the first outbound call until the test lets it through, so the
+    // policy flip lands exactly in the window the race needs.
+    let releaseFetch!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseFetch = resolve;
+    });
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    let startedSignalled = false;
+    const gatedFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (!startedSignalled) {
+        startedSignalled = true;
+        markStarted();
+      }
+      await gate;
+      return fetch(input, init);
+    }) as typeof fetch;
+
+    const pending = handlePostMcpConnectorTest(
+      request("POST", "/api/v1/mcp/connectors/notion/test", { connectorId: "notion" }, {}),
+      gatedFetch,
+    );
+    await started;
+    // The owner disables the connector while its test is still in flight.
+    mcpStore().saveConnection(tenant, {
+      id: "notion",
+      endpointUrl,
+      policy: { accessMode: "disabled" },
+    });
+    releaseFetch();
+    const result = await pending;
+
+    // The test itself succeeded — the server was reached and tools were discovered...
+    expect(json(result).status).toBe(200);
+    expect(json(result).body.ok).toBe(true);
+    // ...but the owner's disable survived it: only discoveredTools was written back.
+    const after = mcpStore().getConnection(tenant, "notion");
+    expect(after?.policy.accessMode).toBe("disabled");
+    expect(after?.discoveredTools.length).toBeGreaterThan(0);
+    // The behavioral end of it: the connector stays refused, not silently re-enabled.
+    const blocked = await runMcpFetch({ connector: "notion", action: "get_page" }, tenant);
+    expect(blocked.ok).toBe(false);
+    if (!blocked.ok) {
+      expect(blocked.reason).toBe("disabled");
+    }
+
+    // Restore read-only for any later use of this tenant.
+    mcpStore().saveConnection(tenant, {
+      id: "notion",
+      endpointUrl,
+      policy: { accessMode: "read_only", allowSubagents: true, maxCallsPerTurn: 4 },
+    });
+  });
+
+  it("never writes a finished test's tools onto a repointed or disconnected connector", async () => {
+    const { mcpStore } = await import("./store");
+    const tenant = await handlerTenant();
+    const endpointA = `${server.baseUrl}/notion`;
+    const endpointB = `${server.baseUrl}/google-drive`;
+    mcpStore().saveConnection(tenant, {
+      id: "notion",
+      endpointUrl: endpointA,
+      token: server.token,
+      policy: { accessMode: "read_only", allowSubagents: true, maxCallsPerTurn: 4 },
+      discoveredTools: [],
+    });
+
+    // Repointed mid-test: the tools discovered against endpoint A do not belong to endpoint B.
+    mcpStore().saveConnection(tenant, { id: "notion", endpointUrl: endpointB, token: server.token });
+    mcpStore().updateDiscoveredTools(tenant, "notion", ["injected_tool"], endpointA);
+    expect(mcpStore().getConnection(tenant, "notion")?.discoveredTools ?? []).toEqual([]);
+
+    // The same write against the endpoint it actually ran on is the one that lands.
+    mcpStore().updateDiscoveredTools(tenant, "notion", ["search", "get_page"], endpointB);
+    expect(mcpStore().getConnection(tenant, "notion")?.discoveredTools).toEqual(["search", "get_page"]);
+
+    // Disconnected mid-test: the write must not resurrect the record.
+    mcpStore().disconnect(tenant, "notion");
+    mcpStore().updateDiscoveredTools(tenant, "notion", ["injected_tool"], endpointB);
+    expect(mcpStore().getConnection(tenant, "notion")).toBeNull();
+    expect(mcpStore().listViews(tenant).find((view) => view.id === "notion")?.connected).toBe(false);
+  });
+
+  it("allows compact 32-hex Notion page IDs returned by a search in the same run back to Notion read", async () => {
+    const { createOutboundGuard, runInToolCall, runOutboundGuarded } = await import("@agentforge/core");
+    const { withToolRun } = await import("../tool-run-context");
+    const { mcpStore } = await import("./store");
+    const { runMcpFetch } = await import("./mcp-tools");
+
+    mcpStore().saveConnection(tenant, {
+      id: "notion",
+      endpointUrl: `${server.baseUrl}/notion`,
+      token: server.token,
+      policy: { accessMode: "read_only", allowSubagents: true, maxCallsPerTurn: 4 },
+    });
+
+    const guard = createOutboundGuard({
+      userText: ["Find the roadmap page in Notion and summarize it"],
+      privateText: [],
+      locale: "en",
+    });
+
+    await withToolRun({ runId: "run_notion_hex_id", mode: "chat" }, () =>
+      runOutboundGuarded(guard, () =>
+        runInToolCall(async () => {
+          const found = await runMcpFetch({ connector: "notion", action: "search", query: "roadmap" }, tenant);
+          expect(found.ok).toBe(true);
+          if (found.ok) {
+            expect(found.content).toContain("c77d2a3d-e936-47de-8d7c-a0d97a52a1ba");
+          }
+          const page = await runMcpFetch(
+            { connector: "notion", action: "get_page", resourceId: "c77d2a3d-e936-47de-8d7c-a0d97a52a1ba" },
+            tenant,
+          );
+          expect(page.ok).toBe(true);
+          if (page.ok) {
+            expect(page.content).toContain("Roadmap priorities");
+          }
+          // Passing the displayed hyphenated ID translates back to the exact wire ID the endpoint returned.
+          const lastGetPage = [...server.calls]
+            .reverse()
+            .find((call) => call.path === "/notion" && call.tool === "get_page");
+          expect((lastGetPage?.args as { resourceId?: string } | undefined)?.resourceId).toBe(
+            "c77d2a3de93647de8d7ca0d97a52a1ba",
+          );
+          // An arbitrary 32-hex blob never returned by Notion is still refused.
+          const arbitrary = await runMcpFetch(
+            { connector: "notion", action: "get_page", resourceId: "deadbeefdeadbeefdeadbeefdeadbeef" },
+            tenant,
+          );
+          expect(arbitrary.ok).toBe(false);
+          if (!arbitrary.ok) {
+            expect(arbitrary.reason).toBe("outbound_blocked");
+          }
+        }),
+      ),
+    );
   });
 });

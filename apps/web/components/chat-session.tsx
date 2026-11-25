@@ -40,6 +40,7 @@ import { useBuddyTakesStatus } from "@/lib/desk-buddy-store";
 import { useChatBuddyReactions } from "@/lib/use-chat-buddy-reactions";
 import { collectToolMediaParts } from "@/lib/tool-media";
 import { notifyThreadsChanged } from "@/lib/threads-events";
+import { notifySubagentsChanged } from "@/lib/team-sessions";
 import { apiFetch } from "@/lib/api-client";
 import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { DEFAULT_MODEL_TIER, type ModelTierId } from "@agentforge/core/tiers";
@@ -647,6 +648,9 @@ export function ChatSession({ agentId, initialThreadId, shell, hrefForThread, vo
             placeholder={shell ? t("agents.composer.placeholder", { name: shell.name }) : undefined}
             voice={{ available: voice.available, active: voice.shown, disabled: running, onToggle: voice.toggle }}
             onToolProgress={(event) => {
+              if (event.toolKey === "delegate") {
+                notifySubagentsChanged();
+              }
               // A worker's progress line belongs to the call of that tool that is still running.
               setTools((current) => {
                 let index = -1;
@@ -692,6 +696,9 @@ export function ChatSession({ agentId, initialThreadId, shell, hrefForThread, vo
             onDelta={(text) => setStreaming((current) => current + text)}
             onThinking={(text, replace) => setThinking((current) => (replace ? text : current + text))}
             onTool={(event) => {
+              if (event.phase === "started" && event.toolKey === "delegate") {
+                notifySubagentsChanged();
+              }
               setTools((current) => {
                 if (event.phase === "started") {
                   return [...current, { key: event.toolKey, status: "started", input: event.input }];

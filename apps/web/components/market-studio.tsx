@@ -19,7 +19,8 @@ import { SettingsLinkHint } from "@/components/settings-link-hint";
 import { UiSelect } from "@/components/ui-select";
 import { WorkingStatus } from "@/components/working-status";
 import { isGatewayBlockedText } from "@/lib/gateway-blocked";
-import { getLocale, t } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
+import { useLocale } from "@/lib/locale-context";
 import {
   DEFAULT_MARKET_DEPTH,
   DEFAULT_MARKET_SPECIALIST,
@@ -92,10 +93,12 @@ export function MarketStudio() {
   const lastSpecialistRef = useRef<MarketSpecialist>(urlSpecialist);
   const specialist = onMarket ? urlSpecialist : lastSpecialistRef.current;
 
+  const deskLocale = useLocale();
   const [tickers, setTickers] = useState<string[]>(() => loadWatchlist(workspaceId, specialist));
-  const [language, setLanguage] = useState<WatchLanguage>(() => getLocale());
+  const [languageOverride, setLanguageOverride] = useState<WatchLanguage | null>(null);
+  const language: WatchLanguage = languageOverride ?? deskLocale;
   const [depth, setDepth] = useState<MarketDepth>(DEFAULT_MARKET_DEPTH);
-  const [prompt, setPrompt] = useState<string>(() => defaultWatchPrompt(specialist, getLocale()));
+  const [prompt, setPrompt] = useState<string>(() => defaultWatchPrompt(specialist, deskLocale));
   const [position, setPosition] = useState("");
   const [maxChars, setMaxChars] = useState<number>(DEFAULT_MAX_CHARS);
   const [showOptions, setShowOptions] = useState(false);
@@ -142,11 +145,18 @@ export function MarketStudio() {
     setErrorStale(true);
   }
 
+  useEffect(() => {
+    if (languageOverride !== null) {
+      return;
+    }
+    setPrompt((current) => nextPrompt({ prompt: current, specialist, language: deskLocale }));
+  }, [deskLocale, languageOverride, specialist]);
+
   function onLanguageChange(next: string): void {
     if (!isLanguage(next)) {
       return;
     }
-    setLanguage(next);
+    setLanguageOverride(next);
     setPrompt(nextPrompt({ prompt, specialist, language: next }));
   }
 
@@ -223,7 +233,7 @@ export function MarketStudio() {
     changeTickers([...starter.tickers]);
   }
 
-  const uiLocale = getLocale();
+  const uiLocale = deskLocale;
   const specialistName = (id: MarketSpecialist): string =>
     labeled(`market.specialists.${id}.label`, specialistLabel(id, uiLocale));
   const specialistTip = (id: MarketSpecialist): string =>
