@@ -7,9 +7,11 @@ import { ModeIllustration } from "@/components/mode-illustration";
 import { PresentationPreview } from "@/components/presentation-preview";
 import { apiFetch } from "@/lib/api-client";
 import {
+  DASHBOARD_EDUCATION_PATH,
   EDUCATION_PATH,
   EDUCATION_TASKS,
-  educationTaskHref,
+  educationBasePath,
+  educationTaskHrefFor,
   taskFromParam,
   type EducationTask,
 } from "@/lib/education-task";
@@ -112,6 +114,7 @@ function PresenterStage({
  * So it says so and links to the one place a lesson comes from.
  */
 function PresenterNeedsLesson() {
+  const pathname = usePathname();
   return (
     <div
       className="mx-auto flex max-w-xl flex-col items-center gap-4 px-4 py-10 text-center"
@@ -119,7 +122,7 @@ function PresenterNeedsLesson() {
     >
       <p className="text-base text-[var(--text-2)]">{t("education.presenterHint")}</p>
       <Link
-        href={educationTaskHref("lesson")}
+        href={educationTaskHrefFor(pathname, "lesson")}
         className="btn btn-primary h-10 rounded-pill px-5"
         data-testid="education-presenter-create-lesson"
       >
@@ -132,7 +135,7 @@ function PresenterNeedsLesson() {
 export function EducationStudio() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const onEducation = pathname === EDUCATION_PATH;
+  const onEducation = pathname === EDUCATION_PATH || pathname === DASHBOARD_EDUCATION_PATH;
   const taskQuery = searchParams.get("task");
   const showChooser = onEducation && (taskQuery == null || taskQuery.trim() === "");
   const urlTask = taskFromParam(taskQuery);
@@ -378,7 +381,7 @@ export function EducationStudio() {
             {EDUCATION_TASKS.map((id) => (
               <Link
                 key={id}
-                href={educationTaskHref(id)}
+                href={educationTaskHrefFor(pathname, id)}
                 className="card-live enter-rise flex items-start px-4 py-4 text-left"
                 data-testid={`education-guide-${id}`}
               >
@@ -396,7 +399,7 @@ export function EducationStudio() {
         <>
           <div className="mt-4 flex justify-end">
             <Link
-              href={EDUCATION_PATH}
+              href={educationBasePath(pathname)}
               className="text-xs font-medium text-[var(--accent)]"
               data-testid="education-guide-change"
             >

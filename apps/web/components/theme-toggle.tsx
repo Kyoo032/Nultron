@@ -8,12 +8,12 @@ function ThemeIcon({ theme }: { theme: Theme }) {
   if (theme === "dark") {
     return (
       <svg
-        width="14"
-        height="14"
+        width="18"
+        height="18"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.75"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"
@@ -25,12 +25,12 @@ function ThemeIcon({ theme }: { theme: Theme }) {
   }
   return (
     <svg
-      width="14"
-      height="14"
+      width="18"
+      height="18"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth="1.75"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"

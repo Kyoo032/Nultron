@@ -10,8 +10,18 @@
   width: var(--ar-w);
   height: 100%;
   background: var(--rail);
-  border-right: 1px solid var(--rail-line);
   color: var(--rail-text-2);
+}
+
+.agent-rail .btn-ghost {
+  color: var(--rail-text-2);
+  border-color: transparent;
+}
+
+.agent-rail .btn-ghost:hover {
+  background: var(--rail-hover);
+  border-color: transparent;
+  color: var(--rail-active-text);
 }
 
 .agent-rail[data-rail="full"] {
@@ -36,7 +46,6 @@
   min-width: 0;
   min-height: 52px;
   padding: 10px var(--ar-pad) 8px;
-  border-bottom: 1px solid var(--rail-line);
 }
 
 .agent-rail-brand-identity {
@@ -60,9 +69,8 @@
 }
 
 .agent-rail[data-rail="min"] .agent-rail-brand {
-  flex-direction: column;
   justify-content: center;
-  gap: 6px;
+  min-height: 52px;
   padding: 10px var(--ar-pad) 8px;
 }
 
@@ -70,6 +78,10 @@
   flex: none;
   justify-content: center;
   padding-inline: 0;
+}
+
+.agent-rail[data-rail="min"] .agent-rail-brand:has(.agent-rail-toggle) .agent-rail-brand-identity {
+  display: none;
 }
 
 .agent-rail-agents,
@@ -114,12 +126,6 @@
   padding: 8px var(--ar-pad) 12px;
 }
 
-.agent-rail-buddy-dock {
-  width: 0;
-  height: 0;
-  overflow: hidden;
-}
-
 .agent-rail-link {
   position: relative;
   display: inline-flex;
@@ -143,7 +149,6 @@
 .agent-rail-link[aria-current="page"] {
   background: var(--rail-active);
   color: var(--rail-active-text);
-  box-shadow: 0 0 0 1px var(--rail-line);
 }
 
 .agent-rail-link:focus-visible {
@@ -258,8 +263,8 @@
   color: var(--rail-text-3);
   font-size: 0.6875rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 
 .agent-rail[data-rail="full"] .agent-rail-agents,
@@ -272,6 +277,10 @@
   justify-content: flex-start;
   gap: 10px;
   padding-inline: 8px;
+}
+
+.agent-rail[data-rail="full"] .agent-rail-session {
+  justify-content: space-between;
 }
 
 .agent-rail[data-rail="full"] .agent-rail-skeleton {
@@ -301,6 +310,10 @@
 
 div:has(> .agent-rail[data-menu]) {
   flex-direction: column;
+}
+
+div:has(> .agent-rail[data-menu]) > .desk-canvas {
+  margin: 8px;
 }
 
 .agent-rail[data-menu][data-rail] {

@@ -11,7 +11,6 @@ import { assistantNameOf, useProductBrand } from "@/lib/product-brand";
 import {
   fetchVirtualAgentCatalog,
   notifyVirtualAgentsChanged,
-  studioHref,
   virtualAgentHref,
   virtualAgentName,
   virtualAgentTagline,
@@ -98,7 +97,7 @@ function AgentCard({ agent, productName, busyId, kind, onHire, onLetGo }: CardPr
             </Link>
             {!agent.generalist ? (
               <Link
-                href={studioHref(agent.id)}
+                href={`/dashboard/${agent.id}`}
                 className="va-open"
                 data-testid="agent-open-dashboard"
                 aria-label={t("agents.page.openDashboardAria", { name })}

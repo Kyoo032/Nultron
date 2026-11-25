@@ -3,13 +3,11 @@
 import { useState, type ReactNode, type SyntheticEvent } from "react";
 import type { ProductMode } from "@agentforge/core/product-modes";
 import { usePathname, useSearchParams } from "@/lib/nav";
-import { AppUpdatesButton } from "@/components/app-updates";
 import { RAIL_PANEL_ID, RailLink, RailMenuButton, RailToggle, type Tip } from "@/components/agent-rail-parts";
 import { BrandMark } from "@/components/brand-mark";
-import { DeskBuddyChip, DeskBuddyDock } from "@/components/desk-buddy";
+import { isAgentsHubPath } from "@/components/agents-shell";
 import { ModeIcon, isModeIconName, type ModeIconName } from "@/components/mode-icons";
 import { isSettingsHubPath } from "@/components/settings-shell";
-import { LanguageToggle } from "@/components/language-toggle";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { productMonogram } from "@/components/app-shell";
 import { t } from "@/lib/i18n";
@@ -24,7 +22,7 @@ import {
   type VirtualAgentInfo,
 } from "@/lib/virtual-agents";
 import { isTeamBotParam, teamBotHref, useTeam, type TeamBotView } from "@/lib/team";
-import { useChatThreads, type ChatThread } from "@/lib/use-chat-threads";
+import type { ChatThread } from "@/lib/use-chat-threads";
 import { Link } from "@/lib/nav";
 import "./agent-rail.css";
 
@@ -77,10 +75,11 @@ export type AgentRailViewProps = {
 };
 
 /**
- * Bottom account group: Knowledge Base, Agents, Usage, and Settings outside the Settings hub
- * so Agents and Usage stay one click away on the rail.
+ * Bottom account group: Dashboard, Knowledge Base, Agents, Usage, and Settings outside the Settings
+ * hub so built-in studios, Agents, and Usage stay one click away on the rail.
  */
 const ACCOUNT_LINKS: ReadonlyArray<{ href: string; icon: ModeIconName; testId: string; labelKey: string }> = [
+  { href: "/dashboard", icon: "dashboard", testId: "dashboard-link", labelKey: "rail.dashboard" },
   { href: "/knowledge", icon: "knowledge", testId: "mode-knowledge", labelKey: "rail.knowledge" },
   { href: "/workspaces", icon: "workspaces", testId: "workspaces-link", labelKey: "rail.agents" },
   { href: "/usage", icon: "usage", testId: "usage-link", labelKey: "rail.usage" },
@@ -88,6 +87,12 @@ const ACCOUNT_LINKS: ReadonlyArray<{ href: string; icon: ModeIconName; testId: s
 ];
 
 function isAccountLinkActive(href: string, pathname: string): boolean {
+  if (href === "/dashboard") {
+    return pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  }
+  if (href === "/workspaces") {
+    return isAgentsHubPath(pathname);
+  }
   if (href === "/settings") {
     return isSettingsHubPath(pathname);
   }
@@ -230,10 +235,10 @@ export function AgentRailView({
                   <Link
                     key={session.id}
                     href={virtualAgentHref("chat", session.id)}
-                    aria-current={isCurrent ? "true" : undefined}
+                    aria-current={isCurrent ? "page" : undefined}
                     data-testid="rail-session-item"
                     title={session.title}
-                    className="agent-rail-link justify-between px-2 text-xs"
+                    className="agent-rail-link agent-rail-session justify-between px-2 text-xs"
                   >
                     <span className="truncate">{session.title}</span>
                     {subCount > 0 ? (
@@ -341,14 +346,12 @@ export function AgentRail(_props: Props) {
   const brand = useProductBrand();
   const { agents, loaded } = useVirtualAgents();
   const { roster } = useTeam();
-  const { threads: chatSessions } = useChatThreads({ scope: "chat" });
   const phone = useMatchMedia(RAIL_PHONE_QUERY);
   const desk = useRailCollapse(false);
   const drawer = useRailDrawer(phone, `${pathname}?${searchParams.toString()}`);
   const collapsed = phone ? !drawer.open : desk.collapsed;
   const agentParam = searchParams.get("agent");
   const activeBotSlug = agentParam && isTeamBotParam(agentParam) ? agentParam : null;
-  const activeThreadId = searchParams.get("thread");
 
   return (
     <AgentRailView
@@ -357,8 +360,6 @@ export function AgentRail(_props: Props) {
       activeId={activeBotSlug ? null : activeAgentId(pathname, searchParams)}
       activeBotSlug={activeBotSlug}
       bots={roster.bots}
-      sessions={chatSessions}
-      activeThreadId={activeThreadId}
       pathname={pathname}
       productName={brand.productName}
       assistantName={assistantNameOf(brand)}
@@ -368,21 +369,7 @@ export function AgentRail(_props: Props) {
       menu={phone}
       onToggle={phone ? drawer.toggle : desk.toggle}
       onDismiss={phone ? drawer.close : undefined}
-      footer={
-        <>
-          {/* The character lives here in this shell, as the small head: the rail is the one place on
-            screen where nothing a person or a model wrote ever scrolls under it. The dock is what
-            tells the buddy it has a home; it is given no room (`agent-rail.css`), so the buddy is
-            always the head and never a body standing over the rail's icons. */}
-          <div className="agent-rail-buddy-dock" aria-hidden="true">
-            <DeskBuddyDock collapsed={false} />
-          </div>
-          <DeskBuddyChip />
-          <ThemeToggle />
-          <LanguageToggle />
-          <AppUpdatesButton collapsed />
-        </>
-      }
+      footer={<ThemeToggle />}
     />
   );
 }

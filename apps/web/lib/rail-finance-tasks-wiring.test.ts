@@ -110,7 +110,7 @@ describe("finance studio reads the rail's choice", () => {
   it("takes the task from the URL and falls back to the brief", () => {
     expect(studio).toContain('const taskQuery = searchParams.get("task");');
     expect(studio).toContain("const urlTask = taskFromParam(taskQuery);");
-    expect(studio).toContain("const onFinance = pathname === FINANCE_PATH;");
+    expect(studio).toContain("const onFinance = pathname === FINANCE_PATH || pathname === DASHBOARD_FINANCE_PATH;");
     expect(studio).toContain("const task = onFinance ? urlTask : lastTaskRef.current;");
     // An empty query is the chooser. Any value, including one the catalog does not know, is a task
     // page, and taskFromParam still resolves the unknown value to the brief.

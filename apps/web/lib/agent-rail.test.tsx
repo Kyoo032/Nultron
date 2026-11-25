@@ -108,7 +108,7 @@ describe("AgentRailView agents", () => {
     expect(attr(byId("mode-chat"), "title")).toBeNull();
     const strip = links(markup({ collapsed: true })).find((tag) => attr(tag, "data-testid") === "mode-chat") ?? "";
     expect(attr(strip, "title")).toBe("Chat");
-    expect(attr(byId("agent-research"), "aria-label")).toBe("Research");
+    expect(attr(byId("agent-research"), "aria-label")).toBe("Research Analyst");
   });
 
   it("marks only the active agent as the current page", () => {
@@ -156,7 +156,7 @@ describe("AgentRailView before the host answers", () => {
 });
 
 describe("AgentRailView account group", () => {
-  it("lists Knowledge, Agents, Usage, and Settings in the account group", () => {
+  it("lists Dashboard, Knowledge, Agents, Usage, and Settings in the account group", () => {
     const html = markup({ pathname: "/settings", activeId: null });
     const group = html.slice(
       html.indexOf('data-testid="rail-account-group"'),
@@ -164,25 +164,40 @@ describe("AgentRailView account group", () => {
     );
     const tags = links(group);
     expect(tags.map((tag) => attr(tag, "data-testid"))).toEqual([
+      "dashboard-link",
       "mode-knowledge",
       "workspaces-link",
       "usage-link",
       "settings-link",
     ]);
-    expect(tags.map((tag) => attr(tag, "href"))).toEqual(["/knowledge", "/workspaces", "/usage", "/settings"]);
+    expect(tags.map((tag) => attr(tag, "href"))).toEqual([
+      "/dashboard",
+      "/knowledge",
+      "/workspaces",
+      "/usage",
+      "/settings",
+    ]);
     expect(tags.filter((tag) => attr(tag, "aria-current") === "page").map((tag) => attr(tag, "data-testid"))).toEqual([
       "settings-link",
     ]);
   });
 
-  it("highlights Agents and Usage directly on the rail outside Settings", () => {
-    const agentsHtml = markup({ pathname: "/workspaces", activeId: null });
-    expect(
-      links(agentsHtml)
-        .filter((tag) => attr(tag, "aria-current") === "page")
-        .map((tag) => attr(tag, "data-testid")),
-    ).toEqual(["workspaces-link"]);
+  it.each(["/dashboard", "/dashboard/images", "/dashboard/finance"])(
+    "highlights Dashboard as active when visiting %s",
+    (path) => {
+      const html = markup({ pathname: path, activeId: null });
+      const current = links(html).filter((tag) => attr(tag, "aria-current") === "page");
+      expect(current.map((tag) => attr(tag, "data-testid"))).toEqual(["dashboard-link"]);
+    },
+  );
 
+  it.each(["/workspaces", "/team"])("highlights Agents as active when visiting %s", (path) => {
+    const html = markup({ pathname: path, activeId: null });
+    const current = links(html).filter((tag) => attr(tag, "aria-current") === "page");
+    expect(current.map((tag) => attr(tag, "data-testid"))).toEqual(["workspaces-link"]);
+  });
+
+  it("highlights Usage directly on the rail outside Settings", () => {
     const usageHtml = markup({ pathname: "/usage", activeId: null });
     expect(
       links(usageHtml)
@@ -191,7 +206,7 @@ describe("AgentRailView account group", () => {
     ).toEqual(["usage-link"]);
   });
 
-  it.each(["/settings", "/team", "/channels", "/customers", "/mcp"])(
+  it.each(["/settings", "/channels", "/customers", "/mcp"])(
     "highlights Settings as active when visiting %s",
     (path) => {
       const html = markup({ pathname: path, activeId: null });

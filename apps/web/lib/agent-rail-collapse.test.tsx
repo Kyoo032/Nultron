@@ -130,7 +130,8 @@ describe("AgentRailView collapse", () => {
     const labels = [...html.matchAll(/<span class="agent-rail-label">([^<]*)<\/span>/g)].map((match) => match[1]);
     expect(html).toContain('data-testid="rail-brand-name">Acme Desk<');
     expect(labels).toContain("Chat");
-    expect(labels).toContain("Research");
+    expect(labels).toContain("Research Analyst");
+    expect(labels).toContain("Dashboard");
     expect(labels).toContain("Settings");
     const button = html.match(/<button[^>]*data-testid="rail-collapse"[^>]*>/)?.[0] ?? "";
     expect(button).toContain('aria-expanded="true"');
@@ -184,8 +185,10 @@ describe("AgentRailView on a narrow screen", () => {
 
   it("names where the person is: the open agent, else the page, else the product", () => {
     const name = (html: string) => html.match(/data-testid="rail-bar-name">([^<]*)</)?.[1];
-    expect(name(markup({ menu: true, collapsed: true, activeId: "research" }))).toBe("Research");
+    expect(name(markup({ menu: true, collapsed: true, activeId: "research" }))).toBe("Research Analyst");
     expect(name(markup({ menu: true, collapsed: true, activeId: "chat" }))).toBe("Acme Desk");
+    expect(name(markup({ menu: true, collapsed: true, activeId: null, pathname: "/dashboard" }))).toBe("Dashboard");
+    expect(name(markup({ menu: true, collapsed: true, activeId: null, pathname: "/team" }))).toBe("Agents");
     expect(name(markup({ menu: true, collapsed: true, activeId: null, pathname: "/settings" }))).toBe("Settings");
     expect(name(markup({ menu: true, collapsed: true, activeId: null, pathname: "/elsewhere" }))).toBe("Acme Desk");
   });

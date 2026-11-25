@@ -16,10 +16,10 @@ import {
 import type { FinanceAutoSource } from "@/lib/finance-auto-io";
 import { FINANCE_IMPORT_ACCEPT } from "@/lib/finance-import-client";
 import { financeWarningText } from "@/lib/finance-import-warnings";
-import { financeTaskHref, type FinanceTask } from "@/lib/finance-task";
+import { financeTaskHrefFor, type FinanceTask } from "@/lib/finance-task";
 import { t } from "@/lib/i18n";
 import type { JobStudioModel } from "@/lib/use-job-model";
-import { Link } from "@/lib/nav";
+import { Link, usePathname } from "@/lib/nav";
 
 const DROP_ZONE =
   "w-full rounded-lg border border-dashed border-[var(--line)] px-4 py-5 text-center text-sm text-[var(--text-2)] transition-colors hover:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50";
@@ -224,6 +224,7 @@ export function AutoMore({
   model: string;
   onModel: (value: string) => void;
 }) {
+  const pathname = usePathname();
   const open = (task: FinanceTask) => () => openTaskWithDraft(workspaceId, task, { prompt, figures });
   return (
     <details className="mt-6 rounded-lg border border-[var(--line)] px-3 py-2" data-testid="finance-more">
@@ -257,7 +258,7 @@ export function AutoMore({
           <div className="space-y-3">
             <div>
               <Link
-                href={financeTaskHref(answer.task)}
+                href={financeTaskHrefFor(pathname, answer.task)}
                 onClick={open(answer.task)}
                 className="btn"
                 data-testid="finance-auto-check-rows"
@@ -274,7 +275,7 @@ export function AutoMore({
                 {financeAutoSwitchTasks(answer).map((task) => (
                   <Link
                     key={task}
-                    href={financeTaskHref(task)}
+                    href={financeTaskHrefFor(pathname, task)}
                     onClick={open(task)}
                     className="btn"
                     data-testid={`finance-auto-switch-${task}`}

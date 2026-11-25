@@ -21,9 +21,9 @@ import { FinanceResultNotices } from "@/components/finance-steps/finance-result-
 import type { FinanceResultPanelProps } from "@/components/finance-steps/finance-result-panel";
 import type { FinanceStepProps } from "@/components/finance-steps/types";
 import { financePhaseLabel } from "@/lib/finance-phase-label";
-import { financeTaskLabel } from "@/lib/finance-task";
+import { financeBasePath, financeTaskLabel } from "@/lib/finance-task";
 import { t } from "@/lib/i18n";
-import { Link } from "@/lib/nav";
+import { Link, usePathname } from "@/lib/nav";
 
 export type FinanceStudioViewProps = {
   showChooser: boolean;
@@ -175,6 +175,7 @@ export function FinanceStudioView({
 }
 
 function TaskPath(props: Omit<FinanceStudioViewProps, "showChooser" | "chooser"> & { step: "numbers" | "result" }) {
+  const pathname = usePathname();
   const {
     task,
     taskName,
@@ -234,7 +235,11 @@ function TaskPath(props: Omit<FinanceStudioViewProps, "showChooser" | "chooser">
             {t(`finance.guide.terms.${task}`)}
           </span>
         </div>
-        <Link href="/finance" className="text-xs font-medium text-[var(--accent)]" data-testid="finance-guide-change">
+        <Link
+          href={financeBasePath(pathname)}
+          className="text-xs font-medium text-[var(--accent)]"
+          data-testid="finance-guide-change"
+        >
           {t("finance.guide.change")}
         </Link>
       </div>

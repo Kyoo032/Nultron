@@ -17,7 +17,12 @@ import {
   type TeamBotView,
   type TeamReleaseTarget,
 } from "@/lib/team";
-import { fetchVirtualAgentCatalog, virtualAgentTagline, type VirtualAgentInfo } from "@/lib/virtual-agents";
+import {
+  fetchVirtualAgentCatalog,
+  virtualAgentName,
+  virtualAgentTagline,
+  type VirtualAgentInfo,
+} from "@/lib/virtual-agents";
 import "./team-page.css";
 
 /**
@@ -361,7 +366,7 @@ function TeamEditor({
                 data-testid={`team-specialist-${agent.id}`}
               />
               <span className="team-specialist-text">
-                <strong>{t(`rail.${agent.id}`)}</strong>
+                <strong>{virtualAgentName(agent, "")}</strong>
                 <span>{virtualAgentTagline(agent)}</span>
               </span>
             </label>
@@ -517,29 +522,32 @@ function TeamRoster({ modes, bots, busy, onRelease, onAdd }: RosterProps) {
           <p className="team-empty">{t("team.roster.noSpecialists")}</p>
         ) : (
           <ul className="team-roster-grid">
-            {modes.map((mode) => (
-              <li className="team-roster-card card-live" key={mode} data-mode={mode} data-testid="team-member">
-                <div className="team-member-head">
-                  <span className="team-tile" aria-hidden="true">
-                    <ModeIcon name={isModeIconName(mode) ? mode : "chat"} size={20} strokeWidth={2} />
-                  </span>
-                  <div>
-                    <h4>{t(`rail.${mode}`)}</h4>
-                    <p>{t(`agents.tagline.${mode}`)}</p>
+            {modes.map((mode) => {
+              const name = virtualAgentName({ id: mode, generalist: false }, "");
+              return (
+                <li className="team-roster-card card-live" key={mode} data-mode={mode} data-testid="team-member">
+                  <div className="team-member-head">
+                    <span className="team-tile" aria-hidden="true">
+                      <ModeIcon name={isModeIconName(mode) ? mode : "chat"} size={20} strokeWidth={2} />
+                    </span>
+                    <div>
+                      <h4>{name}</h4>
+                      <p>{t(`agents.tagline.${mode}`)}</p>
+                    </div>
                   </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={busy !== null}
-                  onClick={() => onRelease({ mode }, `mode:${mode}`)}
-                  aria-label={t("team.roster.letGoAria", { name: t(`rail.${mode}`) })}
-                  data-testid="team-let-go"
-                >
-                  {busy === `mode:${mode}` ? t("team.roster.lettingGo") : t("team.roster.letGo")}
-                </button>
-              </li>
-            ))}
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={busy !== null}
+                    onClick={() => onRelease({ mode }, `mode:${mode}`)}
+                    aria-label={t("team.roster.letGoAria", { name })}
+                    data-testid="team-let-go"
+                  >
+                    {busy === `mode:${mode}` ? t("team.roster.lettingGo") : t("team.roster.letGo")}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

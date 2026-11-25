@@ -112,7 +112,7 @@ describe("education studio reads the rail's choice", () => {
   it("takes the task from the URL and shows the chooser only when the query is empty", () => {
     expect(studio).toContain('const taskQuery = searchParams.get("task");');
     expect(studio).toContain("const urlTask = taskFromParam(taskQuery);");
-    expect(studio).toContain("const onEducation = pathname === EDUCATION_PATH;");
+    expect(studio).toContain("const onEducation = pathname === EDUCATION_PATH || pathname === DASHBOARD_EDUCATION_PATH;");
     expect(studio).toContain("const task = onEducation ? urlTask : lastTaskRef.current;");
     expect(studio).toContain('const showChooser = onEducation && (taskQuery == null || taskQuery.trim() === "");');
   });

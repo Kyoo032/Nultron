@@ -10,6 +10,11 @@ export type EducationTask = (typeof EDUCATION_TASKS)[number];
 export const DEFAULT_EDUCATION_TASK: EducationTask = "lesson";
 
 export const EDUCATION_PATH = "/education";
+export const DASHBOARD_EDUCATION_PATH = "/dashboard/education";
+
+export function educationBasePath(pathname: string): string {
+  return pathname === DASHBOARD_EDUCATION_PATH ? DASHBOARD_EDUCATION_PATH : EDUCATION_PATH;
+}
 
 export function isEducationTask(value: string | null | undefined): value is EducationTask {
   return EDUCATION_TASKS.includes(value as EducationTask);
@@ -23,4 +28,9 @@ export function taskFromParam(value: string | null | undefined): EducationTask {
 /** `/education?task=<id>` — the one place the rail links a task. */
 export function educationTaskHref(id: EducationTask): string {
   return `${EDUCATION_PATH}?task=${encodeURIComponent(id)}`;
+}
+
+/** Task link preserving the current Education route (`/education` or `/dashboard/education`). */
+export function educationTaskHrefFor(pathname: string, id: EducationTask): string {
+  return `${educationBasePath(pathname)}?task=${encodeURIComponent(id)}`;
 }

@@ -133,6 +133,7 @@
   --mode-edit: #b06105;
   --mode-presentations: #9d6b03;
   --mode-education: #0f766e;
+  --mode-dashboard: #2563eb;
   --mode-knowledge: #0c8378;
   --mode-channels: #2563eb;
   --mode-customers: #15803d;
@@ -172,12 +173,12 @@
      dark chrome in both themes to match the workbench mockup, which meant switching to light
      left the entire left edge behind — the rail, its submenus and its footer. Light is a warm
      rail a shade deeper than the desk; dark is the reverse. */
-  --rail: #f6f8fc;
+  --rail: #f7f8fa;
   --rail-text: #0b1020;
   --rail-text-2: #2c3244;
   --rail-text-3: #5a6072;
-  --rail-line: #e4e7ef;
-  --rail-hover: #eaeef7;
+  --rail-line: #e5e8f0;
+  --rail-hover: #eaeef5;
   --rail-active: #ffffff;
   --rail-active-text: #0b1020;
   --rail-accent: #0e58f0;
@@ -332,13 +333,13 @@ html[data-shell="desktop"] {
   --scroll-thumb: color-mix(in srgb, var(--text) 22%, transparent);
   --scroll-thumb-hover: color-mix(in srgb, var(--text) 38%, transparent);
   --scroll-thumb-active: color-mix(in srgb, var(--text) 52%, transparent);
-  --rail: #2a3144;
+  --rail: #13161e;
   --rail-text: #f2f4fa;
   --rail-text-2: #c9cedc;
   --rail-text-3: #9aa1b4;
-  --rail-line: #262a36;
-  --rail-hover: #1d2130;
-  --rail-active: #232734;
+  --rail-line: #232836;
+  --rail-hover: #1d212e;
+  --rail-active: #252b3b;
   --rail-active-text: #ffffff;
   --rail-accent: #8cb6ff;
   /* Mode colours on the dark desk. The light set sits at 1.9-3.4:1 against its own 14% tile on the
@@ -362,6 +363,7 @@ html[data-shell="desktop"] {
   --mode-edit: #e37c06;
   --mode-presentations: #ca8a04;
   --mode-education: #16aca1;
+  --mode-dashboard: #60a5fa;
   --mode-knowledge: #0fab9e;
   --mode-channels: #7098f2;
   --mode-customers: #3fb86a;
@@ -1191,12 +1193,13 @@ h6 {
   background-color: var(--surface);
   background-image: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--page-mode, var(--accent)) 11%, var(--surface)) 0,
+    color-mix(in srgb, var(--page-mode, var(--accent)) 4%, var(--surface)) 0,
     var(--surface) 360px
   );
-  box-shadow: var(--shadow-float);
+  border: 1px solid var(--line);
+  box-shadow: var(--elev-1);
   border-radius: var(--r-card);
-  margin: 8px;
+  margin: 8px 8px 8px 0;
 }
 
 /* The desk's backdrop takes the colour of the mode on screen: a wash at the top (the canvas' own
@@ -1217,6 +1220,7 @@ h6 {
 .desk-canvas:has(main[data-mode="edit"]:not([hidden] *)) { --page-mode: var(--mode-edit); }
 .desk-canvas:has(main[data-mode="presentations"]:not([hidden] *)) { --page-mode: var(--mode-presentations); }
 .desk-canvas:has(main[data-mode="education"]:not([hidden] *)) { --page-mode: var(--mode-education); }
+.desk-canvas:has(main[data-mode="dashboard"]:not([hidden] *)) { --page-mode: var(--mode-dashboard); }
 .desk-canvas:has(main[data-mode="knowledge"]:not([hidden] *)) { --page-mode: var(--mode-knowledge); }
 .desk-canvas:has(main[data-mode="channels"]:not([hidden] *)) { --page-mode: var(--mode-channels); }
 .desk-canvas:has(main[data-mode="customers"]:not([hidden] *)) { --page-mode: var(--mode-customers); }
@@ -1235,12 +1239,12 @@ h6 {
    muted text keeps 4.5:1. */
 .desk-canvas:has([data-testid="chat-home"]:not([hidden] *)) {
   background-image:
-    radial-gradient(55% 38% at 92% -4%, color-mix(in srgb, var(--nultron-cyan) 12%, transparent), transparent 72%),
-    radial-gradient(60% 30% at 8% 104%, color-mix(in srgb, var(--nultron-blue) 8%, transparent), transparent 70%),
+    radial-gradient(55% 38% at 92% -4%, color-mix(in srgb, var(--nultron-cyan) 6%, transparent), transparent 72%),
+    radial-gradient(60% 30% at 8% 104%, color-mix(in srgb, var(--nultron-blue) 4%, transparent), transparent 70%),
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--nultron-blue) 10%, var(--surface)) 0,
-      color-mix(in srgb, var(--nultron-cyan) 5%, var(--surface)) 46%,
+      color-mix(in srgb, var(--nultron-blue) 5%, var(--surface)) 0,
+      color-mix(in srgb, var(--nultron-cyan) 2.5%, var(--surface)) 46%,
       var(--surface) 80%
     );
 }
@@ -2155,6 +2159,7 @@ aside nav > p {
 [data-mode="edit"] { --mode: var(--mode-edit); }
 [data-mode="presentations"] { --mode: var(--mode-presentations); }
 [data-mode="education"] { --mode: var(--mode-education); }
+[data-mode="dashboard"] { --mode: var(--mode-dashboard); }
 [data-mode="knowledge"] { --mode: var(--mode-knowledge); }
 [data-mode="channels"] { --mode: var(--mode-channels); }
 [data-mode="customers"] { --mode: var(--mode-customers); }

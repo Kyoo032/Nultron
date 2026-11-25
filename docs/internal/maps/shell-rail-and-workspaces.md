@@ -2,6 +2,8 @@
 
 Product: both · Instance: main :3000
 
+Last verified: 2026-11-25 on working tree over `d9131193` for `packages/core/src/agents/product-modes.ts` (`redirectIfHiddenMode` now keeps `/dashboard` and `/dashboard/*` always reachable alongside `/chat*`, `/settings*`, `/workspaces*`, `/usage*`, and `/knowledge*`; `FIRST_RUN_MODES` and `HOSTED_FIRST_DESK_MODES` remain `["chat"]`).
+
 Last verified: 2026-11-24 on `chore/dfind-139-retire-desktop` (DFIND-139) for `packages/core/src/agents/product-modes.ts` wording only ("fresh Personal install" -> "fresh OPC desk"; `FIRST_RUN_MODES` and `HOSTED_FIRST_DESK_MODES` unchanged). Nothing else on this page was re-read.
 
 Last verified: 2026-10-17 at 07cb099 for the theme row of § 4 only (the pre-paint theme script; driven on a built bundle and on stub webdev in headless Chrome).
@@ -57,7 +59,7 @@ Content lanes (`apps/web/app/globals.css:156-160`, steps at `:477-512`): `--cont
 
 `ModeRedirect` (`apps/web/components/mode-redirect.tsx:7-18`) calls the pure `redirectIfHiddenMode(pathname, visibleModes)` (`packages/core/src/agents/product-modes.ts:180-200`) on every render and, in an effect, `router.replace(target)` when it is non-null, but only once `settled`: the modes came from the host's answer, not from the remembered list or from nothing (`components/mode-redirect.tsx:14`; a remembered list narrower than the desk would bounce a deep link). The rule:
 
-1. `/chat*`, `/settings*`, `/workspaces*`, `/usage*`, `/knowledge*` are **always** reachable (`:181-189`) — they are not modes, so no desk can hide them.
+1. `/chat*`, `/dashboard*`, `/settings*`, `/workspaces*`, `/usage*`, `/knowledge*` are **always** reachable (`:156-166`) — they are not modes, so no desk can hide them.
 2. Parked `/agents*` and `/studio*` go to `firstVisibleHref(visible)` (`:192-194`).
 3. Any other path that matches a mode href goes to `firstVisibleHref` **unless** that mode is visible (`:195-199`).
 4. A path matching nothing (a 404) is left alone here — `App`'s `<Route path="*">` sends it to `/chat` (`apps/web/src/App.tsx:447`).

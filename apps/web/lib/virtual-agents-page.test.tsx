@@ -116,8 +116,8 @@ describe("VirtualAgentsView", () => {
     expect(count(html, 'data-testid="agent-always"')).toBe(1);
     expect(html).toContain("Always on your desk");
     expect(html).not.toContain('aria-label="Delete Acme"');
-    expect(html).toContain('aria-label="Delete Research"');
-    expect(html).toContain('aria-label="Delete Documents"');
+    expect(html).toContain('aria-label="Delete Research Analyst"');
+    expect(html).toContain('aria-label="Delete Document Writer"');
   });
 
   it("names the generalist after the product, not a brand typed in the page", () => {
@@ -129,8 +129,8 @@ describe("VirtualAgentsView", () => {
   it("gives every available agent an activate button", () => {
     const html = view();
     expect(count(html, 'data-testid="agent-hire"')).toBe(2);
-    expect(html).toContain('aria-label="Activate Finance"');
-    expect(html).toContain('aria-label="Activate Legal"');
+    expect(html).toContain('aria-label="Activate Finance Analyst"');
+    expect(html).toContain('aria-label="Activate Legal Counsel"');
   });
 
   it("draws one card per agent, each in its own mode colour", () => {
@@ -151,11 +151,13 @@ describe("VirtualAgentsView", () => {
 
   it("links active specialists to both their chat and their dedicated Dashboard", () => {
     const html = view();
-    expect(html).toContain('aria-label="Message Documents"');
-    expect(html).toContain('aria-label="Message Research"');
+    expect(html).toContain('aria-label="Message Document Writer"');
+    expect(html).toContain('aria-label="Message Research Analyst"');
     expect(html).toContain('data-testid="agent-open-dashboard"');
-    expect(html).toContain('aria-label="Open Research Dashboard"');
-    expect(html).toContain('aria-label="Open Documents Dashboard"');
+    expect(html).toContain('href="/dashboard/research"');
+    expect(html).toContain('href="/dashboard/documents"');
+    expect(html).toContain('aria-label="Open Research Analyst Dashboard"');
+    expect(html).toContain('aria-label="Open Document Writer Dashboard"');
   });
 
   it("links each desk agent to its conversation", () => {

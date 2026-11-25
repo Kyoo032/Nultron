@@ -29,7 +29,7 @@ export function productMonogram(name: string): string {
 
 export function AppShell({ workspaceName, visibleModes, modesSource = "host", children }: Props) {
   return (
-    <div className="flex h-full min-h-0 overflow-hidden bg-app text-inkbase">
+    <div className="flex h-full min-h-0 overflow-hidden bg-[var(--rail)] text-inkbase">
       {/* A remembered or unknown list is only good for the first frame: nobody is redirected on it. */}
       <ModeRedirect visibleModes={visibleModes} settled={modeRedirectAllowed(modesSource)} />
       {SHELL_LAYOUT === "chat-first" ? (

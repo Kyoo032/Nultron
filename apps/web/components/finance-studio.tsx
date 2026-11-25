@@ -25,6 +25,7 @@ import {
 } from "@/lib/finance-client";
 import { loadFinanceDraft, saveFinanceDraft } from "@/lib/finance-drafts";
 import {
+  DASHBOARD_FINANCE_PATH,
   FINANCE_PATH,
   defaultFinancePrompt,
   financeTaskAvailable,
@@ -58,8 +59,8 @@ export function FinanceStudio() {
   const { id: workspaceId } = useWorkspaceScope();
   const uiLocale = getLocale();
 
-  // The rail owns the task via the URL. Off /finance, keep the last task rather than the default.
-  const onFinance = pathname === FINANCE_PATH;
+  // The rail owns the task via the URL. Off Finance, keep the last task rather than the default.
+  const onFinance = pathname === FINANCE_PATH || pathname === DASHBOARD_FINANCE_PATH;
   const taskQuery = searchParams.get("task");
   const showChooser = onFinance && (taskQuery == null || taskQuery.trim() === "");
   const urlTask = taskFromParam(taskQuery);

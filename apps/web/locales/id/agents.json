@@ -3,6 +3,52 @@
     "load": "Agen Anda gagal dimuat.",
     "save": "Agen Anda gagal diperbarui."
   },
+  "name": {
+    "documents": "Penulis Dokumen",
+    "research": "Analis Riset",
+    "finance": "Analis Keuangan",
+    "data": "Analis Data",
+    "market": "Peneliti Pasar",
+    "legal": "Penasihat Hukum",
+    "meeting": "Notulis Rapat",
+    "images": "Desainer Visual",
+    "videos": "Produser Video",
+    "music": "Komposer Musik",
+    "edit": "Editor Video",
+    "presentations": "Desainer Presentasi",
+    "education": "Pelatih Belajar"
+  },
+  "tabs": {
+    "aria": "Bagian agen",
+    "agents": "Agen",
+    "team": "Tim"
+  },
+  "dashboard": {
+    "title": "Dasbor",
+    "lede": "Buka studio bawaan mana saja secara langsung untuk kontrol khusus, pratinjau, dan ekspor.",
+    "back": "Dasbor",
+    "switcherAria": "Ganti studio",
+    "openStudio": "Buka studio",
+    "sections": {
+      "creative": "Kreatif & Media",
+      "analysis": "Analisis & Tinjauan"
+    },
+    "studios": {
+      "images": "Pembuatan Gambar",
+      "videos": "Pembuatan Video",
+      "edit": "Edit Video",
+      "music": "Pembuatan Musik",
+      "presentations": "Presentasi",
+      "documents": "Dokumen",
+      "market": "Riset Pasar",
+      "finance": "Keuangan",
+      "data": "Analisis Data",
+      "legal": "Tinjauan Hukum",
+      "research": "Riset",
+      "meeting": "Notulen Rapat",
+      "education": "Pendidikan"
+    }
+  },
   "tagline": {
     "chat": "Asisten serbaguna Anda: mencari, membaca file, menjalankan kode, dan membuat media.",
     "documents": "Menulis dokumen dari arahan Anda, lalu mencocokkannya dengan sumber yang Anda berikan.",

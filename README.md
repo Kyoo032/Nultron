@@ -62,31 +62,31 @@ Quick entry points into the runtime: [`apps/web/server.ts`](apps/web/server.ts) 
 
 ## Harnesses
 
-Every fresh desk starts with Chat alone (`FIRST_RUN_MODES = ["chat"]`), and Chat invokes specialist work inline. Full mode catalog: [`docs/product-modes.md`](docs/product-modes.md).
+Every fresh desk starts with Chat alone (`FIRST_RUN_MODES = ["chat"]`), and Chat invokes specialist work inline. Open the **Dashboard** (`/dashboard`) studio hub from the rail for direct access to Image Generation, Video Generation, Video Editing, Market Research, Finance, Data Analysis, Legal Review, and every other built-in studio interface. Full mode catalog: [`docs/product-modes.md`](docs/product-modes.md).
 
 | Harness | What you leave with | Spec | Subsystem map |
 |---|---|---|---|
 | **Chat** | Conversation with model picker, inline specialist tools, and interactive voice | [`chat.ts`](packages/core/src/harness/modes/chat.ts) | [`chat-send.md`](docs/internal/maps/chat-send.md) |
-| **Documents** | A DOCX | [`documents.ts`](packages/core/src/harness/modes/documents.ts) | [`documents.md`](docs/internal/maps/documents.md) |
-| **Research** | Sourced notes and a Markdown dossier | [`research.ts`](packages/core/src/harness/modes/research.ts) | [`research-dossier.md`](docs/internal/maps/research-dossier.md) |
-| **Finance** | Deterministic figures computed in core and an exportable brief | [`finance.ts`](packages/core/src/harness/modes/finance.ts) | [`finance-tasks.md`](docs/internal/maps/finance-tasks.md) |
-| **Data** | Table analysis with the SQL shown | [`data.ts`](packages/core/src/harness/modes/data.ts) | [`data-analysis.md`](docs/internal/maps/data-analysis.md) |
-| **Market** | A watchlist briefing | [`market.ts`](packages/core/src/harness/modes/market.ts) | [`market-watch.md`](docs/internal/maps/market-watch.md) |
-| **Legal** | A memo, a redline, and a deviation report from uploaded documents | [`legal.ts`](packages/core/src/harness/modes/legal.ts) | [`legal-matter-run.md`](docs/internal/maps/legal-matter-run.md) |
-| **Meeting** | A transcript and minutes | [`meeting.ts`](packages/core/src/harness/modes/meeting.ts) | [`meeting-minutes.md`](docs/internal/maps/meeting-minutes.md) |
-| **Images** | Generated images | [`images.ts`](packages/core/src/harness/modes/images.ts) | [`generate-studios.md`](docs/internal/maps/generate-studios.md) |
-| **Videos** | Generated videos | [`videos.ts`](packages/core/src/harness/modes/videos.ts) | [`generate-studios.md`](docs/internal/maps/generate-studios.md) |
-| **Music** | Generated tracks | [`music.ts`](packages/core/src/harness/modes/music.ts) | [`music-mode.md`](docs/internal/maps/music-mode.md) |
-| **Edit** | An exported timeline cut | [`edit.ts`](packages/core/src/harness/modes/edit.ts) | [`edit-timeline.md`](docs/internal/maps/edit-timeline.md) |
-| **Presentation** | An outline, an HTML preview, and a PPTX | [`presentations.ts`](packages/core/src/harness/modes/presentations.ts) | [`presentations.md`](docs/internal/maps/presentations.md) |
-| **Education** | Guided study sessions and structured learning materials | [`education.ts`](packages/core/src/harness/modes/education.ts) | [`education.md`](docs/internal/maps/education.md) |
+| **Documents** (Document Writer) | A DOCX | [`documents.ts`](packages/core/src/harness/modes/documents.ts) | [`documents.md`](docs/internal/maps/documents.md) |
+| **Research** (Research Analyst) | Sourced notes and a Markdown dossier | [`research.ts`](packages/core/src/harness/modes/research.ts) | [`research-dossier.md`](docs/internal/maps/research-dossier.md) |
+| **Finance** (Finance Analyst) | Deterministic figures computed in core and an exportable brief | [`finance.ts`](packages/core/src/harness/modes/finance.ts) | [`finance-tasks.md`](docs/internal/maps/finance-tasks.md) |
+| **Data** (Data Analyst) | Table analysis with the SQL shown | [`data.ts`](packages/core/src/harness/modes/data.ts) | [`data-analysis.md`](docs/internal/maps/data-analysis.md) |
+| **Market** (Market Researcher) | A watchlist briefing | [`market.ts`](packages/core/src/harness/modes/market.ts) | [`market-watch.md`](docs/internal/maps/market-watch.md) |
+| **Legal** (Legal Counsel) | A memo, a redline, and a deviation report from uploaded documents | [`legal.ts`](packages/core/src/harness/modes/legal.ts) | [`legal-matter-run.md`](docs/internal/maps/legal-matter-run.md) |
+| **Meeting** (Meeting Secretary) | A transcript and minutes | [`meeting.ts`](packages/core/src/harness/modes/meeting.ts) | [`meeting-minutes.md`](docs/internal/maps/meeting-minutes.md) |
+| **Images** (Visual Designer) | Generated images | [`images.ts`](packages/core/src/harness/modes/images.ts) | [`generate-studios.md`](docs/internal/maps/generate-studios.md) |
+| **Videos** (Video Producer) | Generated videos | [`videos.ts`](packages/core/src/harness/modes/videos.ts) | [`generate-studios.md`](docs/internal/maps/generate-studios.md) |
+| **Music** (Music Composer) | Generated tracks | [`music.ts`](packages/core/src/harness/modes/music.ts) | [`music-mode.md`](docs/internal/maps/music-mode.md) |
+| **Edit** (Video Editor) | An exported timeline cut | [`edit.ts`](packages/core/src/harness/modes/edit.ts) | [`edit-timeline.md`](docs/internal/maps/edit-timeline.md) |
+| **Presentation** (Presentation Designer) | An outline, an HTML preview, and a PPTX | [`presentations.ts`](packages/core/src/harness/modes/presentations.ts) | [`presentations.md`](docs/internal/maps/presentations.md) |
+| **Education** (Learning Coach) | Guided study sessions and structured learning materials | [`education.ts`](packages/core/src/harness/modes/education.ts) | [`education.md`](docs/internal/maps/education.md) |
 
 ## Desk capabilities
 
 - **Knowledge Base.** Local ingestion, search, and source-delete cascades in [`packages/host/src/`](packages/host/src) ([`knowledge-flows.md`](docs/internal/maps/knowledge-flows.md), [`knowledge-base-page.md`](docs/internal/maps/knowledge-base-page.md)).
 - **Read-only MCP sandbox.** Gmail, Google Drive, OneDrive, and Notion connectors in [`packages/host/src/mcp/`](packages/host/src/mcp) and [`packages/core/src/mcp/`](packages/core/src/mcp) with write, delete, and harness actions blocked before any network call.
 - **Interactive Voice.** Voice relay and turn-taking in [`packages/host/src/voice/`](packages/host/src/voice) ([`voice-mode.md`](docs/internal/maps/voice-mode.md)).
-- **Virtual agents and Team sessions.** Add or delete specialist agents on `/workspaces` and track delegated runs in [`packages/host/src/delegation/`](packages/host/src/delegation) ([`virtual-agents.md`](docs/internal/maps/virtual-agents.md)).
+- **Virtual agents, Team, and Dashboard.** Manage role-named specialist agents and **Team** together inside the **Agents** hub (`/workspaces` and `/team`), open built-in studio interfaces directly from **Dashboard** (`/dashboard`) on the rail, and track delegated runs in [`packages/host/src/delegation/`](packages/host/src/delegation) ([`virtual-agents.md`](docs/internal/maps/virtual-agents.md)).
 - **Channels and Customer Inbox.** Pull-only Telegram bots in [`packages/host/src/channels/`](packages/host/src/channels) ([`channels.md`](docs/internal/maps/channels.md)) and WhatsApp inbox in [`packages/host/src/inbox/`](packages/host/src/inbox) ([`customer-inbox.md`](docs/internal/maps/customer-inbox.md)).
 - **WASM code runner and local extraction.** Sandboxed Python and JavaScript in [`packages/host/src/code-runner/`](packages/host/src/code-runner) and local document extraction with no cloud OCR in [`packages/host/src/file-extract/`](packages/host/src/file-extract) ([`agent-tools-and-files.md`](docs/internal/maps/agent-tools-and-files.md)).
 - **Bilingual UI (EN / ID).** 33 synchronized locale namespaces in [`apps/web/locales/`](apps/web/locales) ([`locale-boot-and-run-harness.md`](docs/internal/maps/locale-boot-and-run-harness.md)).
