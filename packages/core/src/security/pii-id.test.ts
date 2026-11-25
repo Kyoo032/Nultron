@@ -203,6 +203,8 @@ describe("scanIndonesianIds", () => {
     expect(scanIndonesianIds(nbsp)).toEqual([
       { kind: "account", match: "1234\u00a05678\u00a090", index: nbsp.indexOf("1234") },
     ]);
+    // Non-breaking space before a currency suffix keeps the amount unmasked.
+    expect(scanIndonesianIds("Rekening BCA: 125\u202f000\u202f000\u00a0rupiah")).toEqual([]);
 
     const weakLines = [
       "Set the budget to\n1234567890",

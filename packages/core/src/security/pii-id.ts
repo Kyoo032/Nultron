@@ -189,7 +189,7 @@ const GAP_VETO_RE =
   /\b(?:payable|receivable|balance|saldo|total|subtotal|jumlah|nilai|amount|revenue|pendapatan|profit|laba|loss|rugi|expense|expenses|beban|biaya|budget|anggaran|omzet|omset|kas|cash|equity|ekuitas|asset|assets|aset|liability|liabilities|liabilitas|utang|piutang|hutang|modal|koran|tax|pajak|margin|ebit|ebitda|gdp|cap|volume|price|harga|rate|tarif|fee|invoice|faktur)\b/i;
 const BANK_ACCOUNT_CONTEXT_RE = /\b(?:rek(?:ening)?|norek|a\/c|acct\.?|accounts?)\b/i;
 const CURRENCY_OR_SCALE_AFTER_RE =
-  /^[ \t]*(?:rupiah|rp|idr|usd|dollars?|sgd|euros?|eur|myr|jpy|gbp|aud|cny|rmb|juta|miliar|milyar|ribu|triliun|thousand|million|billion|trillion)\b/i;
+  /^[^\S\r\n]*(?:rupiah|rp|idr|usd|dollars?|sgd|euros?|eur|myr|jpy|gbp|aud|cny|rmb|juta|miliar|milyar|ribu|triliun|thousand|million|billion|trillion)\b/i;
 
 function hasExplicitAmountTail(afterRaw: string): boolean {
   return (
