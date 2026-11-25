@@ -3,6 +3,52 @@
     "load": "Could not load your agents.",
     "save": "Could not update your agents."
   },
+  "name": {
+    "documents": "Document Writer",
+    "research": "Research Analyst",
+    "finance": "Finance Analyst",
+    "data": "Data Analyst",
+    "market": "Market Researcher",
+    "legal": "Legal Counsel",
+    "meeting": "Meeting Secretary",
+    "images": "Visual Designer",
+    "videos": "Video Producer",
+    "music": "Music Composer",
+    "edit": "Video Editor",
+    "presentations": "Presentation Designer",
+    "education": "Learning Coach"
+  },
+  "tabs": {
+    "aria": "Agents sections",
+    "agents": "Agents",
+    "team": "Team"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "lede": "Open any built-in studio directly for dedicated controls, previews, and exports.",
+    "back": "Dashboard",
+    "switcherAria": "Switch studio",
+    "openStudio": "Open studio",
+    "sections": {
+      "creative": "Creative & Media",
+      "analysis": "Analysis & Review"
+    },
+    "studios": {
+      "images": "Image Generation",
+      "videos": "Video Generation",
+      "edit": "Video Editing",
+      "music": "Music Generation",
+      "presentations": "Presentations",
+      "documents": "Documents",
+      "market": "Market Research",
+      "finance": "Finance",
+      "data": "Data Analysis",
+      "legal": "Legal Review",
+      "research": "Research",
+      "meeting": "Meeting Minutes",
+      "education": "Education"
+    }
+  },
   "tagline": {
     "chat": "Your general assistant. It searches, reads your files, runs code and makes media.",
     "documents": "Writes a document from your brief, checked against the sources you give it.",

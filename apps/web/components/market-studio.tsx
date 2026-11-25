@@ -68,8 +68,9 @@ function isLanguage(value: string): value is WatchLanguage {
   return value === "id" || value === "en";
 }
 
-/** The URL holds the active specialist as `/market?specialist=<id>`. */
+/** The URL holds the active specialist as `/market?specialist=<id>` or `/dashboard/market?specialist=<id>`. */
 const MARKET_PATH = "/market";
+const DASHBOARD_MARKET_PATH = "/dashboard/market";
 
 function clampMaxChars(value: number): number {
   if (!Number.isFinite(value)) {
@@ -87,7 +88,7 @@ export function MarketStudio() {
   const searchParams = useSearchParams();
   const { id: workspaceId } = useWorkspaceScope();
 
-  const onMarket = pathname === MARKET_PATH;
+  const onMarket = pathname === MARKET_PATH || pathname === DASHBOARD_MARKET_PATH;
   const rawSpecialist = searchParams.get("specialist");
   const urlSpecialist: MarketSpecialist = isMarketSpecialist(rawSpecialist) ? rawSpecialist : DEFAULT_MARKET_SPECIALIST;
   const lastSpecialistRef = useRef<MarketSpecialist>(urlSpecialist);
@@ -164,7 +165,8 @@ export function MarketStudio() {
     if (!isMarketSpecialist(next) || next === specialist) {
       return;
     }
-    navigate(`${MARKET_PATH}?specialist=${encodeURIComponent(next)}`);
+    const basePath = pathname === DASHBOARD_MARKET_PATH ? DASHBOARD_MARKET_PATH : MARKET_PATH;
+    navigate(`${basePath}?specialist=${encodeURIComponent(next)}`);
   }
 
   async function onGenerate(event: FormEvent) {

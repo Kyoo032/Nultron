@@ -302,6 +302,10 @@
   padding-inline: max(var(--chat-gutter), calc((100% - var(--chat-column)) / 2));
 }
 
+.agent-chat-pane .chat-composer-ledge {
+  padding-inline: var(--chat-gutter);
+}
+
 .agent-chat-pane .chat-composer-ledge [data-testid="composer"] {
   width: 100%;
   max-width: var(--chat-column);

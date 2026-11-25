@@ -308,6 +308,18 @@ const SCENES: Record<ModeIconName, ReactNode> = {
       </Pop>
     </>
   ),
+  dashboard: (
+    <>
+      <rect x="20" y="16" width="52" height="44" rx="6" fill={MODE} />
+      <Pop i={1}>
+        <rect x="82" y="16" width="58" height="26" rx="6" fill={A2} />
+      </Pop>
+      <Pop i={2}>
+        <rect x="82" y="50" width="58" height="44" rx="6" fill={A3} />
+      </Pop>
+      <rect x="20" y="68" width="52" height="26" rx="6" fill={A4} />
+    </>
+  ),
   knowledge: (
     <>
       <path d="M40 70 L80 36 L120 58 L96 86 L40 70" fill="none" stroke={LINE} strokeWidth="2" />

@@ -21,7 +21,7 @@ describe("market studio specialist wiring", () => {
     expect(studio).toContain('ariaLabel={t("market.studio.specialistAria")}');
     expect(studio).toContain('prefix={t("market.studio.specialistLabel")}');
     expect(studio).toContain("{specialistName(specialist)}");
-    expect(studio).toContain("navigate(`${MARKET_PATH}?specialist=${encodeURIComponent(next)}`)");
+    expect(studio).toContain("navigate(`${basePath}?specialist=${encodeURIComponent(next)}`)");
   });
 
   it("renders no native <select> in the studio (uses UiSelect pills)", () => {

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { applyLocale, resetLocaleForTests } from "./i18n";
 import {
   activeAgentId,
   agentIdFromSearch,
@@ -79,8 +80,15 @@ describe("where an agent lives", () => {
 });
 
 describe("an agent's name", () => {
-  it("is the product's own name for the generalist, never a typed brand", () => {
+  afterEach(() => resetLocaleForTests());
+
+  it("is the product's own name for the generalist and the specialist role name for others", () => {
+    applyLocale("en");
     expect(virtualAgentName({ id: "chat", generalist: true }, "Acme Desk")).toBe("Acme Desk");
-    expect(virtualAgentName({ id: "research", generalist: false }, "Acme Desk")).toBe("Research");
+    expect(virtualAgentName({ id: "research", generalist: false }, "Acme Desk")).toBe("Research Analyst");
+    expect(virtualAgentName({ id: "images", generalist: false }, "Acme Desk")).toBe("Visual Designer");
+    applyLocale("id");
+    expect(virtualAgentName({ id: "research", generalist: false }, "Acme Desk")).toBe("Analis Riset");
+    expect(virtualAgentName({ id: "images", generalist: false }, "Acme Desk")).toBe("Desainer Visual");
   });
 });

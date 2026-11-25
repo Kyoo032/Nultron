@@ -1,8 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Link } from "@/lib/nav";
-import { FINANCE_TASKS, financeTaskHref, type FinanceTask } from "@/lib/finance-task";
+import { Link, usePathname } from "@/lib/nav";
+import { FINANCE_TASKS, financeTaskHrefFor, type FinanceTask } from "@/lib/finance-task";
 import { t } from "@/lib/i18n";
 
 const STEPS = ["choose", "numbers", "result"] as const;
@@ -21,9 +21,10 @@ export function FinanceChooser() {
 }
 
 function Choice({ id }: { id: FinanceTask }) {
+  const pathname = usePathname();
   return (
     <Link
-      href={financeTaskHref(id)}
+      href={financeTaskHrefFor(pathname, id)}
       className="card-live enter-rise flex items-start px-4 py-4 text-left"
       data-testid={`finance-guide-${id}`}
     >

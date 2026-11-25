@@ -15,6 +15,7 @@ export type ModeIconName =
   | "edit"
   | "presentations"
   | "education"
+  | "dashboard"
   | "knowledge"
   | "channels"
   | "customers"
@@ -115,6 +116,14 @@ const PATHS: Record<ModeIconName, ReactNode> = {
     <>
       <path d="M22 10 12 5 2 10l10 5z" />
       <path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5" />
+    </>
+  ),
+  dashboard: (
+    <>
+      <rect x="3" y="3" width="7" height="9" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="16" width="7" height="5" rx="1.5" />
     </>
   ),
   knowledge: (

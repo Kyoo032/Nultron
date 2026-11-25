@@ -17,7 +17,9 @@ import {
   writeShellModesCache,
   type ShellModes,
 } from "@/lib/shell-modes";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
+import { AgentsShell } from "@/components/agents-shell";
+import { DashboardPage, DashboardStudioKeepAlive, isDashboardStudioId } from "@/components/dashboard-page";
 import { SettingsPage } from "@/components/settings-page";
 import { SettingsShell } from "@/components/settings-shell";
 import { UsagePage } from "@/components/usage-page";
@@ -386,6 +388,7 @@ export function AppRoutes() {
           {/* An owner who onboarded long ago never sees the setup panel; this runs it with no UI. */}
           <ComponentSetupSilent />
           <WorkModeKeepAlive />
+          <DashboardStudioKeepAlive />
           <Routes>
             <Route path="/" element={<HomeRedirect />} />
             {/* Work modes render via WorkModeKeepAlive — null here avoids double-mount. */}
@@ -403,6 +406,15 @@ export function AppRoutes() {
             <Route path="/education" element={null} />
             <Route path="/legal" element={null} />
             <Route path="/meeting" element={null} />
+            <Route
+              path="/dashboard"
+              element={
+                <DeskPane>
+                  <DashboardPage />
+                </DeskPane>
+              }
+            />
+            <Route path="/dashboard/:studio" element={<DashboardStudioRoute />} />
             <Route
               path="/settings"
               element={
@@ -425,7 +437,13 @@ export function AppRoutes() {
               path="/workspaces"
               element={
                 <DeskPane>
-                  {SHELL_LAYOUT === "chat-first" ? <VirtualAgentsPage /> : <WorkspacesPage />}
+                  {SHELL_LAYOUT === "chat-first" ? (
+                    <AgentsShell>
+                      <VirtualAgentsPage />
+                    </AgentsShell>
+                  ) : (
+                    <WorkspacesPage />
+                  )}
                 </DeskPane>
               }
             />
@@ -433,9 +451,13 @@ export function AppRoutes() {
               path="/team"
               element={
                 <DeskPane>
-                  <SettingsShell>
-                    {SHELL_LAYOUT === "chat-first" ? <TeamPage /> : <Navigate to="/workspaces" replace />}
-                  </SettingsShell>
+                  {SHELL_LAYOUT === "chat-first" ? (
+                    <AgentsShell>
+                      <TeamPage />
+                    </AgentsShell>
+                  ) : (
+                    <Navigate to="/workspaces" replace />
+                  )}
                 </DeskPane>
               }
             />
@@ -486,6 +508,14 @@ export function AppRoutes() {
       </Shell>
     </PlanBlockBoundary>
   );
+}
+
+function DashboardStudioRoute() {
+  const { studio } = useParams<{ studio?: string }>();
+  if (isDashboardStudioId(studio)) {
+    return null;
+  }
+  return <Navigate to="/dashboard" replace />;
 }
 
 function HomeRedirect() {

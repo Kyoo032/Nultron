@@ -45,6 +45,11 @@ export type { FinancePhaseId, FinancePhaseKind, FinanceTask };
 export type FinanceTaskLanguage = "id" | "en";
 
 export const FINANCE_PATH = "/finance";
+export const DASHBOARD_FINANCE_PATH = "/dashboard/finance";
+
+export function financeBasePath(pathname: string): string {
+  return pathname === DASHBOARD_FINANCE_PATH ? DASHBOARD_FINANCE_PATH : FINANCE_PATH;
+}
 
 /** The task the URL names, with the brief behind an absent or unknown value. */
 export function taskFromParam(value: string | null | undefined): FinanceTask {
@@ -54,6 +59,11 @@ export function taskFromParam(value: string | null | undefined): FinanceTask {
 /** `/finance?task=<id>` — the one place the rail links a task. */
 export function financeTaskHref(id: FinanceTask): string {
   return `${FINANCE_PATH}?task=${encodeURIComponent(id)}`;
+}
+
+/** Task link preserving the current Finance route (`/finance` or `/dashboard/finance`). */
+export function financeTaskHrefFor(pathname: string, id: FinanceTask): string {
+  return `${financeBasePath(pathname)}?task=${encodeURIComponent(id)}`;
 }
 
 export function financeTaskLabel(id: FinanceTask, locale: FinanceTaskLanguage): string {

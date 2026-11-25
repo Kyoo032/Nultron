@@ -157,6 +157,8 @@ export function redirectIfHiddenMode(path: string, visible: ProductMode[]): stri
     path === "/chat" ||
     path.startsWith("/chat/") ||
     path.startsWith("/chat?") ||
+    path === "/dashboard" ||
+    path.startsWith("/dashboard/") ||
     path.startsWith("/settings") ||
     path.startsWith("/workspaces") ||
     path.startsWith("/usage") ||

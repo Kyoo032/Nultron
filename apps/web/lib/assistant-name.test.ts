@@ -27,8 +27,8 @@ describe("the default agent's name on screen", () => {
     expect(brand.productName).toBe("Acme Desk");
     expect(assistantNameOf(brand)).toBe("Mika");
     expect(virtualAgentName({ id: "chat", generalist: true }, assistantNameOf(brand))).toBe("Mika");
-    // Every other agent is named for its mode, whatever the brand.
-    expect(virtualAgentName({ id: "research", generalist: false }, assistantNameOf(brand))).toBe("Research");
+    // Every other agent is named for its specialist role, whatever the brand.
+    expect(virtualAgentName({ id: "research", generalist: false }, assistantNameOf(brand))).toBe("Research Analyst");
   });
 
   it("reads the character from a ping body", () => {

@@ -208,6 +208,9 @@ describe("firstVisibleHref and hidden redirects", () => {
     expect(redirectIfHiddenMode("/workspaces", [...visible])).toBeNull();
     expect(redirectIfHiddenMode("/usage", [...visible])).toBeNull();
     expect(redirectIfHiddenMode("/knowledge", [...visible])).toBeNull();
+    expect(redirectIfHiddenMode("/dashboard", ["chat"])).toBeNull();
+    expect(redirectIfHiddenMode("/dashboard/images", ["chat"])).toBeNull();
+    expect(redirectIfHiddenMode("/dashboard/finance", ["chat"])).toBeNull();
     expect(redirectIfHiddenMode("/finance", [...visible])).toBe("/chat");
     expect(redirectIfHiddenMode("/data", [...visible])).toBe("/chat");
     expect(redirectIfHiddenMode("/market", [...visible])).toBe("/chat");

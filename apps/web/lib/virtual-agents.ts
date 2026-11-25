@@ -163,10 +163,10 @@ export function useVirtualAgents(): VirtualAgentsState {
 /**
  * The name on screen. The default agent is the brand's character (owner, 2026-10-09): callers pass
  * `assistantNameOf(brand)`, which is the product's name unless the brand names its character. Every
- * other agent is named for its mode. No brand is typed here.
+ * other agent is named for its specialist role. No brand is typed here.
  */
 export function virtualAgentName(agent: Pick<VirtualAgentInfo, "id" | "generalist">, characterName: string): string {
-  return agent.generalist ? characterName : t(`rail.${agent.id}`);
+  return agent.generalist ? characterName : t(`agents.name.${agent.id}`);
 }
 
 export function virtualAgentTagline(agent: Pick<VirtualAgentInfo, "id">): string {
