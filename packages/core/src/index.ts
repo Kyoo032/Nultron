@@ -181,7 +181,7 @@ export {
   stringsOf,
 } from "./security/outbound-guard";
 export type { OutboundGuard, OutboundGuardInit, OutboundRefusal, RefusalKind } from "./security/outbound-guard";
-export { SEARCH_QUERY_MAX_CHARS } from "./security/outbound-match";
+export { SEARCH_QUERY_MAX_CHARS, queryShapeProblem } from "./security/outbound-match";
 export { attachedTextsOf, hasNonTextUserPart, userTextOf } from "./runtime/egress-guard";
 export { isPrivateHostname, isPrivateIpAddress, isPrivateIpLiteral, parseIpAddress } from "./security/ip-range";
 export type { IpAddress } from "./security/ip-range";

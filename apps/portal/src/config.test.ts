@@ -445,4 +445,55 @@ describe("Postgres TLS enforcement in production", () => {
       }),
     ).not.toThrow();
   });
+
+  /**
+   * The Kubernetes base runs the same bundled Postgres the compose file does, under the Service
+   * name `nultron-portal-db` (webapp-deploy/k8s/base/postgres.yaml), and the portal pod's DSNs in
+   * portal.yaml carry no sslmode. In-cluster plaintext is the designed transport there exactly as
+   * on the compose bridge network, so the same exception applies — and only to that exact host.
+   */
+  it("allows the in-kubernetes nultron-portal-db without sslmode in production", () => {
+    for (const dsn of [
+      "postgres://portal_app_login:pw@nultron-portal-db:5432/tokotoken_portal",
+      "postgres://portal:pw@nultron-portal-db:5432/tokotoken_portal",
+    ]) {
+      expect(() =>
+        loadConfig({
+          ...PROD_BASE,
+          PORTAL_DATABASE_URL: dsn,
+          PORTAL_MIGRATE_DATABASE_URL: dsn,
+        }),
+      ).not.toThrow();
+    }
+  });
+
+  it("holds nultron-portal-db to the compose service's own rules: no explicit downgrade, TLS modes accepted", () => {
+    for (const sslmode of ["disable", "allow", "prefer"]) {
+      const problems = problemsOf({
+        ...PROD_BASE,
+        PORTAL_DATABASE_URL: `postgres://portal_app:pw@nultron-portal-db:5432/tokotoken_portal?sslmode=${sslmode}`,
+        PORTAL_MIGRATE_DATABASE_URL: "postgres://portal:pw@nultron-portal-db:5432/tokotoken_portal",
+      });
+      expect(problems.some((p) => p.includes("PORTAL_DATABASE_URL")), sslmode).toBe(true);
+    }
+
+    expect(() =>
+      loadConfig({
+        ...PROD_BASE,
+        PORTAL_DATABASE_URL: "postgres://portal_app:pw@nultron-portal-db:5432/tokotoken_portal?sslmode=verify-full",
+        PORTAL_MIGRATE_DATABASE_URL: "postgres://portal:pw@nultron-portal-db:5432/tokotoken_portal?sslmode=verify-full",
+      }),
+    ).not.toThrow();
+  });
+
+  it("does not extend the bundled exception to hosts that merely start with the service name", () => {
+    for (const host of ["nultron-portal-db.example.com", "portal-db.example.com", "nultron-portal-db-extra"]) {
+      const problems = problemsOf({
+        ...PROD_BASE,
+        PORTAL_DATABASE_URL: `postgres://portal_app:pw@${host}:5432/tokotoken_portal`,
+        PORTAL_MIGRATE_DATABASE_URL: "postgres://owner:pw@db.example.com:5432/tokotoken_portal?sslmode=verify-full",
+      });
+      expect(problems.some((p) => p.includes("must require TLS")), host).toBe(true);
+    }
+  });
 });

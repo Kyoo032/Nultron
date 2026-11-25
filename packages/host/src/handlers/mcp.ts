@@ -79,6 +79,12 @@ export async function handlePostMcpConnector(
     if (!activeToken) {
       throw new ApiError("invalid_request", "Access token is required to connect this MCP source.", 400);
     }
+    // A previously saved Bearer token is credentials for the endpoint it was typed for only. Pointing
+    // the connector at a new URL reuses it silently otherwise — including in the verification call
+    // below — so the change is refused before any outbound request unless a fresh token came with it.
+    if (existing && tokenToSave === undefined && validatedUrl !== existing.endpointUrl) {
+      throw new ApiError("invalid_request", "Enter a new access token when changing the MCP endpoint URL.", 400);
+    }
 
     const policy = normalizeMcpPolicy(body.policy ?? existing?.policy);
     let discoveredTools: string[] | undefined;
@@ -129,12 +135,13 @@ export async function handlePostMcpConnectorTest(
     const client = new McpHttpClient(connectorId, connection.endpointUrl, connection.token, fetchImpl);
     await client.initialize();
     const safeTools = await client.listSafeTools();
-    const connector = mcpStore().saveConnection(tenant, {
-      id: connectorId,
-      endpointUrl: connection.endpointUrl,
-      policy: connection.policy,
-      discoveredTools: safeTools,
-    });
+    // Only the discovered tools are written back, re-reading the config inside the write: the
+    // `connection` snapshot above is stale by now, and saving its policy back would undo an
+    // owner who disabled or reconnected the connector while this test was in flight.
+    mcpStore().updateDiscoveredTools(tenant, connectorId, safeTools, connection.endpointUrl);
+    const connector = mcpStore()
+      .listViews(tenant)
+      .find((view) => view.id === connectorId);
     return jsonOk({ ok: true, connector, safeTools, boundaries: MCP_BOUNDARY_RULES });
   } catch (error) {
     return jsonError(error);

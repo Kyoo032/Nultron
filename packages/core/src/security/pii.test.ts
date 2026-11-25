@@ -125,6 +125,73 @@ describe("Indonesian identifiers", () => {
   });
 });
 
+describe("account cue regressions", () => {
+  it("masks destination accounts while leaving financial figures after cue-like words visible", () => {
+    for (const line of [
+      "Set the budget to 125500123 rupiah",
+      "Set the budget to 125500123",
+      "Pay 125500123 rupiah to the supplier",
+      "Pay 125500123",
+      "BCA dividends were 125500123 rupiah",
+      "BCA dividends were 125500123",
+      "Transfer ke 125500123 rupiah",
+      "Rekening 125500123 rupiah",
+      "Transfer 125500123",
+      "Send 125500123 dollars",
+      "Transfer 125500123 juta",
+    ]) {
+      expect({ line, masked: maskPii(line) }).toEqual({ line, masked: line });
+    }
+
+    expect(maskPii("Pay to 125500123")).toBe("Pay to [account]");
+    expect(maskPii("BCA account 125500123")).toBe("BCA account [account]");
+    expect(maskPii("Transfer 125500123 rupiah ke 987654321")).toBe("Transfer 125500123 rupiah ke [account]");
+  });
+
+  it("masks accounts across one wrapped newline but not after weak line endings", () => {
+    for (const [line, masked] of [
+      ["Transfer ke:\n1234567890", "Transfer ke:\n[account]"],
+      ["Transfer ke BCA:\n1234567890", "Transfer ke BCA:\n[account]"],
+      ["Transfer ke rekening BCA:\n1234567890", "Transfer ke rekening BCA:\n[account]"],
+      ["No. Rekening:\n1234567890", "No. Rekening:\n[account]"],
+      ["BCA account\n1234567890", "BCA account\n[account]"],
+      ["transfer Rp 1.500.000 ke\n1234567890", "transfer Rp 1.500.000 ke\n[account]"],
+    ]) {
+      expect({ line, masked: maskPii(line) }).toEqual({ line, masked });
+    }
+
+    for (const line of [
+      "Set the budget to\n1234567890",
+      "Revenue grew to\n1234567890",
+      "Invoice total:\n1234567890",
+      "Pay\n1234567890",
+      "BCA dividends were\n1234567890",
+      "BCA\n1234567890",
+      "Transfer ke rekening BCA:\n\n1234567890",
+    ]) {
+      expect({ line, masked: maskPii(line) }).toEqual({ line, masked: line });
+    }
+  });
+
+  it("masks the abbreviated ke rek transfer cue", () => {
+    expect(maskPii("ke rek 1234567890")).toBe("ke rek [account]");
+    expect(maskPii("ke rek. 1234567890")).toBe("ke rek. [account]");
+    expect(maskPii("ke reksa 1234567890")).toBe("ke reksa 1234567890");
+    expect(maskPii("ke rek 12345678")).toBe("ke rek 12345678");
+  });
+
+  it("masks transfer accounts before sentence punctuation without touching decimal or grouped figures", () => {
+    expect(maskPii("Transfer ke 123456789.")).toBe("Transfer ke [account].");
+    expect(maskPii("Transfer ke 123456789,")).toBe("Transfer ke [account],");
+    expect(maskPii("Wire to 123456789.")).toBe("Wire to [account].");
+    expect(maskPii("Transfer ke 123456789.50")).toBe("Transfer ke 123456789.50");
+    expect(maskPii("Transfer ke 123456789,50")).toBe("Transfer ke 123456789,50");
+    expect(maskPii("Transfer ke rekening 123456789.50")).toBe("Transfer ke rekening 123456789.50");
+    expect(maskPii("Rekening 123456789,50")).toBe("Rekening 123456789,50");
+    expect(maskPii("Transfer ke 123,456,789")).toBe("Transfer ke 123,456,789");
+  });
+});
+
 describe("money is never masked", () => {
   // F: `1.250.000.000.000` came back as `[phone]` and a Luhn-lucky bare total as `[card]`. Both
   // rewrote a figure a Finance brief is built from, which is the one thing masking may not do.
@@ -272,6 +339,34 @@ describe("free-text person name detection", () => {
     ]) {
       expect({ safe, masked: maskPii(safe) }).toEqual({ safe, masked: safe });
     }
+  });
+
+  it("separates explicit self-introductions from bare product subjects", () => {
+    for (const line of [
+      "Perkenalkan Microsoft Word kepada pemula",
+      "Perkenalkan Microsoft Word dari Microsoft",
+      "Perkenalkan Microsoft Word sebagai alat",
+      "Kenalkan Microsoft Word dari tim produk",
+      "Perkenalkan Adobe Photoshop",
+    ]) {
+      expect({ line, masked: maskPii(line) }).toEqual({ line, masked: line });
+    }
+
+    expect(maskPii("Perkenalkan, saya Dewi Lestari")).toBe("Perkenalkan, saya [name]");
+    expect(maskPii("Perkenalkan nama saya Dewi Lestari")).toBe("Perkenalkan nama saya [name]");
+    expect(maskPii("Perkenalkan saya Dewi Lestari")).toBe("Perkenalkan saya [name]");
+    expect(maskPii("Kenalkan Andi Wijaya dari tim produk")).toBe("Kenalkan [name] dari tim produk");
+    expect(maskPii("Perkenalkan Budi Santoso sebagai manajer")).toBe("Perkenalkan [name] sebagai manajer");
+    expect(maskPii("Perkenalkan Budi Santoso dari PT Maju")).toBe("Perkenalkan [name] dari PT Maju");
+    expect(maskPii("Perkenalkan Pak Budi Santoso")).toBe("Perkenalkan Pak [name]");
+  });
+
+  it("masks the exact repeated-space span in a self-introduced name", () => {
+    const text = "nama saya Budi   Santoso";
+    expect(scanPii(text)).toEqual([{ kind: "name", match: "Budi   Santoso", index: "nama saya ".length }]);
+    expect(maskPii(text)).toBe("nama saya [name]");
+    expect(maskPii("my name is Rizky   Pratama")).toBe("my name is [name]");
+    expect(maskPii("nama saya budi   santoso")).toBe("nama saya budi   santoso");
   });
 
   it("stops before stoplist words after a real name", () => {

@@ -4,8 +4,9 @@
  * One wrap key (`AGENTFORGE_SECRETS_KEY`, or `.master-key` on a desk) encrypts every tenant's
  * `settings` payload, session refresh tokens (`auth_sessions.refresh_sealed`), and all at-rest
  * encrypted columns/objects (`messages.content`, `tool_invocations.input/output`,
- * `agent_versions.system_prompt`, `artifacts.body`, `threads.title`, `customer_conversations`,
- * `customer_messages`, and `desk_files` objects) through `packages/core/src/crypto/envelope.ts`.
+ * `agent_versions.system_prompt`, `artifacts.body`, `threads.title`, `knowledge_sources.name` on
+ * thread cards, `knowledge_graph_nodes.label`, `customer_conversations`, `customer_messages`, and
+ * `desk_files` objects) through `packages/core/src/crypto/envelope.ts`.
  *
  * **Decrypt everything before writing anything.** The rotation is a two-phase commit:
  * every sealed payload across every store is opened with the old key and re-sealed in memory first,
@@ -169,6 +170,8 @@ export type EncryptedStoreRotationCounts = {
   customerConversations: number;
   customerMessages: number;
   deskFiles: number;
+  knowledgeSources: number;
+  knowledgeGraphNodes: number;
 };
 
 export type RotateWrapKeyResult = {
@@ -306,6 +309,7 @@ type SingleColumnTableSpec = {
   table: string;
   column: string;
   countKey: keyof EncryptedStoreRotationCounts;
+  where?: string;
 };
 
 const SINGLE_COLUMN_TABLES: readonly SingleColumnTableSpec[] = [
@@ -313,6 +317,8 @@ const SINGLE_COLUMN_TABLES: readonly SingleColumnTableSpec[] = [
   { table: "agent_versions", column: "system_prompt", countKey: "agentVersions" },
   { table: "artifacts", column: "body", countKey: "artifacts" },
   { table: "threads", column: "title", countKey: "threads" },
+  { table: "knowledge_sources", column: "name", countKey: "knowledgeSources", where: "origin_kind = 'thread'" },
+  { table: "knowledge_graph_nodes", column: "label", countKey: "knowledgeGraphNodes" },
   { table: "customer_messages", column: "text", countKey: "customerMessages" },
 ];
 
@@ -418,6 +424,8 @@ export function rotateWrapKey(input: RotateWrapKeyInput): RotateWrapKeyResult {
       customerConversations: 0,
       customerMessages: 0,
       deskFiles: 0,
+      knowledgeSources: 0,
+      knowledgeGraphNodes: 0,
     };
 
     if (sql) {
@@ -425,8 +433,9 @@ export function rotateWrapKey(input: RotateWrapKeyInput): RotateWrapKeyResult {
         if (!tableExists(sql, spec.table)) {
           continue;
         }
+        const where = spec.where ? ` WHERE ${spec.where}` : "";
         const rows = sql
-          .prepare(`SELECT id, ${spec.column} AS val FROM ${spec.table} ORDER BY id`)
+          .prepare(`SELECT id, ${spec.column} AS val FROM ${spec.table}${where} ORDER BY id`)
           .all() as Array<{ id: string; val: unknown }>;
         for (const row of rows) {
           const next = resealEnvelopeString(row.val, oldKey, newKey, `${spec.table}(${row.id}).${spec.column}`);

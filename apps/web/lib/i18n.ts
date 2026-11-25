@@ -247,12 +247,16 @@ function interpolate(template: string, vars?: Record<string, string | number>): 
   });
 }
 
-/** Single UI translator. Missing `id` keys fall back to English; missing English returns the key. */
-export function t(key: string, vars?: Record<string, string | number>): string {
-  const locale = getLocale();
+/** Translate for one explicit locale. Missing `id` keys fall back to English; missing English returns the key. */
+export function translate(locale: AppLocale, key: string, vars?: Record<string, string | number>): string {
   const value = lookup(locale, key) ?? (locale === "en" ? undefined : lookup("en", key));
   if (value == null) {
     return key;
   }
   return interpolate(value, vars);
+}
+
+/** Single UI translator for the desk's current locale. */
+export function t(key: string, vars?: Record<string, string | number>): string {
+  return translate(getLocale(), key, vars);
 }

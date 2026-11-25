@@ -1,7 +1,7 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 // Isolation: this file points the SQLite data dir, media root, and starter media dir at
 // temp folders BEFORE any host module is imported, so nothing touches the operator's desk.
@@ -29,6 +29,44 @@ describe("starter media seeding (offline)", () => {
   it("resolves the starter dir from the env override", async () => {
     const { starterMediaDir } = await import("./starter-media");
     expect(starterMediaDir()).toBe(path.resolve(startersDir));
+  });
+
+  it("uses assets first, falls back to legacy clips, and lets the env override both", async () => {
+    const { resolveStarterMediaFile } = await import("./starter-media");
+    const root = mkdtempSync(path.join(tmpdir(), "agentforge-starter-resolution-"));
+    const assetsDir = path.join(root, "assets", "starters");
+    const legacyDir = path.join(root, "apps", "desktop", "resources", "starters");
+    const envDir = path.join(root, "env-starters");
+    mkdirSync(assetsDir, { recursive: true });
+    mkdirSync(legacyDir, { recursive: true });
+    mkdirSync(envDir, { recursive: true });
+    writeFileSync(path.join(assetsDir, "promo-skyline-16x9.mp4"), "assets copy");
+    writeFileSync(path.join(legacyDir, "promo-skyline-16x9.mp4"), "legacy copy");
+    writeFileSync(path.join(legacyDir, "talk-20s-16x9.mp4"), "legacy only");
+    mkdirSync(path.join(assetsDir, "talk-invalid-16x9.mp4"));
+    writeFileSync(path.join(legacyDir, "talk-invalid-16x9.mp4"), "valid legacy copy");
+
+    const previousEnv = process.env.AGENTFORGE_STARTER_MEDIA_DIR;
+    const cwd = vi.spyOn(process, "cwd").mockReturnValue(root);
+    try {
+      delete process.env.AGENTFORGE_STARTER_MEDIA_DIR;
+      expect(resolveStarterMediaFile("promo-skyline-16x9.mp4")).toMatchObject({ dir: assetsDir, problem: null });
+      expect(resolveStarterMediaFile("talk-20s-16x9.mp4")).toMatchObject({ dir: legacyDir, problem: null });
+      expect(resolveStarterMediaFile("talk-invalid-16x9.mp4")).toMatchObject({ dir: assetsDir, problem: "not a file" });
+
+      process.env.AGENTFORGE_STARTER_MEDIA_DIR = envDir;
+      expect(resolveStarterMediaFile("talk-20s-16x9.mp4").problem).toBe("missing");
+      writeFileSync(path.join(envDir, "talk-20s-16x9.mp4"), "env copy");
+      expect(resolveStarterMediaFile("talk-20s-16x9.mp4")).toMatchObject({ dir: envDir, problem: null });
+    } finally {
+      cwd.mockRestore();
+      if (previousEnv === undefined) {
+        delete process.env.AGENTFORGE_STARTER_MEDIA_DIR;
+      } else {
+        process.env.AGENTFORGE_STARTER_MEDIA_DIR = previousEnv;
+      }
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("lays bundled clips on v1 after the title and the music bed on a1", async () => {

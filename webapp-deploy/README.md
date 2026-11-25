@@ -434,8 +434,8 @@ then open `https://<NULTRON_DOMAIN>`, press sign in, enter the first owner's use
 ### Backups and the restore drill
 
 Two things hold state: the app's SQLite and files in the `nultron-data` volume, and the portal's Postgres in
-`portal-pgdata`. `scripts/backup.sh` takes both in one run, each encrypted with `BACKUP_KEY` (AES-256-CBC,
-PBKDF2) before it leaves the box, and uploads both to the COS backup bucket:
+`portal-pgdata`. `scripts/backup.sh` takes both in one run, each encrypted with `BACKUP_KEY` (AES-256-GCM,
+scrypt, since SR-171) before it leaves the box, and uploads both to the COS backup bucket:
 
 - `nultron-data-<stamp>.tar.gz.enc`: a consistent SQLite snapshot plus `/data`, as before.
 - `nultron-portal-<stamp>.dump.enc`: `pg_dump -Fc` of `tokotoken_portal`, taken as the schema owner over the
@@ -676,9 +676,12 @@ uploads the result to the COS backup bucket.
   through `better-sqlite3` - one committed transaction, compacted, with no `-wal`/`-shm`
   of its own. `backup.sh` checks for `sqlite3` first and uses `.backup` if a future image
   ever adds it; both do the same job.
-- **Encryption (spec S6).** `openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_KEY`,
-  on this host, before the bytes leave it. A leaked bucket is then not a leaked database.
-  The script refuses to run with an empty `BACKUP_KEY` rather than writing plaintext.
+- **Encryption (spec S6).** chunked AES-256-GCM with scrypt key derivation, by
+  `scripts/aead-crypt.mjs` (SR-171), on this host, before the bytes leave it. A leaked bucket is
+  then not a leaked database, and a tampered or truncated ciphertext fails authentication instead
+  of decrypting into garbage. The script refuses to run with an empty `BACKUP_KEY` rather than
+  writing plaintext. Backups from before SR-171 are `openssl enc -aes-256-cbc -pbkdf2`; the
+  restore scripts tell the two apart by the file's first 8 bytes and still read both.
 - **Verification.** Every run decrypts and lists the archive it just wrote. Set
   `BACKUP_VERIFY=0` to skip it on a very large volume.
 - **Upload.** `coscli cp` if `coscli` is installed, else `tccli cos put-object`, else the
@@ -1158,7 +1161,7 @@ matter:
 | `DATABASE_URL` | Leave unset. SQLite under the data dir. A `postgres://` URL throws on boot — Postgres is an open decision, not a supported mode |
 | `USE_SSM` | `1` on the CVM: `deploy.sh` fetches the wrap key and `BACKUP_KEY` from Secrets Manager with the instance role and exports them for that one command. `0` reads them from `.env` (local and staging only) |
 | `SSM_SECRET_AGENTFORGE_SECRETS_KEY` / `SSM_SECRET_BACKUP_KEY` | Secret **names** in SSM, never values |
-| `BACKUP_KEY` | Passphrase for `openssl enc` over the backup tarball (spec S6). Separate from the wrap key. Empty in `.env` on the server |
+| `BACKUP_KEY` | Passphrase for the backup tarball's AES-256-GCM encryption (spec S6; pre-SR-171 backups used `openssl enc`). Separate from the wrap key. Empty in `.env` on the server |
 | `TENCENT_REGION` | `ap-jakarta`. SSM, COS and the CVM. Personal data stays in-country; `ap-singapore` is the backup replica only |
 | `COS_BACKUP_BUCKET` / `COS_MEDIA_BUCKET` | `<name>-<appid>` as the console shows them. Both private, both SSE-KMS |
 | `AGENTFORGE_SERVER`, `AGENTFORGE_TRUSTED_ORIGINS`, `BIND_HOST`, `AGENTFORGE_PORTAL_URL`, `AGENTFORGE_MAX_FFMPEG`, `AGENTFORGE_MAX_SQL_WORKERS`, `AGENTFORGE_JOB_QUEUE_TIMEOUT_MS`, `AGENTFORGE_LOG_LEVEL`, `AGENTFORGE_RATE_IP_RPM`, `AGENTFORGE_RATE_SESSION_RPM`, `AGENTFORGE_RATE_AUTH_RPM` | Hosted mode (Phase 1 and 2). See the comments in `.env.example`; the switch is `AGENTFORGE_SERVER=1` |

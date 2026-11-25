@@ -36,7 +36,9 @@ export function AgentChatPane({ agentMode, threadId }: Props) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [teamPanelOpen, setTeamPanelOpen] = useState(false);
   const [detailsSlot, setDetailsSlot] = useState<HTMLElement | null>(null);
-  const { sessions: teamSessions } = useThreadSubagents(agentMode === "chat" ? threadId : undefined);
+  const { sessions: teamSessions } = useThreadSubagents(agentMode === "chat" ? threadId : undefined, {
+    open: teamPanelOpen,
+  });
   const activeTeamCount = teamSessions.filter((item) => item.status === "running").length;
   const agent = agents.find((entry) => entry.id === agentMode);
   // An agent with no row cannot hold a thread: the host has not hired it for this desk.

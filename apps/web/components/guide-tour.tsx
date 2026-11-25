@@ -13,7 +13,8 @@ import {
   type GuideRect,
 } from "@/lib/guide-placement";
 import { dispatchGuide, getGuideSnapshot, subscribeGuide } from "@/lib/guide-store";
-import { getLocale, t } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
+import { useLocale } from "@/lib/locale-context";
 import { useProductBrand } from "@/lib/product-brand";
 
 /**
@@ -123,6 +124,7 @@ type OverlayProps = {
 
 function GuideOverlay({ state, visibleModes }: OverlayProps) {
   const { productName } = useProductBrand();
+  const locale = useLocale();
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [measure, setMeasure] = useState<Measure>(UNMEASURED);
   const offer = state.kind === "offered";
@@ -131,10 +133,8 @@ function GuideOverlay({ state, visibleModes }: OverlayProps) {
   const total = GUIDE_STEPS.length;
 
   const context = useMemo(
-    () =>
-      guideContextFor(visibleModes, (id) => t(`rail.${id}`), listFormatter(getLocale())),
-    // The locale is frozen for the life of a mount, and `Shell` remounts on a locale change.
-    [visibleModes],
+    () => guideContextFor(visibleModes, (id) => t(`rail.${id}`), listFormatter(locale)),
+    [visibleModes, locale],
   );
   const title = offer ? t("guide.offer.title") : step ? t(step.titleKey) : "";
   const bodyCopy = step ? step.body(context) : null;

@@ -79,12 +79,23 @@ function extractMcpText(result: unknown): string {
   return JSON.stringify(result);
 }
 
+/**
+ * Drop a response body nobody is going to read. Awaiting the cancel matters: the pinned dispatcher
+ * is closed right after this, and `close()` deadlocks while a request still has an unconsumed body.
+ */
+async function cancelUnreadBody(response: Response): Promise<void> {
+  await response.body?.cancel().catch(() => undefined);
+}
+
 export class McpHttpClient {
   private readonly endpoint: URL;
   private readonly token: string;
   private readonly connectorId: McpConnectorId;
   private readonly fetchImpl: typeof fetch;
   private nextId = 1;
+  /** Issued by the server on `initialize` (Streamable HTTP); echoed on every later POST. */
+  private sessionId: string | null = null;
+  private initialized = false;
 
   constructor(connectorId: McpConnectorId, endpointUrl: string, token: string, fetchImpl: typeof fetch = fetch) {
     this.connectorId = connectorId;
@@ -93,25 +104,28 @@ export class McpHttpClient {
     this.fetchImpl = fetchImpl;
   }
 
-  private async rpc(method: string, params: Record<string, unknown>): Promise<unknown> {
+  /**
+   * One POST to the endpoint, with the response body fully read (or cancelled) before the pinned
+   * dispatcher is closed. Closing the dispatcher with the body unread — the order this used to
+   * have — deadlocks `close()` against the unconsumed response, so every branch below either reads
+   * the body in full inside the `try` or cancels it before throwing; the `finally` runs only after.
+   */
+  private async post(payload: string): Promise<{ status: number; headers: Headers; text: string }> {
     const spec = MCP_CONNECTOR_SPECS[this.connectorId];
-    const body = JSON.stringify({
-      jsonrpc: "2.0",
-      id: this.nextId++,
-      method,
-      params,
-    });
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       Accept: "application/json",
       Authorization: `Bearer ${this.token}`,
       ...(spec.extraHeaders ?? {}),
     };
+    if (this.sessionId) {
+      headers["Mcp-Session-Id"] = this.sessionId;
+    }
     const allowLoopbackDev =
       gatewayUrlOverrideAllowed() && !isServerMode() && isLoopbackHost(this.endpoint.hostname);
-    let response: Response;
     let dispatcher: ReturnType<typeof pinnedAgent> | undefined;
     try {
+      let response: Response;
       if (this.fetchImpl === fetch && !allowLoopbackDev) {
         // Resolve DNS and pin the verified public IP on an undici Agent to prevent DNS rebinding / SSRF.
         const addresses = await resolvePublicAddresses(this.endpoint.hostname);
@@ -121,7 +135,7 @@ export class McpHttpClient {
         response = (await undiciFetch(this.endpoint.toString(), {
           method: "POST",
           headers,
-          body,
+          body: payload,
           redirect: "manual",
           signal: AbortSignal.timeout(MCP_LIMITS.timeoutMs),
           ...(dispatcher ? { dispatcher } : {}),
@@ -130,35 +144,58 @@ export class McpHttpClient {
         response = await this.fetchImpl(this.endpoint.toString(), {
           method: "POST",
           headers,
-          body,
+          body: payload,
           redirect: "manual",
           signal: AbortSignal.timeout(MCP_LIMITS.timeoutMs),
         });
       }
+
+      if (response.status >= 300 && response.status < 400) {
+        await cancelUnreadBody(response);
+        throw new ApiError("mcp_redirect_blocked", `${spec.label} MCP endpoint attempted a redirect, which is blocked.`, 502);
+      }
+      if (response.status === 401 || response.status === 403) {
+        await cancelUnreadBody(response);
+        throw new ApiError("mcp_forbidden", `${spec.label} MCP server rejected the credentials (HTTP ${response.status}).`, 403);
+      }
+      if (!response.ok) {
+        await cancelUnreadBody(response);
+        throw new ApiError("mcp_upstream_error", `${spec.label} MCP server answered HTTP ${response.status}.`, 502);
+      }
+
+      const text = await readBoundedText(response, MCP_LIMITS.maxResponseBytes);
+      return { status: response.status, headers: response.headers, text };
     } catch (error) {
       if (error instanceof ApiError) {
         throw error;
       }
       const detail = redactMcpToken(error instanceof Error ? error.message : "MCP transport failed", this.token);
-      log.warn("mcp_call_failed", { connector: this.connectorId, method, detail });
+      log.warn("mcp_call_failed", { connector: this.connectorId, detail });
       throw new ApiError("mcp_unreachable", `Could not reach ${spec.label} MCP server: ${detail}`, 502);
     } finally {
       if (dispatcher) {
         await dispatcher.close().catch(() => undefined);
       }
     }
+  }
 
-    if (response.status >= 300 && response.status < 400) {
-      throw new ApiError("mcp_redirect_blocked", `${spec.label} MCP endpoint attempted a redirect, which is blocked.`, 502);
+  private async rpcRequest(
+    method: string,
+    params: Record<string, unknown>,
+  ): Promise<{ result: unknown; headers: Headers }> {
+    const spec = MCP_CONNECTOR_SPECS[this.connectorId];
+    if (method !== "initialize") {
+      // The Streamable HTTP handshake must complete before any other method: a stateful server
+      // answers `tools/list` / `tools/call` with an error until `notifications/initialized` arrives.
+      await this.ensureInitialized();
     }
-    if (response.status === 401 || response.status === 403) {
-      throw new ApiError("mcp_forbidden", `${spec.label} MCP server rejected the credentials (HTTP ${response.status}).`, 403);
-    }
-    if (!response.ok) {
-      throw new ApiError("mcp_upstream_error", `${spec.label} MCP server answered HTTP ${response.status}.`, 502);
-    }
-
-    const text = await readBoundedText(response, MCP_LIMITS.maxResponseBytes);
+    const payload = JSON.stringify({
+      jsonrpc: "2.0",
+      id: this.nextId++,
+      method,
+      params,
+    });
+    const { headers, text } = await this.post(payload);
     let parsed: JsonRpcSuccess;
     try {
       parsed = JSON.parse(text) as JsonRpcSuccess;
@@ -169,15 +206,48 @@ export class McpHttpClient {
       const detail = redactMcpToken(parsed.error.message ?? "MCP error", this.token);
       throw new ApiError("mcp_rpc_error", `${spec.label} MCP error: ${detail}`, 502);
     }
-    return parsed.result;
+    return { result: parsed.result, headers };
   }
 
+  private async rpc(method: string, params: Record<string, unknown>): Promise<unknown> {
+    return (await this.rpcRequest(method, params)).result;
+  }
+
+  private async ensureInitialized(): Promise<void> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+  }
+
+  /**
+   * The Streamable HTTP handshake: `initialize`, then the required `notifications/initialized`
+   * notification. When the server issues a session id it is captured here — `Headers.get` is
+   * case-insensitive per the fetch spec — and echoed as `Mcp-Session-Id` on every later POST.
+   */
   async initialize(): Promise<void> {
-    await this.rpc("initialize", {
+    if (this.initialized) {
+      return;
+    }
+    const { headers } = await this.rpcRequest("initialize", {
       protocolVersion: "2024-11-05",
       capabilities: {},
       clientInfo: { name: "nultron", version: "1.0.0" },
     });
+    const sessionId = headers.get("mcp-session-id");
+    if (sessionId) {
+      this.sessionId = sessionId;
+    }
+    await this.notifyInitialized();
+    this.initialized = true;
+  }
+
+  /**
+   * A JSON-RPC notification carries no `id` and the server answers 200/202/204 with no JSON-RPC
+   * body to parse, so the response text is deliberately not parsed here.
+   */
+  private async notifyInitialized(): Promise<void> {
+    const payload = JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" });
+    await this.post(payload);
   }
 
   /** Lists tools exposed by the server and filters strictly to the connector's read-only allowlist. */
@@ -202,7 +272,13 @@ export class McpHttpClient {
       );
     }
     const result = await this.rpc("tools/call", { name: action, arguments: args });
-    const rawText = redactMcpToken(extractMcpText(result), this.token);
+    const extracted = extractMcpText(result);
+    if (result && typeof result === "object" && (result as { isError?: unknown }).isError === true) {
+      // A tool-level failure is not a successful read: surface it as an upstream error so the
+      // caller reports `fetch_failed` instead of handing the model an error page as content.
+      throw new ApiError("mcp_tool_error", redactMcpToken(extracted, this.token) || "MCP tool returned an error.", 502);
+    }
+    const rawText = redactMcpToken(extracted, this.token);
     const clipped =
       rawText.length > MCP_LIMITS.maxResultChars
         ? `${rawText.slice(0, MCP_LIMITS.maxResultChars - 1).trimEnd()}…`

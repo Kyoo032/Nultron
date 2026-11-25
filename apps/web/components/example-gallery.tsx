@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import type { LibraryEntry, LibraryMode } from "@agentforge/core/templates";
+import { useLocale } from "@/lib/locale-context";
 import { galleryChrome, localizedLibrary } from "@/lib/ui-copy";
 
 type ExampleGalleryProps = {
@@ -10,8 +11,9 @@ type ExampleGalleryProps = {
 };
 
 export function ExampleGallery({ mode, onSelect }: ExampleGalleryProps) {
-  const entries = useMemo(() => localizedLibrary(mode), [mode]);
-  const chrome = useMemo(() => galleryChrome(mode), [mode]);
+  const locale = useLocale();
+  const entries = useMemo(() => localizedLibrary(mode, locale), [mode, locale]);
+  const chrome = useMemo(() => galleryChrome(mode, locale), [mode, locale]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = entries.find((entry) => entry.exampleId === selectedId) ?? null;
 

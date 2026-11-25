@@ -22,6 +22,7 @@ import { WorkingStatus } from "@/components/working-status";
 import { apiFetch, mediaSrc } from "@/lib/api-client";
 import { isGatewayBlockedText, messageUnlessBlocked } from "@/lib/gateway-blocked";
 import { t } from "@/lib/i18n";
+import { useLocale } from "@/lib/locale-context";
 import { mediaPriceHints, videoEstimateView } from "@/lib/media-estimate";
 import {
   adjustedNote,
@@ -91,7 +92,8 @@ export function VideosStudio() {
   const [landed, setLanded] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const starters = useMemo(() => localizedLibrary("videos"), []);
+  const locale = useLocale();
+  const starters = useMemo(() => localizedLibrary("videos", locale), [locale]);
   const loadSeq = useRef(0);
   const load = useCallback(async () => {
     const seq = ++loadSeq.current;

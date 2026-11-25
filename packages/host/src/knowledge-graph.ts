@@ -4,7 +4,7 @@ import type { KnowledgeMap, TenantContext } from "@agentforge/core";
 import { sanitizeSourceName } from "./knowledge-text";
 import { sweepOrphanGraph } from "./knowledge-graph-prune";
 import { visibleGraphNodes } from "./knowledge-visibility";
-import { openThreadTitle } from "./thread-title-seal";
+import { openThreadTitle, sealThreadTitle } from "./thread-title-seal";
 import { log } from "./log";
 
 /**
@@ -53,6 +53,11 @@ function label(value: string, fallback: string): string {
   return (sanitizeSourceName(value) || fallback).slice(0, LABEL_MAX);
 }
 
+/** Labels can name a person's chat or work card, so the row keeps ciphertext and readers open it. */
+function storedLabel(value: string, fallback: string): string {
+  return sealThreadTitle(label(value, fallback));
+}
+
 /** Stable id for a topic: the map is regenerated wholesale, so the id has to come from the title. */
 export function topicNodeId(workspaceId: string, title: string): string {
   const digest = createHash("sha1").update(`${workspaceId}\n${title.trim().toLowerCase()}`).digest("hex");
@@ -72,7 +77,7 @@ export function upsertNodes(tenant: TenantContext, nodes: readonly GraphNodeInpu
         node.id,
         tenant.workspaceId,
         node.kind,
-        label(node.label, node.id),
+        storedLabel(node.label, node.id),
         node.payload === undefined ? null : JSON.stringify(node.payload),
         updatedAt,
       );
@@ -342,13 +347,17 @@ function edgePool(tenant: TenantContext, limit: number): EdgeRow[] {
     .all(tenant.workspaceId, limit) as EdgeRow[];
 }
 
+function openNode(row: GraphNode): GraphNode {
+  return { ...row, label: openThreadTitle(row.label) };
+}
+
 function topNodes(tenant: TenantContext, limit: number): GraphNode[] {
   const ws = tenant.workspaceId;
   const view = visibleGraphNodes(tenant);
-  if (view) {
-    return sql.prepare(hostedGraphNodeQuery(view.with)).all(...view.params, ws, ws, ws, limit) as GraphNode[];
-  }
-  return sql.prepare(GRAPH_NODE_QUERY).all(ws, ws, ws, limit) as GraphNode[];
+  const rows = view
+    ? (sql.prepare(hostedGraphNodeQuery(view.with)).all(...view.params, ws, ws, ws, limit) as GraphNode[])
+    : (sql.prepare(GRAPH_NODE_QUERY).all(ws, ws, ws, limit) as GraphNode[]);
+  return rows.map(openNode);
 }
 
 /**

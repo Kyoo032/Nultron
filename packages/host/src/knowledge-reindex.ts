@@ -1,7 +1,8 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import { ApiError, maskPii, type TenantContext } from "@agentforge/core";
+import { ApiError, maskPii, openPayload, type TenantContext } from "@agentforge/core";
 import { sql } from "@agentforge/db";
+import { getLocalVaultKey } from "@agentforge/db/vault-key";
 import { extractText } from "./knowledge-extract";
 import { getKnowledgeModels, markSourceFailed, nextCreatedAt, type SourceOriginKind } from "./knowledge";
 import { embedTextsWithModel } from "./knowledge-embed";
@@ -10,7 +11,7 @@ import { CHUNK_OVERLAP, chunkKnowledgeText, ftsSourceFilter } from "./knowledge-
 import { andVisibleSource } from "./knowledge-visibility";
 import { tenantMediaRoot } from "./media-root";
 import { tenantDataDir } from "./tenant-paths";
-import { openThreadTitle, sealThreadTitle } from "./thread-title-seal";
+import { isSealedThreadTitle, sealThreadTitle } from "./thread-title-seal";
 import { log } from "./log";
 
 /**
@@ -60,7 +61,12 @@ const NO_TEXT = "No extractable text";
 
 type ReindexRow = {
   id: string;
+  /** Best-effort plaintext for outcomes and for re-sealing when the row is readable. */
   name: string;
+  /** The exact stored value, kept so an unreadable envelope is never sealed a second time. */
+  storedName: string;
+  /** Whether `name` may replace `storedName` on the rewrite. */
+  nameWritable: boolean;
   type: string;
   status: string;
   origin_kind: string | null;
@@ -83,6 +89,23 @@ function warn(what: string, error: unknown): void {
   log.warn("knowledge_reindex_step_failed", { step: what, detail: short(error) });
 }
 
+/**
+ * Open a thread card's stored name without turning a decrypt failure into a replacement value.
+ * Legacy plaintext is writable, so one re-index upgrades it to a sealed row. A sealed row that does
+ * not open is not: writing it again would seal the ciphertext itself and lose the title for good.
+ */
+function threadNameState(stored: string): { name: string; writable: boolean } {
+  if (!isSealedThreadTitle(stored)) {
+    return { name: stored, writable: true };
+  }
+  try {
+    const opened = openPayload<unknown>(JSON.parse(stored), getLocalVaultKey());
+    return typeof opened === "string" ? { name: opened, writable: true } : { name: stored, writable: false };
+  } catch {
+    return { name: stored, writable: false };
+  }
+}
+
 function sourceRow(tenant: TenantContext, sourceId: string): ReindexRow | null {
   try {
     // Hosted: a colleague's Chat card is not this person's to re-read, and the outcome of trying
@@ -97,9 +120,12 @@ function sourceRow(tenant: TenantContext, sourceId: string): ReindexRow | null {
     if (!row) {
       return null;
     }
+    const threadName = row.origin_kind === "thread" ? threadNameState(row.name) : { name: row.name, writable: true };
     return {
       ...row,
-      name: row.origin_kind === "thread" ? openThreadTitle(row.name) : row.name,
+      name: threadName.name,
+      storedName: row.name,
+      nameWritable: threadName.writable,
     };
   } catch (error) {
     warn(`${sourceId} could not be read`, error);
@@ -229,7 +255,8 @@ async function replaceSourceRows(tenant: TenantContext, row: ReindexRow, chunks:
   const { vectors, model: storedModel } = await embedTextsWithModel(chunks, models.embeddingModel, tenant);
   const createdAt = nextCreatedAt();
   const ws = tenant.workspaceId;
-  const storedName = row.origin_kind === "thread" ? sealThreadTitle(row.name) : row.name;
+  const storedName =
+    row.origin_kind === "thread" ? (row.nameWritable ? sealThreadTitle(row.name) : row.storedName) : row.name;
   const insertChunk = sql.prepare("INSERT INTO knowledge_chunks (source_id, workspace_id, body) VALUES (?, ?, ?)");
   const insertVector = sql.prepare(
     `INSERT INTO knowledge_vectors (id, workspace_id, source_id, chunk_index, body, embedding, model, created_at)
@@ -280,6 +307,7 @@ function recordFailure(tenant: TenantContext, row: ReindexRow, reason: string): 
         type: row.type,
         origin:
           row.origin_kind && row.origin_id ? { kind: row.origin_kind as SourceOriginKind, id: row.origin_id } : null,
+        preserveStoredName: row.origin_kind === "thread" && !row.nameWritable,
       },
       reason,
     );
@@ -290,6 +318,32 @@ function recordFailure(tenant: TenantContext, row: ReindexRow, reason: string): 
 }
 
 const WORK_CARD_HOST_HEADER_LINE = /^(?:Mode|Model|Pointer|File):\s/;
+
+/**
+ * Mask one contiguous run of user-written card text as one value. Host-generated header lines break
+ * the run and pass through unchanged; the lines around them keep their own context, so a value such
+ * as `Compare this total:\n3273…` still reaches the PII scanner with its money cue attached.
+ */
+function maskWorkCardPart(text: string): string {
+  const out: string[] = [];
+  let userLines: string[] = [];
+  const flushUserLines = () => {
+    if (userLines.length > 0) {
+      out.push(maskPii(userLines.join("\n")));
+      userLines = [];
+    }
+  };
+  for (const line of text.split("\n")) {
+    if (WORK_CARD_HOST_HEADER_LINE.test(line)) {
+      flushUserLines();
+      out.push(line);
+    } else {
+      userLines.push(line);
+    }
+  }
+  flushUserLines();
+  return out.join("\n");
+}
 
 /**
  * Mask PII in a reconstructed source body before re-chunking, storing, and embedding.
@@ -303,16 +357,9 @@ function maskReindexedBody(body: string, isWorkCard: boolean): string {
   }
   const split = body.indexOf("\n\n");
   if (split === -1) {
-    return body
-      .split("\n")
-      .map((line) => (WORK_CARD_HOST_HEADER_LINE.test(line) ? line : maskPii(line)))
-      .join("\n");
+    return maskWorkCardPart(body);
   }
-  const header = body
-    .slice(0, split)
-    .split("\n")
-    .map((line) => (WORK_CARD_HOST_HEADER_LINE.test(line) ? line : maskPii(line)))
-    .join("\n");
+  const header = maskWorkCardPart(body.slice(0, split));
   return `${header}\n\n${maskPii(body.slice(split + 2))}`;
 }
 

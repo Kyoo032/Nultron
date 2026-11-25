@@ -33,9 +33,9 @@
  *    the tree on a file one, with the same guard in front of both.
  * 5. **The job trees on local disk**, which are the bytes the object store does not hold: ffmpeg's
  *    scratch, knowledge uploads, dataset files, meeting recordings, legal matter files, channel
- *    state — and the tenant's own settings envelope and gate verdict on a deployment that still
- *    keeps them as files. The in-process caches go with them, because a key cached in this process
- *    would outlive the row it came from.
+ *    state, subagent session ledgers, MCP connector files — and the tenant's own settings envelope
+ *    and gate verdict on a deployment that still keeps them as files. The in-process caches go
+ *    with them, because a key cached in this process would outlive the row it came from.
  * 6. **The portal, best effort** (`./auth/portal-sign-out.ts`). The portal has no call that removes a
  *    company or a member, so the host signs each signed-in person out of the portal everywhere with
  *    the refresh token it held for them. It starts right after the purge and runs beside steps 4 and 5,
@@ -161,7 +161,7 @@ export type TenantResetDeps = {
  * Lane D's layout, read back: a hosted tenant's files live under `tenants/<id>/` inside each shared
  * root. The data directory itself covers the ffmpeg scratch, the knowledge uploads, the object
  * cache and — on a deployment that has not adopted the `tenant_state` rows — the settings envelope
- * and the gate verdict. The other four are the shared roots that are not the media root, which the
+ * and the gate verdict. The rest are the shared roots that are not the media root, which the
  * object store owns.
  *
  * Declared here rather than derived from `tenantJobRoots` because the two answer different
@@ -177,10 +177,15 @@ export function tenantPurgeSharedRoots(): string[] {
     path.join(dataDir, "meetings"),
     path.join(dataDir, "legal"),
     path.join(dataDir, "channels"),
+    // The delegation ledgers and the MCP connector configs are their own shared roots
+    // (`delegations/tenants/<id>`, `mcp/tenants/<id>`), not subtrees of the data-dir one: an
+    // erase that skips them leaves the company's subagent sessions and connector files on disk.
+    path.join(dataDir, "delegations"),
+    path.join(dataDir, "mcp"),
   ];
 }
 
-/** The same five roots, as the tenant-scoped directories they resolve to. */
+/** The same roots, as the tenant-scoped directories they resolve to. */
 export function tenantPurgeRoots(tenantId: string): string[] {
   return tenantPurgeSharedRoots().map((root) => tenantScopedRoot(root, tenantId));
 }

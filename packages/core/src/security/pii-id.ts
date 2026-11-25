@@ -148,7 +148,7 @@ const ACCOUNT_LABEL_PART =
   "(?:no\\.?\\s*rek(?:ening)?|nomor\\s*rek(?:ening)?|norek|rekening|a\\/c|acct\\.?|account(?:\\s*(?:no\\.?|number|#))?)";
 
 const ACCOUNT_LABELLED_RE = new RegExp(
-  `\\b(?:no\\.?\\s*rek(?:ening)?|nomor\\s*rek(?:ening)?|norek|rekening|a\\/c|acct\\.?|account\\s*(?:no\\.?|number|#))(?:\\s+${BANK_NAME_PART})?\\s*[:#=-]?\\s*(\\d[\\d\\s-]{6,23})(?!\\d)`,
+  `\\b(?:no\\.?[ \\t]*rek(?:ening)?|nomor[ \\t]*rek(?:ening)?|norek|rekening|a\\/c|acct\\.?|account[ \\t]*(?:no\\.?|number|#))(?:[ \\t]+${BANK_NAME_PART})?[ \\t]*[:#=-]?[ \\t]*(\\d[\\d\\s-]{6,23})(?!\\d)`,
   "gi",
 );
 
@@ -167,8 +167,18 @@ const BANK_GAP_CUE_RE = new RegExp(
   `\\b(?:${BANK_NAME_PART}|iban)[ \\t,:#=-]+(${BOUNDED_GAP_PART})$`,
   "i",
 );
+const TRANSFER_VERB_PART = "(?:transfer|trf|kirim|wire|remit|send|setor)";
+const PAYMENT_VERB_PART = "(?:bayar|pay)";
+const TRANSFER_ACTION_PART = `(?:${TRANSFER_VERB_PART}|${PAYMENT_VERB_PART})`;
+const TRANSFER_EVIDENCE_RE = new RegExp(
+  `\\b${TRANSFER_VERB_PART}\\b|\\b${PAYMENT_VERB_PART}[ \\t]+(?:ke|to)\\b`,
+  "i",
+);
 const TRANSFER_CUE_RE = new RegExp(
-  `(?:\\b(?:transfer|trf|kirim|wire|remit|send|setor|bayar|pay)(?:\\s+(?:ke|to|via|dari|from))?[ \\t,:#=-]+(${BOUNDED_GAP_PART})(?:ke|to)[ \\t,:#=-]*$|\\b(?:transfer|trf|kirim|wire|remit|send|setor|bayar|pay)(?:\\s+(?:ke|to|via|dari|from))?[ \\t,:#=-]+$|\\bvia\\s+(?:bank\\s+)?(?:ke|to|no\\.?|nomor)?[\\s:#=-]{0,20}$|\\b(?:ke|to)[ \\t,:#=-]+$)`,
+  `(?:\\b${TRANSFER_ACTION_PART}(?:[ \\t]+(?:ke|to|via|dari|from))?[ \\t,:#=-]+(${BOUNDED_GAP_PART})(?:ke|to)[ \\t,:#=-]*$` +
+    `|\\b${TRANSFER_ACTION_PART}[ \\t]+(?:ke|to|via|dari|from)[ \\t,:#=-]+$` +
+    `|\\bvia[ \\t]+(?:bank[ \\t]+)?(?:ke|to|no\\.?|nomor)?[ \\t,:#=-]{0,20}$` +
+    `|\\bke[ \\t]+rek\\.?[ \\t,:#=-]*$)`,
   "i",
 );
 const LEDGER_ACCOUNT_VETO_RE =
@@ -177,8 +187,18 @@ const NON_TRANSFER_KE_TO_RE =
   /\b(?:up|equal|close|rose|grew|fell|dropped|increased|decreased|naik|turun|meningkat|menurun|mencapai|sampai)\s+(?:ke|to)\s*[:#=-]?\s*$/i;
 const GAP_VETO_RE =
   /\b(?:payable|receivable|balance|saldo|total|subtotal|jumlah|nilai|amount|revenue|pendapatan|profit|laba|loss|rugi|expense|expenses|beban|biaya|budget|anggaran|omzet|omset|kas|cash|equity|ekuitas|asset|assets|aset|liability|liabilities|liabilitas|utang|piutang|hutang|modal|koran|tax|pajak|margin|ebit|ebitda|gdp|cap|volume|price|harga|rate|tarif|fee|invoice|faktur)\b/i;
+const BANK_ACCOUNT_CONTEXT_RE = /\b(?:rek(?:ening)?|norek|a\/c|acct\.?|accounts?)\b/i;
+const CURRENCY_OR_SCALE_AFTER_RE =
+  /^[ \t]*(?:rupiah|rp|idr|usd|dollars?|sgd|euros?|eur|myr|jpy|gbp|aud|cny|rmb|juta|miliar|milyar|ribu|triliun|thousand|million|billion|trillion)\b/i;
 
-const UNLABELLED_ACCOUNT_RE = /(?<![\d.,-])(\d[\d -]{6,20}\d)(?![\d.,-])/g;
+function hasExplicitAmountTail(afterRaw: string): boolean {
+  return (
+    CURRENCY_OR_SCALE_AFTER_RE.test(afterRaw) ||
+    ((afterRaw.startsWith(".") || afterRaw.startsWith(",")) && /\d/.test(afterRaw[1] ?? ""))
+  );
+}
+
+const UNLABELLED_ACCOUNT_RE = /(?<![\d.,-])(\d[\d -]{6,20}\d)(?![\d-])/g;
 const ROUND_TOTAL_TAIL_RE = /0{4}$/;
 const GROUPED_THOUSANDS_SPACE_RE = /^\d{1,3}(?: \d{3})+$/;
 const BANK_HYPHEN_GROUPING_RE = /^[1-9]\d{1,3}(?:-\d{2,7}){2,3}$/;
@@ -194,25 +214,31 @@ const UNLABELLED_ACCOUNT_MAX_DIGITS = 16;
 const LOCAL_PHONE_MIN_DIGITS = 10;
 const LOCAL_PHONE_MAX_DIGITS = 13;
 
-function matchAccountCueBefore(clauseBefore: string): { hasCue: boolean; minDigits: number } {
+function matchAccountCueBefore(clauseBefore: string): { hasCue: boolean; minDigits: number; canWrap: boolean } {
   if (LEDGER_ACCOUNT_VETO_RE.test(clauseBefore)) {
-    return { hasCue: false, minDigits: UNLABELLED_ACCOUNT_MIN_DIGITS };
+    return { hasCue: false, minDigits: UNLABELLED_ACCOUNT_MIN_DIGITS, canWrap: false };
   }
   const explicitMatch = EXPLICIT_ACCOUNT_GAP_CUE_RE.exec(clauseBefore);
   if (explicitMatch && !GAP_VETO_RE.test(explicitMatch[1] ?? "")) {
-    return { hasCue: true, minDigits: ACCOUNT_MIN_DIGITS };
+    return { hasCue: true, minDigits: ACCOUNT_MIN_DIGITS, canWrap: true };
   }
   const bankMatch = BANK_GAP_CUE_RE.exec(clauseBefore);
-  if (bankMatch && !GAP_VETO_RE.test(bankMatch[1] ?? "")) {
-    return { hasCue: true, minDigits: TRANSFER_ACCOUNT_MIN_DIGITS };
+  const bankGap = bankMatch?.[1] ?? "";
+  const bankHasAccountContext = BANK_ACCOUNT_CONTEXT_RE.test(bankGap);
+  if (bankMatch && (bankGap.length === 0 || bankHasAccountContext) && !GAP_VETO_RE.test(bankGap)) {
+    return {
+      hasCue: true,
+      minDigits: TRANSFER_ACCOUNT_MIN_DIGITS,
+      canWrap: bankHasAccountContext || TRANSFER_EVIDENCE_RE.test(clauseBefore),
+    };
   }
   if (!NON_TRANSFER_KE_TO_RE.test(clauseBefore)) {
     const transferMatch = TRANSFER_CUE_RE.exec(clauseBefore);
     if (transferMatch && !GAP_VETO_RE.test(transferMatch[1] ?? "")) {
-      return { hasCue: true, minDigits: TRANSFER_ACCOUNT_MIN_DIGITS };
+      return { hasCue: true, minDigits: TRANSFER_ACCOUNT_MIN_DIGITS, canWrap: true };
     }
   }
-  return { hasCue: false, minDigits: UNLABELLED_ACCOUNT_MIN_DIGITS };
+  return { hasCue: false, minDigits: UNLABELLED_ACCOUNT_MIN_DIGITS, canWrap: false };
 }
 
 function isValidIbanShape(raw: string): boolean {
@@ -257,7 +283,13 @@ function collectLabelled(text: string, found: IdPiiMatch[]): void {
   for (const match of text.matchAll(ACCOUNT_LABELLED_RE)) {
     const span = capturedSpan(match);
     const digits = span ? digitsOnly(span.text) : "";
-    if (span && digits.length >= ACCOUNT_MIN_DIGITS && digits.length <= ACCOUNT_MAX_DIGITS) {
+    const afterSpan = span ? text.slice(span.index + span.text.length) : "";
+    if (
+      span &&
+      digits.length >= ACCOUNT_MIN_DIGITS &&
+      digits.length <= ACCOUNT_MAX_DIGITS &&
+      !hasExplicitAmountTail(afterSpan)
+    ) {
       add(found, { kind: "account", match: span.text, index: span.index });
     }
   }
@@ -315,14 +347,21 @@ function collectUnlabelled(text: string, found: IdPiiMatch[]): void {
     if (isNikDigits(digits) || looksLikeCard(raw, digits) || /^08/.test(digits)) {
       continue;
     }
+    const afterRaw = text.slice(match.index + raw.length);
+    if (hasExplicitAmountTail(afterRaw)) {
+      continue;
+    }
     const immediateBefore = text.slice(Math.max(0, match.index - MONEY_CUE_LOOKBACK), match.index);
     if (MONEY_CUE_RE.test(immediateBefore)) {
       continue;
     }
-    const clauseBefore = text
-      .slice(Math.max(0, match.index - ACCOUNT_CUE_LOOKBACK), match.index)
-      .replace(/^[\s\S]*[\n;|!?]/, "");
-    const { hasCue, minDigits } = matchAccountCueBefore(clauseBefore);
+    const cueWindow = text.slice(Math.max(0, match.index - ACCOUNT_CUE_LOOKBACK), match.index);
+    const wrappedCueWindow = cueWindow.replace(/([^\n])\r?\n[ \t]*$/, "$1 ");
+    const newlineWrapped = wrappedCueWindow !== cueWindow;
+    const clauseBefore = wrappedCueWindow.replace(/^[\s\S]*[\n;|!?]/, "");
+    const accountCue = matchAccountCueBefore(clauseBefore);
+    const hasCue = accountCue.hasCue && (!newlineWrapped || accountCue.canWrap);
+    const minDigits = accountCue.minDigits;
     const hasBankGrouping =
       digits.length >= UNLABELLED_ACCOUNT_MIN_DIGITS &&
       BANK_HYPHEN_GROUPING_RE.test(raw) &&

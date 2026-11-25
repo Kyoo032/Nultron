@@ -6,16 +6,42 @@ import {
   MCP_FETCH_TOOL_KEY,
   MCP_LIMITS,
   MCP_LIST_SOURCES_TOOL_KEY,
+  currentOutboundGuard,
   defineTool,
+  inToolCall,
   isAllowedMcpAction,
   isMcpConnectorId,
+  outboundRefusal,
+  queryShapeProblem,
   redactSecrets,
+  type OutboundRefusal,
   type TenantContext,
 } from "@agentforge/core";
 import { currentDelegation } from "../delegation/delegation-context";
 import { currentToolRun } from "../tool-run-context";
 import { McpHttpClient } from "./client";
 import { mcpStore } from "./store";
+
+/**
+ * The outbound-guard verdict for text an MCP call would carry off this machine (SR-112).
+ *
+ * `mcp_fetch` is a sender in the same sense as web search: the query and the resource id leave the
+ * host on a third-party server, so a tainted run must never pack the person's private text into
+ * either. The contract of `security/outbound-guard.ts` is mirrored exactly: inside a guarded run the
+ * guard judges the text; inside a model's tool call with no guard open the send is refused closed;
+ * anywhere else (a host route, a test) the shape rules still apply and nothing is counted.
+ */
+function mcpOutboundRefusal(text: string): OutboundRefusal | null {
+  const guard = currentOutboundGuard();
+  if (guard) {
+    return guard.judgeQuery(text);
+  }
+  if (inToolCall()) {
+    return outboundRefusal("unguarded", "en");
+  }
+  const shape = queryShapeProblem(text);
+  return shape ? outboundRefusal(shape, "en") : null;
+}
 
 const runConnectorCalls = new Map<string, number>();
 
@@ -140,6 +166,23 @@ export async function runMcpFetch(
       connector: args.connector,
       message: `Delegated subagents are not permitted to access ${spec.label} under this desk's MCP boundary policy. Return to the primary orchestrator or ask the owner to allow subagent access.`,
     };
+  }
+
+  // The egress check comes before the turn counter: a query the guard refuses never leaves the
+  // machine, so it must not spend one of the turn's calls either.
+  for (const text of [args.query, args.resourceId]) {
+    if (text === undefined) {
+      continue;
+    }
+    const refusal = mcpOutboundRefusal(text);
+    if (refusal) {
+      return {
+        ok: false,
+        reason: "outbound_blocked",
+        connector: args.connector,
+        message: refusal.message,
+      };
+    }
   }
 
   const effectiveLimit = delegated

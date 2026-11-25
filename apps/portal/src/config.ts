@@ -149,7 +149,13 @@ function readPort(env: Env, name: string, fallback: number, problems: string[]):
 type DsnVariable = "PORTAL_DATABASE_URL" | "PORTAL_MIGRATE_DATABASE_URL";
 
 const REQUIRED_POSTGRES_SSLMODES = new Set(["require", "verify-ca", "verify-full"]);
-const COMPOSE_LOCAL_DB_HOST = "portal-db";
+/**
+ * The Postgres services this repo bundles and runs itself, where in-cluster plaintext is the
+ * designed transport: compose.yml's `portal-db` and the Kubernetes base's `nultron-portal-db`
+ * (webapp-deploy/k8s/base/postgres.yaml). A managed Postgres (TencentDB) is neither — its DSN
+ * names an external host and stays held to sslmode=require or stricter.
+ */
+const BUNDLED_LOCAL_DB_HOSTS = new Set(["portal-db", "nultron-portal-db"]);
 
 interface PostgresDsnCheckOptions {
   readonly production: boolean;
@@ -193,10 +199,10 @@ function checkPostgresDsn(
     return "";
   }
   const hostname = parsed.hostname.replace(/^\[|\]$/g, "");
-  const isComposeLocal = hostname.toLowerCase() === COMPOSE_LOCAL_DB_HOST;
+  const isBundledLocal = BUNDLED_LOCAL_DB_HOSTS.has(hostname.toLowerCase());
   if (options.production && !isLoopbackHost(hostname) && !options.allowInsecureLocal) {
     const sslmode = parsed.searchParams.get("sslmode")?.trim().toLowerCase() ?? "";
-    if (isComposeLocal) {
+    if (isBundledLocal) {
       if (sslmode !== "" && !REQUIRED_POSTGRES_SSLMODES.has(sslmode)) {
         problems.push(
           `${name} cannot use sslmode=${JSON.stringify(sslmode)} in production without PORTAL_DB_ALLOW_INSECURE_LOCAL=1`,
