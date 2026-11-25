@@ -1,12 +1,12 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { AppLocale } from "@agentforge/core/locale";
-import { getLocale, LOCALE_RESTART_EVENT } from "@/lib/i18n";
+import { getLocale, LOCALE_RESTART_EVENT, subscribeLocale } from "@/lib/i18n";
 
 export const LocaleContext = createContext<AppLocale | null>(null);
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  useLocaleEpoch();
-  return <LocaleContext.Provider value={getLocale()}>{children}</LocaleContext.Provider>;
+  const locale = useSyncExternalStore(subscribeLocale, getLocale, getLocale);
+  return <LocaleContext.Provider value={locale}>{children}</LocaleContext.Provider>;
 }
 
 export function useLocale(): AppLocale {

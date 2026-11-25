@@ -140,8 +140,16 @@ async function writeChunk(stream, data) {
   }
   if (!stream.write(data)) {
     await new Promise((resolveWrite, rejectWrite) => {
-      stream.once("drain", resolveWrite);
-      stream.once("error", rejectWrite);
+      const onDrain = () => {
+        stream.off("error", onError);
+        resolveWrite();
+      };
+      const onError = (err) => {
+        stream.off("drain", onDrain);
+        rejectWrite(err);
+      };
+      stream.once("drain", onDrain);
+      stream.once("error", onError);
     });
   }
 }

@@ -6,8 +6,8 @@ import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LanguageToggle } from "@/components/language-toggle";
-import { applyLocale, getLocale, LOCALE_RESTART_EVENT, resetLocaleForTests, t } from "./i18n";
-import { LocaleContext, useLocale, useLocaleEpoch } from "./locale-context";
+import { applyLocale, freezeLocale, getLocale, LOCALE_RESTART_EVENT, resetLocaleForTests, t } from "./i18n";
+import { LocaleContext, LocaleProvider, useLocale, useLocaleEpoch } from "./locale-context";
 import { switchAppLocale } from "./switch-locale";
 import { localizedLibrary } from "./ui-copy";
 import { installMiniDom } from "./test-dom";
@@ -140,5 +140,33 @@ describe("switchAppLocale", () => {
     const result = await switchAppLocale("id", fakeFetch as unknown as typeof fetch);
     expect(result).toEqual({ ok: false, message: "HTTP 500" });
     expect(getLocale()).toBe("en");
+  });
+
+  it("updates LocaleProvider and LanguageToggle immediately when freezeLocale applies Indonesian on boot", async () => {
+    resetLocaleForTests();
+    const dom = installMiniDom();
+    const container = dom.document.createElement("div");
+    dom.document.body.appendChild(container);
+    const root = createRoot(container as unknown as Element);
+    try {
+      await act(async () => {
+        root.render(
+          <LocaleProvider>
+            <LanguageToggle />
+          </LocaleProvider>,
+        );
+      });
+      expect(container.textContent).toContain("EN");
+
+      await act(async () => {
+        freezeLocale("id");
+      });
+      expect(container.textContent).toContain("ID");
+    } finally {
+      await act(async () => {
+        root.unmount();
+      });
+      dom.restore();
+    }
   });
 });

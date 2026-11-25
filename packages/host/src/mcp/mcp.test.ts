@@ -451,4 +451,53 @@ describe("MCP connector handlers (endpoint token rule and test write-back)", () 
     expect(mcpStore().getConnection(tenant, "notion")).toBeNull();
     expect(mcpStore().listViews(tenant).find((view) => view.id === "notion")?.connected).toBe(false);
   });
+
+  it("allows compact 32-hex Notion page IDs returned by a search in the same run back to Notion read", async () => {
+    const { createOutboundGuard, runInToolCall, runOutboundGuarded } = await import("@agentforge/core");
+    const { withToolRun } = await import("../tool-run-context");
+    const { mcpStore } = await import("./store");
+    const { runMcpFetch } = await import("./mcp-tools");
+
+    mcpStore().saveConnection(tenant, {
+      id: "notion",
+      endpointUrl: `${server.baseUrl}/notion`,
+      token: server.token,
+      policy: { accessMode: "read_only", allowSubagents: true, maxCallsPerTurn: 4 },
+    });
+
+    const guard = createOutboundGuard({
+      userText: ["Find the roadmap page in Notion and summarize it"],
+      privateText: [],
+      locale: "en",
+    });
+
+    await withToolRun({ runId: "run_notion_hex_id", mode: "chat" }, () =>
+      runOutboundGuarded(guard, () =>
+        runInToolCall(async () => {
+          const found = await runMcpFetch({ connector: "notion", action: "search", query: "roadmap" }, tenant);
+          expect(found.ok).toBe(true);
+          if (found.ok) {
+            expect(found.content).toContain("c77d2a3de93647de8d7ca0d97a52a1ba");
+          }
+          const page = await runMcpFetch(
+            { connector: "notion", action: "get_page", resourceId: "c77d2a3de93647de8d7ca0d97a52a1ba" },
+            tenant,
+          );
+          expect(page.ok).toBe(true);
+          if (page.ok) {
+            expect(page.content).toContain("Roadmap priorities");
+          }
+          // An arbitrary 32-hex blob never returned by Notion is still refused.
+          const arbitrary = await runMcpFetch(
+            { connector: "notion", action: "get_page", resourceId: "deadbeefdeadbeefdeadbeefdeadbeef" },
+            tenant,
+          );
+          expect(arbitrary.ok).toBe(false);
+          if (!arbitrary.ok) {
+            expect(arbitrary.reason).toBe("outbound_blocked");
+          }
+        }),
+      ),
+    );
+  });
 });

@@ -13,6 +13,7 @@ import {
   isMcpConnectorId,
   outboundRefusal,
   queryShapeProblem,
+  redactCredentials,
   redactSecrets,
   type OutboundRefusal,
   type TenantContext,
@@ -44,6 +45,36 @@ function mcpOutboundRefusal(text: string): OutboundRefusal | null {
 }
 
 const runConnectorCalls = new Map<string, number>();
+const runConnectorResourceIds = new Map<string, Set<string>>();
+const RESOURCE_ID_TOKEN_RE = /\b[A-Za-z0-9_-]{16,80}\b/g;
+
+function rememberConnectorResourceIds(runId: string | undefined, connectorId: string, content: string): void {
+  if (!runId) {
+    return;
+  }
+  if (runConnectorResourceIds.size > 500) {
+    runConnectorResourceIds.clear();
+  }
+  const key = `${runId}:${connectorId}`;
+  let known = runConnectorResourceIds.get(key);
+  if (!known) {
+    known = new Set<string>();
+    runConnectorResourceIds.set(key, known);
+  }
+  for (const match of content.matchAll(RESOURCE_ID_TOKEN_RE)) {
+    if (known.size >= 200) {
+      break;
+    }
+    known.add(match[0]);
+  }
+}
+
+function isRememberedResourceId(runId: string | undefined, connectorId: string, resourceId: string): boolean {
+  if (!runId) {
+    return false;
+  }
+  return runConnectorResourceIds.get(`${runId}:${connectorId}`)?.has(resourceId) ?? false;
+}
 
 function trackConnectorCall(runId: string | undefined, connectorId: string, maxAllowed: number): boolean {
   if (!runId) {
@@ -168,13 +199,24 @@ export async function runMcpFetch(
     };
   }
 
+  const runId = currentToolRun()?.runId;
   // The egress check comes before the turn counter: a query the guard refuses never leaves the
   // machine, so it must not spend one of the turn's calls either.
-  for (const text of [args.query, args.resourceId]) {
-    if (text === undefined) {
-      continue;
+  // Exact resourceIds returned earlier in this run by the SAME connector (e.g. compact 32-hex
+  // Notion page IDs) are permitted back to that connector without tripping the hex-blob check.
+  if (args.query !== undefined) {
+    const refusal = mcpOutboundRefusal(args.query);
+    if (refusal) {
+      return {
+        ok: false,
+        reason: "outbound_blocked",
+        connector: args.connector,
+        message: refusal.message,
+      };
     }
-    const refusal = mcpOutboundRefusal(text);
+  }
+  if (args.resourceId !== undefined && !isRememberedResourceId(runId, args.connector, args.resourceId)) {
+    const refusal = mcpOutboundRefusal(args.resourceId);
     if (refusal) {
       return {
         ok: false,
@@ -188,7 +230,7 @@ export async function runMcpFetch(
   const effectiveLimit = delegated
     ? Math.min(connection.policy.maxCallsPerTurn, MCP_LIMITS.subagentMaxCallsPerTurn)
     : connection.policy.maxCallsPerTurn;
-  if (!trackConnectorCall(currentToolRun()?.runId, args.connector, effectiveLimit)) {
+  if (!trackConnectorCall(runId, args.connector, effectiveLimit)) {
     return {
       ok: false,
       reason: "turn_limit_reached",
@@ -212,6 +254,8 @@ export async function runMcpFetch(
   try {
     const client = new McpHttpClient(args.connector, connection.endpointUrl, connection.token, fetchImpl);
     const result = await client.callReadOnlyTool(args.action, rpcArgs);
+    const redactedContent = redactCredentials(result.content);
+    rememberConnectorResourceIds(runId, args.connector, redactedContent);
     return {
       ok: true,
       connector: args.connector,
@@ -219,7 +263,7 @@ export async function runMcpFetch(
       action: args.action,
       boundary: "read_only_sandbox",
       callerRole: delegated ? "delegated_subagent" : "primary_agent",
-      content: redactSecrets(result.content),
+      content: redactedContent,
     };
   } catch (error) {
     return {

@@ -30,6 +30,15 @@ fi
 FORMAT="$(backup_format "$TARBALL")"
 PLAIN="$TARBALL"
 
+case "$TARBALL" in
+*.enc)
+	if [ "$FORMAT" = "plain" ]; then
+		echo "error: $TARBALL is expected to be an encrypted backup (.enc) but has no encryption header." >&2
+		exit 1
+	fi
+	;;
+esac
+
 if [ "$FORMAT" != "plain" ]; then
 	BACKUP_KEY="$(setting BACKUP_KEY)"
 	if [ -z "$BACKUP_KEY" ]; then

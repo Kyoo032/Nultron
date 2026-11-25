@@ -18,6 +18,7 @@ import { apiFetch } from "@/lib/api-client";
 import { meetingFfmpegNoteKey } from "@/lib/ffmpeg-notice-copy";
 import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { getLocale, t } from "@/lib/i18n";
+import { useLocale } from "@/lib/locale-context";
 import { Link } from "@/lib/nav";
 import {
   classifyMeetingFile,
@@ -73,8 +74,12 @@ export function MeetingStudio() {
   const [capability, setCapability] = useState<Capability | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
+  const deskLocale = useLocale();
   // The language meetings are usually spoken in: what the owner last picked, else the desk's.
-  const [locale, setLocale] = useState<AppLocale>(() => readMeetingLanguage(getLocale()));
+  const [locale, setLocale] = useState<AppLocale>(() => readMeetingLanguage(deskLocale));
+  useEffect(() => {
+    setLocale(readMeetingLanguage(deskLocale));
+  }, [deskLocale]);
   const [alwaysTranslate, setAlwaysTranslate] = useState<boolean>(() => readAlwaysTranslate());
   const [prompt, setPrompt] = useState("");
   const [paste, setPaste] = useState("");

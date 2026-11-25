@@ -178,13 +178,15 @@ describe("scanIndonesianIds", () => {
       "Transfer ke BCA:\n1234567890",
       "Transfer ke rekening BCA:\n1234567890",
       "No. Rekening:\n1234567890",
+      "No. Rekening:\n1234560000",
       "BCA account\n1234567890",
       "transfer Rp 1.500.000 ke\n1234567890",
     ];
     for (const line of wrapped) {
+      const expectedMatch = line.endsWith("1234560000") ? "1234560000" : "1234567890";
       expect({ line, hits: scanIndonesianIds(line) }).toEqual({
         line,
-        hits: [{ kind: "account", match: "1234567890", index: line.indexOf("1234567890") }],
+        hits: [{ kind: "account", match: expectedMatch, index: line.indexOf(expectedMatch) }],
       });
     }
 

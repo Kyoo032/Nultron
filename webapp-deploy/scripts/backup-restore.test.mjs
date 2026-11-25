@@ -256,6 +256,16 @@ describe("backup/restore shell wiring", () => {
     assert.equal(run.status, 0, run.output);
   });
 
+  it("restore.sh refuses a plain tarball disguised with a .enc extension before any destructive docker call", { skip: SHELL_OPTS.shellSkip }, () => {
+    const dir = tempDir("restore-disguised-enc-");
+    const fakeEnc = join(dir, "backup.tar.gz.enc");
+    writeFileSync(fakeEnc, readFileSync(makeTarFixture(dir)));
+    const run = runRestoreScript("webapp-deploy/scripts/restore.sh", [fakeEnc, "--yes"], { dir });
+    assert.notEqual(run.status, 0);
+    assert.match(run.output, /no encryption header/);
+    assert.deepEqual(destructiveCalls(run.log), []);
+  });
+
   it("restore.sh refuses an encrypted backup when BACKUP_KEY is empty", { skip: SHELL_OPTS.shellSkip }, () => {
     const dir = tempDir("restore-nokey-");
     const backup = encryptGcm(makeTarFixture(dir), join(dir, "backup.tar.gz.enc"));

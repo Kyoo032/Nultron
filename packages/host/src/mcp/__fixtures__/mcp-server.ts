@@ -60,7 +60,7 @@ const FIXTURE_DATA: Record<string, { tools: Array<{ name: string }>; responses: 
       { name: "delete_block" },
     ],
     responses: {
-      search: "Notion page pg_77: Nultron Product Roadmap 2026",
+      search: "Notion page c77d2a3de93647de8d7ca0d97a52a1ba (pg_77): Nultron Product Roadmap 2026",
       get_page: "Roadmap priorities: Omnichannel, Voice Mode, MCP Sandbox Connectors.",
       query_database: "3 active launch milestones found.",
     },

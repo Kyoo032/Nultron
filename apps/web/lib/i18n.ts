@@ -180,8 +180,22 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
 };
 
 let frozen: AppLocale | null = null;
+const localeListeners = new Set<() => void>();
 
 export const LOCALE_RESTART_EVENT = "agentforge-locale-restart";
+
+export function subscribeLocale(listener: () => void): () => void {
+  localeListeners.add(listener);
+  return () => {
+    localeListeners.delete(listener);
+  };
+}
+
+function notifyLocaleListeners(): void {
+  for (const listener of localeListeners) {
+    listener();
+  }
+}
 
 export function freezeLocale(locale: unknown): AppLocale {
   if (frozen) {
@@ -192,9 +206,13 @@ export function freezeLocale(locale: unknown): AppLocale {
 
 /** Overwrite the boot freeze. Settings Restart is the only product caller. */
 export function applyLocale(locale: unknown): AppLocale {
+  const prev = frozen;
   frozen = parseAppLocale(locale);
   if (typeof document !== "undefined") {
     document.documentElement.lang = frozen;
+  }
+  if (prev !== frozen) {
+    notifyLocaleListeners();
   }
   return frozen;
 }
@@ -205,6 +223,7 @@ export function getLocale(): AppLocale {
 
 export function resetLocaleForTests(): void {
   frozen = null;
+  notifyLocaleListeners();
 }
 
 function walk(node: unknown, parts: string[]): unknown {
