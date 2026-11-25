@@ -1,678 +1,150 @@
 # Nultron
 
+This file is the source of truth for coding agents working in this repository. Personal vault notes outside the repo are for Rizky, not domain rules here.
+
 ## Where am I?
 
-Check before any edit: `pnpm where` (`scripts/where-am-i.mjs`). Where it is missing (an older branch), run `git rev-parse --show-toplevel` and `git branch --show-current`, and match the row. If `pnpm where` refuses (exit 1), or the folder and branch break a row, stop and ask Rizky. A folder outside the table, such as a Cloud VM clone, prints `other`: work only on a branch cut from `main` there, and never release or deploy from it.
+Run `pnpm where` (`scripts/where-am-i.mjs`) before any edit. If it exits 1, or if your folder and branch violate a row below, stop and ask Rizky. Install the push guard once per clone with `pnpm hooks:install` so every worktree shares it.
 
-Turn the push guard on once per clone with `pnpm hooks:install`. It writes `core.hooksPath` to this clone's own git config, so every worktree of the clone, the tester folder included, gets it.
-
-| Folder | Branch | What it is | Webdev |
+| Folder | Branch | Role | Webdev |
 |---|---|---|---|
-| `C:\Users\rizky\Documents\nultron` (or `C:\Users\rizky\agentforge`) and worktrees `nultron-<topic>` / `agentforge-<topic>` | `main`, or a branch cut from `main` | Active development & published code. **All production updates, fixes, and new features go into `main` (Rizky, 2026-11-24).** | `:3000` |
-| `C:\Users\rizky\agentforge-chat` | `tester/chat-first` | **Paused until live (Rizky, 2026-11-24).** Not needed and owes no sync step until Rizky explicitly re-enables it. | `:3200` |
+| `C:\Users\rizky\Documents\nultron` (or `agentforge`) and worktrees `nultron-<topic>` / `agentforge-<topic>` | `main` or a branch cut from `main` | Active development and published code. All features, UI/UX updates, voice work, security work, and bug fixes land on `main` (Rizky, 2026-11-24). | `:3000` |
+| `C:\Users\rizky\agentforge-chat` | `tester/chat-first` | Paused until live launch (Rizky, 2026-11-24). Owes no sync step until Rizky re-enables it. | `:3200` |
 
-- **Main-first rapid iteration (Rizky, 2026-11-24).** While pushing updates and features rapidly before going live, `tester/chat-first` is paused and not needed until Rizky says so. All updates, features, UI/UX changes, voice work, and security work land directly on `main` (directly or via branches cut from `main`). No tester sync step is owed after merging to `main` while tester is paused.
-- **Stage (Rizky, 2026-10-14; paused 2026-11-24).** When re-enabled after live launch, the tester returns as the staging code (`TESTER.md`).
-- **The tester is OPC only (Rizky, 2026-10-15; stripped 2026-10-16, repo split P5b).** The team board, collective Workspaces, versioned documents and the document tools, quota and the company gateway management token, the enterprise shell, prompt-made agents, people names, paid media approval and per-person file privacy were removed from `tester/chat-first`. What stays there beyond `main`: the chat-first bots shell, the four model choices (K-D31, on the `opc` profile), stored pictures as input (F3) and chat upload originals (U1). Their old tables stay orphaned in existing databases, with no DROP. Do not build any of the removed features here.
+A folder outside this table (such as a Cloud VM clone) prints `other`. Work only on a branch cut from `main` there, and never release or deploy from it.
 
 ## Where a change goes
 
-| The change | Cut the branch from | Work in | Pull request to | Still owed before it counts as done |
+| Change type | Cut branch from | Work in | Pull request to | Required before done |
 |---|---|---|---|---|
-| Any feature, UI/UX update, behaviour change, bug fix, or security work | `main` (or direct on `main` when rapid-iterating) | `nultron` or a worktree `nultron-<topic>` | `main` | `ci:local` / tests passing (tester sync paused until live) |
-| Docs, maps, skills about shared code | `main` | `nultron` or a worktree | `main` | none while tester is paused |
-| A release or a deploy | `main` only | `nultron` / `agentforge` | none | Rizky's go at that moment |
-
-Never: a release from `C:\Users\rizky\agentforge-chat`; a hand fix in two places. (When Rizky re-enables `tester/chat-first` after going live, restore the tester staging rows and post-merge sync step.)
-
-## Which product a change reaches
-
-Since the 2026-10-15 split this repo is Nultron only. Shared code reaches Nultron and the tester.
-
-- `engine` or `ui`: Nultron (OPC) and the tester. Tests must pass for the OPC profile.
-- `opc`: Nultron only.
-- Shared code never names the gateway (`Toko Token`). `Nultron` may appear: this repo is the Nultron core.
-
-**The vision (Rizky, 2026-10-05): everyone has all their workers inside one desk.**
-
-A desk is a one-person company (OCP). Every job a company needs is a worker on that desk:
-
-- Money: Finance and Data
-- Contracts: Legal
-- Paperwork: Documents
-- Pitch and sell: Presentation and Research
-- Market sense: Market
-- Clients: Meeting
-- Marketing: Images, Videos, Music and Edit
-- Memory: Chat, Knowledge and Education
-
-Each worker is a mode whose harness is already built in: prompt, tools, skills, checks and judges. Nobody sets up agents, skills or prompts. They add their files, ask, and get a checked result. Build with that in mind:
-- **Prompt first** (Rizky, 2026-10-05). Every worker starts from one prompt box, with files optional, and no form up front.
-  - The user adds values (parameters, more files, choices) later, and only when they need them.
-  - Every result can be edited under that mode's rules: inline edits, then regenerating one section, slide, clip or item.
-  - A regeneration keeps the user's edits. Do not make it complicated.
-- Put capability into the worker's harness, not into setup. Defaults, auto-detection and code-run judges are the user's skills, so never add a step or setting the user must configure first.
-- Show the result first. Keep advanced controls under "More", and run a paid step only on the user's Run.
-- Keep every worker on the same desk, reachable from the rail, with one sign-in and one key.
-- Make every worker hand off to the others: research to a deck, a contract's facts to a memo.
-- A desk serves one owner and that owner's agents (the OPC, 2026-10-14). Team features (a board, shared Workspaces, people working beside agents) are not built here.
-
-**Read [`docs/internal/release-targets.md`](docs/internal/release-targets.md) first.** It lists every release target built from this repo: the hosted web app (Nultron Enterprise), which is the one active target, and the retired ones, Nultron Personal and its desktop flavors. For each one it gives the type, company, codebase, services, how it ships and what is running now. Name the target your task serves before you edit, and stop if the change lands on another one.
-
-**Changed 2026-10-14 (Rizky): Nultron is the OPC, and the desktop app is retired.** Nultron is a one-person company whose agents work together 24/7 for one owner, running in a VPS. Nultron Personal (the Electron app) is retired into the web app: its release repo is now `Kyoo032/Nultron-Desktop`, archived, and the old `Kyoo032/NultronEnt` became `Kyoo032/Nultron-Releases` (`RELEASE_REPO` in `scripts/release-web.mjs`). On 2026-11-24 (DFIND-139), `apps/desktop/**`, the root `desktop:*` scripts, the retired desktop skills, and the renderer's Electron bridge were removed from the tree. Sentences below that describe Personal as a shipping product, or name `NultronEnt`, are history from before this change.
-
-**Changed 2026-10-15 (Rizky): the repo split.** The web app's release repo is `Kyoo032/Nultron-Releases` (`RELEASE_REPO`), renamed from `Kyoo032/Nultron`. After that, the source repo `Kyoo032/agentforge` was renamed `Kyoo032/Nultron` (the `origin` remote now points there), for the OPC only; company and team features left this repo. The pre-push guard judges a remote named `agentforge` or `nultron`, and `pnpm where` also takes folders named `nultron` and `nultron-<topic>`. Image names and `AGENTFORGE_*` names are unchanged. Sentences below that call `Kyoo032/Nultron` or `Kyoo032/NultronEnt` the release repo are history from before this change.
-
-**Two products, one repo — read this before touching anything.**
-
-The owner split the product, then still called DPSBuddy, into two products on 2026-09-23. They share a codebase and a renderer, and they diverge on packaging, deployment, identity and versioning. Work on one is not work on the other.
-
-| | **Personal** (retired 2026-10-14) | **Enterprise** |
-|---|---|---|
-| What it is | The Mac/Windows Nultron app | The hosted multi-user web app |
-| Shell | Electron (`apps/desktop`), packaged IPC, **no HTTP port** | Express (`apps/web/server.ts`) behind a reverse proxy |
-| Data | On the user's machine, SQLite in the user data dir | Per-tenant, on Rizky's server |
-| Account | A pasted gateway key is the floor | Portal sign-in: a username and password in the Enterprise deploy bundle (`PORTAL_SIGNIN_MODE=password`, its default since 2026-10-09), or the e-mailed one-time code, which is the portal's own default when `PORTAL_SIGNIN_MODE` is unset; the pasted key stays the floor for model calls |
-| Ships by | Nothing now. It shipped by `pnpm desktop:build` → installers on `Kyoo032/Nultron`, which was renamed `Kyoo032/Nultron-Desktop` and archived on 2026-10-14 | `node scripts/release-web.mjs` → a private image `ghcr.io/kyoo032/nultron-ent:<tag>` plus a deploy bundle (pinned `compose.yml`, `.env.example`, `DEPLOY.md`, `Caddyfile`) and a GitHub Release on `Kyoo032/Nultron-Releases`; each deploy is logged by commit sha |
-| Version | Semver. **0.15.1** (2026-09-28) is the last published installer. **0.16.0**, the first Nultron-named installer, was packed on 2026-10-06 and never published | No version number |
-| Entry point | the installer | the hosted URL |
-
-**History (DPSBuddy rename and Personal desktop retirement):** On 2026-09-29 the product was renamed from DPSBuddy to Nultron (`ghcr.io/kyoo032/nultron-ent`, `NULTRON_DOMAIN`, `nultron-data` / `nultron-components`, `nultron-web` / `nultron-ent`; source packages and `AGENTFORGE_*` names stay `agentforge`). Nultron Personal (Electron, last published installer v0.15.1 on `Kyoo032/Nultron-Desktop`) was retired on 2026-10-14 and its desktop tree (`apps/desktop/**`) was removed on 2026-11-24 (DFIND-139); `apps/web` now serves the hosted web app and OPC desk only.
-
-**Mascot and logo (2026-09-29).** The character is Nultron: `NultronMascot` (`apps/web/components/nultron/`) renders 21 states from `MASCOT_STATES` and `STATE_MOTION` (`apps/web/lib/mascot-states.ts`) using pre-rendered images (`components/nultron/images/`: stills, one-shot clips, four-frame busy loops, `manifest.json`; scene in `tools/nultron-3d`). Smooth browser ambient loops pause under `html[data-ambient="paused"]` (idle 12 s, blurred, hidden) and stop under reduced motion. The **logo** is Rizky's painted head in a blue tile (`docs/internal/brand/nultron/reference/app-logo.webp`), shipping in `apps/web/public/brand` (favicons and 256 px `logo.png`), `apps/web/components/brand-art` (`BrandMark`), and `apps/portal/assets`. Maps: [`docs/internal/maps/mascot-and-brand.md`](docs/internal/maps/mascot-and-brand.md); recipe: `features/mascot.md`.
-
-**Goal (Rizky, 2026-09-22): many harnesses inside one app.** Every kind of work is a harness in that same app: its own screen, prompt, tools, checks, and output. The harnesses are Chat, Documents, Research, Finance, Data, Market, Legal, Meeting, Images, Videos, Music, Edit, and Presentation. A new kind of work is a new harness here, not a new app and not a custom-agent builder. Knowledge Base, Channels, Workspaces, Usage, and Settings sit on the same desk. Custom-agent Build stays parked. Hermes stays the tinkering surface outside this product.
-
-On **Enterprise** each tenant keeps its own workspaces on Rizky's server. On **Personal** the workspaces are the user's own desks on their machine. Either way the left rail follows that workspace's `productModes`, and Packs are workspace presets. **Every fresh desk starts with one agent, the default Chat agent alone, on both products (Rizky, 2026-10-21, replacing the 2026-09-29 five-mode starter set).** Both **Personal** (`FIRST_RUN_MODES = ["chat"]`, [`packages/core/src/agents/product-modes.ts`](packages/core/src/agents/product-modes.ts)) and **Enterprise** (`HOSTED_FIRST_DESK_MODES = FIRST_RUN_MODES`) start a fresh desk with `["chat"]` alone, while Specialist Modes (`research`, `images`, `videos`, `presentation`, `spreadsheets`, `documents`) remain available on the Virtual agents page (`/workspaces`, `apps/web/src/App.tsx:421-424`) and chat handles specialist work inline via `research_dossier`, `finance_task`, `build_deck`, `image_generate`, `video_generate`, and `delegate`. An existing desk is never rewritten. Catalog: [`docs/product-modes.md`](docs/product-modes.md).
-
-**Status: closed beta** (not prototype). Public entry point: [`README.md`](README.md).
-
-## Product direction (Rizky, 2026-10-06; this repo Nultron only since 2026-10-15): chat-first
-
-**Nultron is the product developed here.** Keep shipping and iterating on it as the main build focus.
-
-**Archive / deprioritize mode-heavy complicated UI setup.** Do not invest in elaborate multi-mode UI configuration flows.
-
-**Focus: put everything inside chat and optimize in-chat UIs and flow.** Prefer chat-native surfaces over separate setup screens.
-
-**North star: like Dots and Muse, but multi-model.** Multi-model chat-first wins.
-
-**Bots on harnesses (Rizky, 2026-10-06 evening).** The chat-first shell shows each harness as a bot with its own conversations and a side panel (computer, routines, the mode's control fields). What sets it apart from a skills-and-instructions product: a bot here is a harness the host enforces. Three decisions from him the same evening:
-
-- Hiring your own bot is not built in Nultron: the tester's prompt-made agents were removed on 2026-10-16. Custom-agent Build stays parked.
-- The cloud computer (VPS) and the person's own computer are paid features. A free trial cannot use either, and gets no graphical screen.
-- Routines (scheduled runs) are free on every plan (Rizky, 2026-10-07: "routines are free, since they cost tokens anyway"). A routine that needs a computer still needs a paid plan for that part.
-- The host enforces that from the plan the portal reports. The renderer only displays it.
-
-The plan is [`docs/internal/chat-first-plan.md`](docs/internal/chat-first-plan.md): "Second reference", "Free and paid" and Track B.
-
-**No team privacy rules here (2026-10-15).** A Nultron desk has one owner, so team rules (per-person Knowledge Bases, company-wide desks, sharing through a bot, leavers) are not built here. What `main` already enforces on a hosted desk stays as built: a Chat card is visible only to the person who owns its thread, the owner and admins included (`knowledge-visibility.ts`, [`knowledge-flows.md`](docs/internal/maps/knowledge-flows.md) § 7), and each person's chat uploads folder is their own ([`chat-documents.md`](docs/internal/maps/chat-documents.md)). The build focus is the chat and several agents working together.
-
-### Lanes: main and the tester (Rizky, 2026-10-06, 2026-10-09, 2026-10-14, 2026-10-15, updated 2026-11-24; must follow)
-
-The tables at the top say where a change is cut, made and merged. This section keeps the rules behind them. The working form is [`docs/internal/maps/release-and-sync-lanes.md`](docs/internal/maps/release-and-sync-lanes.md).
-
-- **Lanes (updated 2026-11-24).** `main` is the single active lane for all production updates, features, and fixes while iterating rapidly before live launch. The tester (`C:\Users\rizky\agentforge-chat`, `tester/chat-first`) is **paused until live** (until Rizky explicitly says to re-enable it), so no new work goes to `tester/chat-first` and no post-merge tester sync is owed right now. Nultron Personal is retired (2026-10-14): no sync step is owed to it, and no release is cut from it.
-- **One place to work.** All fixes, features, UI/UX changes, voice updates, and security hardening land on `main` (directly or via a branch cut from `main`). Never run a release from `C:\Users\rizky\agentforge-chat`.
-- **Two codes, one way (when tester is active).** Once Rizky re-enables `tester/chat-first` after live launch, changes move one way from `main` into `tester/chat-first` (`git fetch origin`, then `git merge origin/main` in `C:\Users\rizky\agentforge-chat`), and tester work reaches `main` only through a promotion PR Rizky approves. Its webdev uses port 3200 and its own data folder, so it never shares a database with `:3000`. The precise map is Rizky's vault note `C:\Users\rizky\Documents\Obsidian\40-Dev\nultron-two-codes-map.md`.
-- **After a change merges to `main`:** (1) Tester sync is **paused until live** (skip until Rizky re-enables it); (2) release Enterprise only when Rizky says.
-- **Shared code never names the gateway (Rizky, 2026-10-17).** Shared code and copy never hard-code `Toko Token`; they read `gatewayName`. `Nultron` may be typed: after the 2026-10-15 split this repo is the Nultron core, and `lane-guard` ratchets only `Toko Token`. `Kyoo032/hyp-ai` is a standalone codebase: nothing syncs between the two repos, a fix needed in both is made in each by hand, and brand code never comes into this repo. A difference between lanes is a setting (`PORTAL_SIGNIN_MODE`, the edge mode), not a fork.
-- **No edge on Nultron.** Nultron keeps its direct two-name setup with its own certificates and uses no Cloudflare edge. Sign-in is a portal setting, `PORTAL_SIGNIN_MODE`, with two defaults. The portal's own default, when the variable is unset, is the e-mailed one-time code (`apps/portal/src/config.ts:256-259`). The Enterprise deploy bundle sets `password` (`ENV_DEFAULTS` at `scripts/release-web.mjs:124`, written into the bundle's `portal.env.example` by `portalEnvExample()` at `:298`, tested at `scripts/release-web.test.mjs:583`; the source stack's `webapp-deploy/portal.env.example:67` matches; PR #145, 2026-10-09), so a hosted Nultron signs people in with a username and a password unless the operator sets `code`.
-- **Label what a change touches.** In a pull request and in `unreleased.md`, name the lanes with the tokens `lanes.json` reads: `enterprise` and `tester`. The retired `personal` token (owes nothing) is left only on the `apps/desktop` entries, because it is the one lane those paths reach. Shared code defaults to `enterprise` and `tester`. The guard checks only that a `Lanes:` line exists, not which tokens it names.
-- **Priority.** Published wins; in a conflict keep the `main` side. The Obsidian map has the full list.
-
-**Change guard (2026-10-09).** Any change follows the project skill [`.cursor/skills/change-agentforge/SKILL.md`](.cursor/skills/change-agentforge/SKILL.md). Paste [`preamble.md`](.cursor/skills/change-agentforge/preamble.md) at the top of every subagent prompt. [`lanes.json`](lanes.json) maps path globs to their map page, the lanes they reach and a `protected` flag. `pnpm lane-guard` (`scripts/lane-guard.mjs`) has three blocking rules that exit 1 with or without `--strict`: a never-promote path in a diff to `main`, a protected file with no `Lanes:` line, a brand literal added to shared code (`scripts/lane-guard.mjs:19-28`). One rule is advisory and exits 1 only under `--strict`: a map page not refreshed (`:30-32`). `ci:local` runs the required step `lane-guard` without `--strict`, so a blocking rule fails the run (`scripts/ci-local.mjs:342`), and the advisory step `lane-guard:map` with `--strict`, so a map warning shows in the table and never fails the run (`:345`). The blocking rules, the never-promote list, the pre-push hook and the release-script checks came from branch `chore/agent-guardrails` and are on `main`; the map page names the file that holds each. Plan: [`docs/internal/white-label-and-agent-guardrails-plan.md`](docs/internal/white-label-and-agent-guardrails-plan.md).
-
-**Paid media gate check (2026-11-03).** A change that touches the SR-167 Run gate, adds a way to start a model run (a channel, a routine, `delegate`), or binds `image_generate` or `video_generate` runs `pnpm verify:paid-gate` before it merges. The skill is [`.cursor/skills/verify-paid-media-gate/SKILL.md`](.cursor/skills/verify-paid-media-gate/SKILL.md).
-
-`.ref/` (gitignored) holds two third-party repositories for reading only, OpenMausBot and hermes-agent. Take ideas, never code, and never anything from `OpenMausBot/enterprise/`.
-
-### Hosting and scaling (Rizky, 2026-10-07 and 2026-10-13)
-
-The hosted app is one process on one SQLite file, with customers' files on the local disk (SR-29, SR-66), so a second server would start empty. The Kubernetes manifests in `webapp-deploy/k8s/` run exactly one app pod for the same reason. Scaling means resizing the one server. The road to more than one copy is Kubernetes (TKE), not CVM Auto Scaling, and only after the data layer moves (Rizky's decisions K-D9 and K-D10, 2026-10-13). Before a second copy can run:
-- the product database moves off SQLite to a managed database (open decision 1 in the pivot record);
-- files move to object storage (the COS backend has never run against a real bucket);
-- sign-in sessions, the run cap and in-flight jobs are shared between servers;
-- the app starts from a server image and passes a health check behind a load balancer.
-
-None of that is started. Do not start it in passing: it needs Rizky's word.
-
-## Current focus (Rizky, 2026-10-01): fix, perfect, polish — no new modes
-
-Until Rizky lifts it, work is limited to three things, in this order:
-
-1. **Fix the bugs.** Product findings in [`docs/internal/unreleased.md`](docs/internal/unreleased.md), the open rows in [`docs/internal/security-register.md`](docs/internal/security-register.md), and whatever a verify pass turns up.
-2. **Perfect the harnesses that exist.** Each mode's prompt, tools, checks, output and locale should work end to end on webdev and on the packed app. The modes are the ones already in `packages/core/src/agents/product-modes.ts`.
-3. **Fix the UI.** Spacing (borders and outlines sitting on the text), overlaps (the top-right theme control covering mode headers), clipped or overflowing labels, and dark-mode contrast, on both products' shared renderer, at desktop and phone widths.
-
-**One approved exception (Rizky, 2026-10-01): bring-your-own-key on Enterprise.** Enterprise users may connect Toko Token, OpenAI, Anthropic, Google and OpenRouter keys, company keys set by owners/admins plus personal keys, each provider on a base URL pinned in code (`packages/core/src/providers/registry.ts`, never a typed URL); a failed job retries on the same provider only unless the company turns on cross-provider fallback in its settings. Personal stays pinned to the Toko Token gateway (SR-85). Every BYOK change is gated to server mode with a Personal-parity test.
-
-**Second approved exception (Rizky, 2026-10-03): stronger harnesses and agent tools inside the existing modes.** Each mode declares one harness spec (`packages/core/src/harness/modes/`), and the host enforces its tools and budget for every run (`packages/host/src/job-regen.ts`). Agents get desk files (versioned, per desk, both products), a real folder on Personal with an approval per write, `knowledge_search`, and `run_code` (Python and JavaScript in a WASM sandbox, `packages/host/src/code-runner/`). On hosted, `run_code` is off unless `AGENTFORGE_CODE_RUNS=on`, until the sandbox is proven inside the image. Plan: [`docs/internal/mode-harness-tools-plan.md`](docs/internal/mode-harness-tools-plan.md); map: [`docs/internal/maps/agent-tools-and-files.md`](docs/internal/maps/agent-tools-and-files.md); decision trail: `docs/internal/mode-harness-tools-decisions.tsv`. This added tools, not modes.
-
-**No new modes, harnesses, rail entries or packs.** Do not add a product mode, a new job surface or a new Pack, even a small one. If a fix seems to need one, stop and ask Rizky. Refactors are fine only when a fix needs them.
-
-### Resume here: 2026-10-07, afternoon (history)
-
-**These Resume-here blocks are history from before the 2026-10-15 split.** Items about the other product were removed on 2026-10-16; read them for Nultron context only.
-
-**Full handoff:** `nultron-files/handoff-2026-10-07/HANDOFF.md`, with one note per lane in flight in `lanes/` and the day's helper scripts in `tools/`. The brief for outside advisers, covering every product and site, is `nultron-files/PRODUCTION-BRIEF.md`.
-
-**Done on 2026-10-07.**
-- Every lane paused on 10-06 is merged into `main`, except the edge login gate and the tester bots: chat error recovery, the hosted run cap, ffmpeg (image limits and the desktop bundle code), documents in Chat, the Chat image fix, the Chat deck tool, hosted team privacy.
-- A live drive found a new bug and it is fixed and merged: a slow gateway answer ended a Chat turn in silence. The wait for response headers is 45 s and a failed follow-up ends with a sentence.
-- Driven on `:3000` with a real key: `self_check`, a Word file, a picture, a deck. Evidence is under `.cursor/skills/verify-agentforge/evidence/chat/2026-10-07-*`.
-- The Nultron preview runs `nultron-web:0d829f00bc81`, rolled desk by desk without touching the proxy.
-
-**Git.** Everything up to the password sign-in is on GitHub: PR #142, merged into `main` as `079d325` in the evening at Rizky's word. Full local CI was green on `0d829f0`; after that only the suites named in the PR ran. A follow-up with two fixes from the second security review of the password sign-in is still local.
-
-**In flight (see the lane notes).**
-- The per-company gateway key check: reviewed, fixed and merged into `main` as `24fb47c9` (evening). Not driven on a hosted server.
-- The portal's username and password sign-in: merged. Two independent security reviews, no critical or high finding; the second review's two fixes are local `main` at `e8a069c9`, three commits ahead of GitHub. The residual risks are in SR-165.
-
-**Needs Rizky's decision.** Hosted "erase account" purges every company of a partner (SR-163). Settle it before a second company exists on a hosted server. Also still open: the snapshot policy.
-
-### Resume here: 2026-10-05, end of day (read this before the 10-03 block below)
-
-**Full handoff, including lanes that were running and their exact scope:** `nultron-files/handoff-2026-10-05/HANDOFF.md`. **Newer, 2026-10-06:** `nultron-files/handoff-2026-10-06/HANDOFF.md`, covering the live sites, the app preview with per-tester desks, PR #139, the 0.16.0 cut and the verify-skill findings. **Newest, evening of 2026-10-06: `nultron-files/handoff-2026-10-06/HANDOFF-evening.md`**, with one note per paused lane in `lanes/`. Read it first: ten lanes were paused mid-work (ffmpeg in the image is live on the preview; the desktop bundle, the run cap, chat error recovery, document upload, the deck tool, the image-attachment fix, team privacy and the H1 knock gate are on unmerged branches or local folders), the local `edge/` folder is NOT safe to deploy, and the document-upload branch is half way through its review fixes.
-
-**Git (2026-10-06).**
-- `main` is at `de95267`, after PR #138.
-- PR #139 is open: `packages/core/src/data` back in the app image, plus SR-132 and SR-133.
-- Branch `chore/verify-skill-maintain-2026-10-06` holds the verify-skill maintenance and these notes.
-- Branch `chore/release-0.16.0` (a worktree) holds the Personal 0.16.0 cut. It is dry-run only: publishing needs Rizky's OK at that moment.
-
-**Git (2026-10-05).**
-- `main` is at `b1839ad`. PRs #119–#133, #125, #127, #136 and #137 are merged. #137 fixes the blank dev renderer.
-- PR #134 (old rename) is superseded and open. It is waiting on Rizky to close it.
-- The edits that sat uncommitted in this checkout were committed on the evening of 10-05 on branch `chore/vision-motion-deploy-2026-10-05` (from origin/main) and opened as a PR to `main`. They are:
-  - this AGENTS.md (the vision and prompt-first sections at the top);
-  - `docs/internal/release-targets.md`;
-  - the Nultron motion smoothing (`apps/web` css, `shell-motion.ts` and tests, map, recipe);
-  - the SR-113 audit-closure follow-up (`ci-local` lists `--prod`);
-  - deploy and security doc refreshes.
-
-**Worktrees in flight.**
-- `C:\Users\rizky\agentforge-docflow` (`feat/doc-flow-2026-10-05`): Legal, Finance and Meeting "add files → answers". Plan: `docs/internal/doc-flow-plan.md` there, with owner answers in 7a.
-  - Done: L0 judges, W routes, L3a Meeting engine, L4a Finance engine.
-  - Running: L1 Legal engine, L3b Meeting UI, L4b Finance UI.
-  - Next: L2 Legal UI, then L6 integration (register `PUT /meetings/:id/minutes/edits` in router.ts plus its tenancy row, merge main, maps, ci:local, PR).
-- `C:\Users\rizky\agentforge-multisite` (`feat/multi-site-edge`): one Caddy serving dpscloud.co.id, nultron-ai.xyz plus portal, and tokotokenai.com. `api.tokotokenai.com` is never served. Not pushed.
-- `agentforge-hotfix` (PR #137, merged) and `agentforge-pr134` can be removed.
-
-**Decisions on 10-05.**
-- The vision and prompt-first rules are now at the top of this file.
-- Nultron keeps Toko Token.
-- Hosting (to learn, then try): one Tencent Lighthouse in Jakarta hosting dpscloud.co.id (the parent site), nultron-ai.xyz (app) with portal.nultron-ai.xyz, and tokotokenai.com.
-  - Keep the DNS for `api.tokotokenai.com` untouched.
-  - Company mailboxes are self-hosted on the same box (Stalwart), sending through Tencent SES; see "Tencent hosting" below. Nultron's sign-in codes go through SES from `mail.dpscloud.co.id`. **Superseded on 2026-10-06.** Company mailboxes moved to Lark custom-domain mail and the Stalwart kit is shelved (see "Mail" below).
-  - Guide: `nultron-files/deploy/hosting-guide.html`.
-- Nultron motion: smooth in browsers, stepped in the packed app. The CPU trade-off is still open; Rizky has not chosen between capping the background at 20 fps or keeping 60.
-
-**Tencent hosting (updated 2026-10-06).** Everything lives in `nultron-files/deploy/tencent/`, which is gitignored. Its `README.md` is the runbook and the log. The day's full handoff is `nultron-files/handoff-2026-10-06/HANDOFF.md`; read it first next session.
-
-**The box.**
-- Lighthouse Jakarta `43.165.195.135`: Ubuntu 24.04, 2 vCPU / 7.5 GB.
-- SSH is key-only (`~/.ssh/dpscloud_lighthouse`, user `ubuntu`).
-- One Caddy 2.11 (`edge/compose.yml`, compose project `edge`) serves every site.
-- `edge/deploy.ps1` ships a site only when its apex and www resolve to the box.
-  - It always ships every ready site from `www/`, so use the staging copy described in the runbook while a site is mid-rebuild.
-  - Flags: `-SiteOnly`, `-BuildApp`, `-ProvisionApp`, `-Bootstrap`, `-HardenSsh`.
-
-**Live sites** (all `noindex` until Rizky approves the copy):
-- **dpscloud.co.id**: the parent company profile.
-  - 26 pages in ID and EN, generated by `src/dpscloud/build.py`.
-  - Partner pages in brand colours, customer logos, and a contact form posting to `/api/contact`. That relay is the `edge/contact/` service; it stores submissions and notifies Lark when a webhook is set.
-- **tokotokenai.com**: links to `api.tokotokenai.com` (dashboard, docs, pricing). Never touch the `api` CNAME. The hero prices are Rizky's; the group section still differs.
-- **nultron-ai.xyz**: the Nultron landing, with video and the guide mascot.
-
-**Rule (Rizky, 2026-10-06): Nultron is "coming soon" on every public page.**
-- No GitHub download links.
-- No public link to the web preview.
-- Never "closed beta", "testers" or "invitations".
-
-**App preview: https://app.nultron-ai.xyz**
-- It runs the image `nultron-web:<sha>`, built from `git archive`. The app runs off server mode through `edge/app/preview-server.ts`. Security register SR-133 holds the decision record.
-- **Since 2026-10-07 it runs `nultron-web:0d829f00bc81`** (`main` at `0d829f0`). The tag before it was `5bec53280e27`.
-- **Updating it (must follow).** The box also serves three websites through the same proxy, and Rizky asked for care. Use the runbook section "Update the app image only: the safe route" in `nultron-files/deploy/tencent/README.md`:
-  - Rizky says go in the chat for that deploy. If the permission system refuses a step, stop and hand him the commands.
-  - Build and test the image on the PC, send it with `docker save | ssh docker load`, and change only `app/app-image.env`.
-  - Recreate the desks one at a time with `--no-deps`, a tester desk first as a canary, the owner's desk last.
-  - Never recreate the proxy on its own: every desk lives in its network namespace and would answer 502.
-  - Do not run `edge/deploy.ps1` while the local `edge/` folder holds undeployed work.
-- Each login is HTTP Basic Auth and lands on a private desk:
-  - `nultron` (Rizky) on port 3000;
-  - `tester01`–`tester10` on 3001–3010, each with its own volume and its own key slot, created by `edge/app/add-testers.sh`.
-- `edge/app/check-app.sh` runs 20 checks on every deploy.
-- Admin status, the desk switch, SQLite upkeep and fail2ban were being added on 10-06.
-
-**Mail.**
-- Company mailboxes use Lark custom-domain mail. The self-hosted Stalwart kit in `edge/mail/` is shelved, with `MAIL_DOMAIN` empty.
-- SES is reserved for Nultron sign-in codes on `mail.dpscloud.co.id`.
-
-**Open.**
-- The Enterprise release on Thursday 8 Oct replaces the preview.
-- Moving `edge/` into the repo as `webapp-deploy/edge/` needs Rizky's OK, because this file forbids a third deploy path in passing.
-
-### Resume here: 2026-10-03, end of day (paused at Rizky's request)
-
-Rizky paused the run to sleep. Continue from exactly this state. Read this block, then the plan and the trail it names, before touching anything.
-
-**Git state.** Branch `feat/nultron-ent-pilot-byok-2026-10-02`, HEAD `0b61a29` (same as `main`). **Nothing is committed and nothing is pushed.** About 650 changed files hold five programs at once: the Enterprise Phase 0 pilot, BYOK Phase A, the Personal UI pass, the verify-skill maintenance (2026-09-30 to 10-02), and the 2026-10-03 harness program.
-
-**Owner decisions on 2026-10-03.**
-- The harness program and its tools (the "Second approved exception" above). Rizky's four answers: JavaScript and Python in WASM; desk files plus a real folder on Personal; tools in every model-driven mode; both products now.
-- Commit everything on this branch, one commit per program, staged by path, no push.
-- Then push to prod: the Enterprise release to `Kyoo032/NultronEnt` with the ghcr image, and the Personal public release to `Kyoo032/Nultron`. Releases and deploys cannot be undone, so confirm with Rizky at the moment of release even though he has said go.
-- Defaults the orchestrator set, which Rizky may reverse: hosted `run_code` off unless `AGENTFORGE_CODE_RUNS=on`; the egress guard after private reads (SR-112).
-
-**Verified on 2026-10-03.**
-- Unit suites in core, host, db and web are green.
-- The real-engine sandbox passes 27 of 27 (`ci:local --only sandbox:integration`).
-- The live smoke on `:3000` matched the baseline 6 of 6 (`packages/host/eval/harness/results/after-2026-10-03.json`).
-- A live Chat drive proved desk-file edits and `run_code` (`evidence/{files,code}/2026-10-03-live-after-restart/`).
-- `ci:local` has two reds. `test:apps/portal` fails because embedded Postgres refuses an administrator shell, which is the environment, not the code. `audit:deployed` fails on `braces`, SR-113.
-
-**Half done when paused (both lanes stopped mid-edit).**
-1. **Third-party notices for the sandbox runtime.**
-   - Touched files: `scripts/sandbox-licenses/{notices.mjs,pyodide-MPL-2.0.txt,cpython-PSF-2.0.txt}`, plus edits in `scripts/build-sandbox-runtime.mjs`, `scripts/sandbox-runtime-lock.mjs` and `scripts/sandbox-runtime.lock.json`.
-   - One test is red: `validateLock refuses a file name that could leave the output folder` in `scripts/build-sandbox-runtime.test.mjs`.
-   - `vendor/sandbox-runtime` was not rebuilt, so `sandbox:verify` still passes on the old build.
-   - To finish: extract each wheel's `*.dist-info` license files, write `THIRD_PARTY_NOTICES.txt` into the ship dir and its MANIFEST, fix the test, then run `npx pnpm@9.15.9 sandbox:build --offline` and `sandbox:verify`.
-2. **SR-113 `braces` (HIGH, no fix published).**
-   - The path is `tailwindcss` 3.4.19, a devDependency of `apps/web`, through `chokidar`, `fast-glob` and `micromatch`.
-   - The lane's approach is to make the image runtime install production dependencies only. So far it has done two things:
-     - moved `tsx` from devDependencies to dependencies in `apps/web/package.json`;
-     - made `vite` a dynamic import on the non-production branch of `apps/web/server.ts`.
-   - `pnpm-lock.yaml` changed with it.
-   - The `webapp-deploy/Dockerfile` runtime-stage prune is **not done**, and `audit:deployed` is still red.
-   - To finish: prune the runtime stage to production dependencies, then prove every runtime import of `tsx server.ts` resolves, transitively through `packages/host`, `core` and `db`.
-     - Then re-run `ci:local --only audit:deployed` and update SR-113.
-     - If the prune cannot work, use a `pnpm.overrides` path or an accepted-risk entry, but only if `scripts/audit-deployed.mjs` supports one. Never invent a bypass.
-
-**Next, in order.**
-1. Finish the two items above. Then run `/verify` and `npx pnpm@9.15.9 ci:local`; the only red left should be the portal environment.
-2. **Commit, grouped, no push.**
-   - The classifier is `nultron-files/handoff-2026-10-03/classify.mjs`, with its output in `groups.json` beside it; re-run it, since files have changed since. Every file modified after `2026-10-03T12:00Z` belongs to the harness program.
-   - The rest splits by path:
-     - verify skill and docs: `.cursor/**`, `docs/**`, `*.md`;
-     - renderer: `apps/web/**`, `apps/desktop/**`;
-     - pilot and BYOK: everything else.
-   - A file that holds both older lanes' hunks and the harness program's goes in the harness commit, so the earlier commits may not build on their own. Say so in the commit messages.
-   - Never `git add -A`. The repo's own attribution rules apply.
-3. **Personal cut 0.15.2.**
-   - 0.15.1 is published, so the next pack needs a new version.
-   - Bump `apps/desktop/package.json`, then write `docs/public/0.15.2-notes.md` and a `0.15.2` changelog, and commit.
-4. **Hosted image proof.**
-   - Build `webapp-deploy/Dockerfile`.
-   - Inside the image (Node 22, read-only root, `noexec` /tmp, `cap_drop ALL`), run Python and JavaScript through the sandbox with `AGENTFORGE_CODE_RUNS=on`.
-   - Also prove `tsx server.ts` boots with production dependencies only.
-   - The sandbox has never run on Linux or Node 22. Docker Desktop was started on 2026-10-03.
-5. **Packs, following `.cursor/skills/pack-nultron/SKILL.md`.**
-   - Windows NSIS in a worktree from the new HEAD, then launch `Nultron.exe` and run `doctor --desktop`.
-   - Drive the folder flow on the packaged app. `pnpm desktop:dev` has no preload, so the packaged app is the only place it works. Playwright `_electron` with the dialog stubbed in the main process can do it.
-   - mac via the Docker route with `verify-bundle`. Mac stays "preview" until someone smoke-tests it on a Mac.
-6. **Prod, after Rizky confirms at that moment.**
-   - Enterprise: `node scripts/release-web.mjs --tag ent-YYYY.MM.DD --sha <sha> --dry-run`, then without `--dry-run`. The Tencent deploy is Thursday 8 Oct.
-   - Personal: `release-desktop.mjs --require-mac --dry-run`, then for real.
-   - Record both in the deploy log and the pack table.
-
-**Pointers.**
-- Plan: [`docs/internal/mode-harness-tools-plan.md`](docs/internal/mode-harness-tools-plan.md).
-- Decision trail: `docs/internal/mode-harness-tools-decisions.tsv`.
-- Map: [`docs/internal/maps/agent-tools-and-files.md`](docs/internal/maps/agent-tools-and-files.md).
-- Register rows SR-111 to SR-130; SR-112 and SR-113 need Rizky's call on their residuals.
-- `docs/internal/unreleased.md`, section "2026-10-03: mode harness and agent tools".
-- The sandbox prototype logs and escape matrix are in `nultron-files/handoff-2026-10-03/`.
-- `:3000` runs `tsx server.ts` from `apps/web` with `AGENTFORGE_DATA_DIR=C:\Users\rizky\agentforge\.webdev-data-design`. If it is down, start it that way. The host does not hot-reload.
-
-Where things stand on 2026-10-01 (end of day; NOTHING below is committed — everything sits in the working tree on `main`, the agent's branch/commit was blocked by the permission classifier, so Rizky branches and commits by path/hunk; stage by hunk where a file also holds other lanes' edits):
-- **Verify skill maintained twice** (2026-09-30 and 2026-10-01, outcome `changed`): all 41 recipes driven on webdev; evidence under `evidence/<feature>/2026-10-01-maintain2/`.
-- **Personal UI pass:** spacing/contrast fixes, header art no longer overlaps text, Nultron wordmark in IP colours, Nultron as desk buddy (rail) and as page host (`BuddyStage` in every `ModeHeader`, on the Chat composer), Chat greeting bubble + sky background, interactive stepped background. Chat-sky leak across kept-alive panes fixed (`:not([hidden] *)`).
-- **Enterprise Phase 0 pilot (see "Current focus" and the deck `nultron-files/deploy/Nultron-Enterprise-TKE-Plan.pptx`):** SR-85 (packaged gateway pin), SR-25 (boot guards before SQLite), pricing billing probe gated on sign-in, Caddy `sign_in_filters` (SR-72) + webhook 404 (SR-03), pilot compose stack (app + Caddy 2.11 + portal + Postgres + prepare, `portal.env` split, Tencent SES `sg-smtp.qcloudmail.com:465` implicit TLS), Kubernetes manifests `webapp-deploy/k8s/` rehearsed on Docker Desktop (left running: https://nultron.localhost:8443), invite-code sign-in with state-aware e-mail step and `role` claim (`pnpm portal:invite`), host reads the role (no more everyone-is-owner), Erase account deletes people + sessions (owner only, typed `DELETE`), "Add it later" for the key on hosted.
-- **Done in the evening (verified by the orchestrator):** BYOK Phase A (provider registry `packages/core/src/providers/`, per-tenant model cache, `redirect: "manual"` with keys, exact-host check — all server-mode only; Personal untouched). Two Opus 5.5 reviewers (security/code-leak; correctness + abuse walk on the k8s rehearsal) found nothing critical; their findings are fixed in the tree: stale `webapp-deploy/.dockerignore`, the billing test time bomb, `ci-local` false greens, hosted model-cache warm-up after upgrade, hosted enhance without a key → 403, portal retired-code revival, double-submit codes, invite lock on the 5th wrong code, seat cap at the e-mail step, the Edit needs-key note and hosted ffmpeg copy, the Erase button at 360 px. Each is in `docs/internal/unreleased.md`.
-- **Next (Rizky paused 2026-10-01):** (1) the leftovers batch is done and verified (hosted first-sign-in locale from `Accept-Language`, no `ffmpeg.setup` on hosted `/edit/doctor`, Edit Go/recipe/Generate quiet without a hosted key; in `unreleased.md`); (2) rebuild the rehearsal and re-run the abuse walk on the fixed portal + app; (3) batch the security register from `nultron-files/register-pending-2026-10-01.md` (SR numbers from SR-86; the register has NOT been updated today beyond SR-85 and the SR-21 wording); (4) BYOK Phase B (chat on five providers, company + personal keys, owner/admin-only key writes — today any member can forget or replace the company key —, cross-provider fallback as an audited company setting, forced fresh portal check at erase).
-- **Open owner decisions:** whether Erase also closes the company in the portal (people now sign back in to a fresh empty company), the Indonesian Erase label "Hapus permanen akun perusahaan", who pays testers' model usage, ffmpeg in the image, whether to close the tenant (portal has no org erase), the one-off owner-row demotion (moot on a fresh box), the light-theme mode colours (done), the in-app plan catalog placeholder vs the $24 seat proposal.
-- SR-85 is fixed in the tree and not yet packed. The packaged app sets `AGENTFORGE_PACKAGED=1` (`apps/desktop/main.cjs`, `bootstrapPackaged`), and a brand flavor's gateway now travels as `AGENTFORGE_BRAND_GATEWAY_URL`.
-- No Nultron-named installer has been packed yet, so every desktop claim is still unproven on a packed app.
-
-**Direction.** Personal is under active development again and released as **0.15.0** — the `0.14.2x` scheme was scoped to maintenance cuts while the desktop was frozen, and 0.15.0 is a product release, so it takes the next minor. Enterprise is priced per user and contacted through DPS. The 2026-09-18 decision record, open decisions, and deploy log are [`docs/internal/web-pivot-2026-09-18.md`](docs/internal/web-pivot-2026-09-18.md). The gateway stays the model backend for both.
-
-This file is the project source of truth for coding agents. Vault memory at `C:\Users\rizky\Documents\Obsidian` is for Rizky, not for this repo’s domain rules.
-
-**Two uses of the word harness.** A *job harness* is a product mode, and it ships. The *agent guardrails* below do not: the verify skill [`.cursor/skills/verify-agentforge`](.cursor/skills/verify-agentforge/SKILL.md), the pack skill [`.cursor/skills/pack-nultron`](.cursor/skills/pack-nultron/SKILL.md), and the Cursor **pstack** plugin (`how` / `why` mapper, `create-verification-skill` / `maintain-verification-skill` verifier). Project skills call the original pstack skills; nobody vendors pstack into `apps/`, `packages/`, the installer, or the UI. Rules and model routing are in **Agent guardrails** below.
-
-## Harness pass (verify skill, mapper, repack) — landed 2026-09-15, maps extended 2026-09-17
-
-This section is the record of that pass. The checklist under it is what the pass was asked to fix; it is not an open task list. Login has since landed (Phase 9): do not treat “no product login” as a current rule.
-
-**Landed 2026-09-15.** Deliverable 1 is done — the verify skill is maintained (`features/locale.md` and `features/gateway-gate.md` added, 15 dead one-off scripts removed, `doctor --base`, live pass driven on webdev) — and so is deliverable 2, eight map pages under [`docs/internal/maps/`](docs/internal/maps/README.md), extended on 2026-09-17 to 23 pages covering every mode plus the shell rail, chat sessions, Knowledge flows, PII and Market Watch, with a new `features/rail.md` recipe and every feature file linked to its map. The findings those mapping passes produced are logged in [`docs/internal/unreleased.md`](docs/internal/unreleased.md) (“Findings from the mapping pass”, “Findings from the knowledge-flow pass”) — they are product bugs to schedule, not map errors. Deliverable 3 was exercised for real rather than rehearsed: 0.14.26 was packed twice (Windows worktree + mac Docker, one supersession) and the traps are in [`.cursor/skills/pack-nultron/traps.md`](.cursor/skills/pack-nultron/traps.md) (the skill was `pack-dpsbuddy` until 2026-09-29). Still owed: a packaged-app drive from the verify skill (a `DPSBuddy.exe` was running during the pass, so the live pass stayed on webdev), and the Legal recipe, which has still never been driven. The mac hardware smoke was done by the owner for 0.14.26 (Rizky installed and launched the dmg on Mac hardware himself; it works — the first release with a mac launch confirmed on hardware).
-
-Rizky’s order (2026-09-15): bring the harness up to the tree first, then build 0.14.26. Three deliverables, each its own PR, each proven by driving, none touching product code.
-
-### 1. Verify skill — run pstack `/maintain-verification-skill` on `verify-agentforge`
-
-The skill was last touched on 2026-09-14, before the locale PRs and the renderer gate landed, so the honest outcome is `changed`, not `clean`. Known rot to fix under that skill’s edit scope:
-
-- `scripts/` holds 15 one-off `drive-*`, `loop-*`, `poll-*`, `probe-*`, `reverify-*` files next to `doctor.mjs`, while **Helpers** says doctor is the only helper. Promote the ones a recipe still needs (executable, invocation documented in the skill body) and delete the rest. `desktop-app-url.mjs` stays; doctor imports it.
-- No recipe for the locale switch. Add `features/locale.md` (four-H2 contract): Settings language select `settings-locale`, the restart banner `settings-locale-restart` and its apply button, then an `id` walk of the rail, Chat, and one job mode, plus the parity tests as the source check.
-- No recipe for the gateway gate. Add `features/gateway-gate.md` for the states that exist now: `onboarding.gate.*` reasons, the Settings status row `settings-gateway-status` + `settings-gateway-recheck`, 7-day grace, and the `settings-reset` card (already in `features/settings.md`). The host gate and the `403 gateway_blocked` answer both landed on 2026-09-15, so every step is drivable on webdev with a throwaway data dir.
-- `features/README.md` still says Edit rail `mode-edit` “lands in Phase 1; Loop 0 only ships the map” — Edit shipped in 0.14.22. Reconcile. Keep “No product login” true, and add that login, when it lands, is the device-code door and never a password.
-- SKILL.md **Delegation** names Cursor models only. Add the Claude Code routing line from **Agent guardrails** below.
-- The live pass is required: doctor, drive every feature once, evidence under `evidence/<feature>/<run-id>/`, teardown after the last drive. Product bugs it finds go to `docs/internal/unreleased.md` as findings, never into the skill PR.
-
-### 2. Mapper — pstack `how` / `why`, recorded in-repo
-
-pstack `how` and `why` print to the chat and write nothing to disk. The map for agentforge is therefore two things kept in git:
-
-- **Where to press:** `.cursor/skills/verify-agentforge/features/<feature>.md` — user POV, testids, gotchas. Owned by the verify skill.
-- **How it works:** `docs/internal/maps/<subsystem>.md` — the dated `how` output (user action → code path → where to fix) and, when a decision needs a record, the `why` findings with their sources and confidence. First page to write: Chat send, moving the 2026-09-06 `## how — Chat send (pstack)` block out of [`docs/internal/0.14-changelog.md`](docs/internal/0.14-changelog.md). Then, in this order: settings + gateway gate, locale boot and the run harness (`localeForRun` → `withOutputLanguage`), knowledge ingest loop, desktop pack routes.
-- A feature file’s opening paragraph links its map page once one exists; a map page names the feature file that verifies it. `how` runs read-only. A map page that disagrees with the code is fixed the same day or deleted; a stale map is worse than none.
-
-### 3. Repack skill — `pack-nultron` becomes the Windows + macOS repack route
-
-**The pack skill served the Personal app and is retired with it (2026-10-14). Do not run it.** It applied to the Mac/Windows Nultron app, whose last published installer is `0.15.1`. It never packs the hosted web app. That app ships as a container image and a deploy bundle through `scripts/release-web.mjs` (see **Web release (hosted)**).
-
-Today’s skill packs once from HEAD. A repack (same version, after a fix) must be a documented route in that skill, not improvisation:
-
-- **Same version, new artifact.** Remove the previous worktree first (`git worktree remove C:\Users\rizky\agentforge-pack-<v>`) or suffix the new one with the short sha; never rebuild inside the old tree. Move the superseded exe, blockmap and `latest.yml` to `apps/desktop/dist/superseded-<sha>/` before copying new ones in. `latest.yml` is regenerated by the build, never hand-edited.
-- **Docker packs HEAD.** Commit the fix first. `--allow-dirty` never produces a shipped artifact.
-- **Proof stays per OS.** Windows: launch `dist\win-unpacked\Nultron.exe`, `doctor --desktop` from the main checkout, and the Windows smoke row after any shell change. macOS: `verify-bundle.py` on `.app` **and** dmg/zip per arch. Docker exit 0 is not mac proof; the hardware smoke (Gatekeeper, Keychain, Cmd+V, Cmd+Q, Dock reopen) is still owed, and mac stays labelled preview until it is driven.
-- **Record every pack**, shipped or not: the artifact table in [`docs/internal/unreleased.md`](docs/internal/unreleased.md) (source sha, worktree, sha256, bytes, UTC) and a `## Pack + publish` block in the current changelog. `scripts/preflight.mjs` runs before either route; any trap that bites twice becomes a preflight check, not another paragraph in `traps.md`.
-- **Release is separate.** `release-desktop.mjs --require-mac --dry-run`, then without `--dry-run`, only when Rizky says ship. A repack never implies a release.
-
-## Agent guardrails (verify, map, pack)
-
-- **Verify skill:** [`.cursor/skills/verify-agentforge/SKILL.md`](.cursor/skills/verify-agentforge/SKILL.md) — Launch / Doctor / Keys / Drive / Evidence / Cleanup / Helpers / Isolate. Read [`features/README.md`](.cursor/skills/verify-agentforge/features/README.md) before driving; each feature file is H1 + one paragraph + exactly four H2s (`Sub-features`, `How to get to it (user POV)`, `Driving it with the Nultron harness`, `Gotchas`). `scripts/doctor.mjs` (no args = webdev on `:3000`; `--desktop` = packaged app via `host-status.json`) is the health check; never drive an instance this run did not doctor. Proof = action + named result + capture + doctor JSON (+ side effect for mutations) under `evidence/` (gitignored except its README). A green `tsc`, a worker summary, or a screenshot without an action record is not proof.
-- **Pack skill:** [`.cursor/skills/pack-nultron/SKILL.md`](.cursor/skills/pack-nultron/SKILL.md), [`traps.md`](.cursor/skills/pack-nultron/traps.md), `scripts/preflight.mjs` (the directory was `pack-dpsbuddy` until 2026-09-29). Two routes, never in the same cwd: Windows NSIS in an isolated worktree, macOS dmg/zip in Docker Linux from the main checkout. This PC only; Cloud aborts.
-- **Formal check, Chat run settle (2026-11-05):** [`.cursor/skills/chat-run-settle/SKILL.md`](.cursor/skills/chat-run-settle/SKILL.md). A TLA+ model of how a Chat run ends when the stall watchdog, a closed connection and the model's completion race. Run `node scripts/formal/chat-run-settle.mjs` (Java plus the pinned TLC jar) before you change `startModalityRun` in `packages/host/src/runs.ts`, `finishRun`, `recordChatRunUsage` or the database driver. Since 2026-11-06 it holds on a driver whose writes yield too (`--hazard`, Postgres for example), because the run claims its end before it saves the answer. Since 2026-11-09 it also covers a write that never returns. The watchdog then ends the person's stream (`StreamEnds`), but the run row stays `streaming`. A move off SQLite still owes a timeout on each write, or a sweep of `streaming` rows. It is dev tooling, imported by no build.
-- **pstack** is the plugin at `~/.claude/plugins/marketplaces/cursor-plugins/pstack` (0.15.36). T3 Code and Grok load those skills through junctions in `~/.grok/skills`, `~/.agents/skills`, and `~/.fx/skills`. Project skills stay in `.cursor/skills/` and are linked into `.grok/skills` and `.fx/skills` for the same scanners. Nothing is installed under Antigravity. Project skills call `/how`, `/why`, `/create-verification-skill`, `/maintain-verification-skill`; they never copy pstack into `apps/`, `packages/`, the installer, or the UI. `maintain-verification-skill` edits only `.cursor/skills/verify-agentforge/`; product bugs it finds are reported, not fixed in that PR. Its outcome is one of `clean` / `changed` / `blocked`, said plainly.
-- **Claude Code sessions in this repo work the pstack way too.** Read the subsystem's map page before changing it (`how`), and refresh that page plus the matching `features/<feature>.md` in the same change. Prove by driving the real thing, not by a green `tsc` or a worker's summary (`principle-prove-it-works`); cite `file:line` for every claim. Write docs to `technical-writing` and edit them with `unslop`. Read the skills from the plugin path above; never vendor a copy into this repo. The three recipes owed from this round landed on 2026-09-21: [`features/login.md`](.cursor/skills/verify-agentforge/features/login.md), [`features/plans.md`](.cursor/skills/verify-agentforge/features/plans.md), and the Recording section of [`features/meeting.md`](.cursor/skills/verify-agentforge/features/meeting.md).
-- **Model routing.** Cursor sessions: explore = Composer 2.5, worker = Grok 4.5, fan-out 2 (as the verify skill says). T3 Code and Grok sessions (Rizky, 2026-11-10, second pass): pstack's per-role models come from [`.claude/rules/pstack-models.md`](.claude/rules/pstack-models.md), which is identical to `~/.claude/rules/pstack-models.md` and `~/.grok/rules/pstack-models.md`; keep the three the same. Opus 5.5 is the main chat. Sonnet 5.5 takes hard or long-running work: features, bug fixes, `perf-issue`, the hardest tasks and `reflect` tooling. DeepSeek V4.1 Flash (always `max`) is the general worker for small tasks with few dependencies, and takes the `how` explorer, the `why` investigators, `swarm` workers and `hillclimb`. Gemini 4 Argon takes judgment and prose, the `how` explainer and the `why` and `reflect` synthesizers. Grok 4.7 is slow, so it takes no worker tasks: it keeps one seat on the cross-judge and interrogate panels only (Rizky, 2026-11-10, third pass). Opus is the first arena cross-judge by Rizky's override. Fable 5.2 only judges: it is called for security-sensitive or high-dependency work, after explorer reports, and delegates every piece to Sonnet, DeepSeek or Gemini instead of writing code; the rule file spells out that flow. Gemini 3.8 Flash reads screenshots and visual requirements. The file names each provider's `delegate_task` target. Change a role by editing its line in all three copies; delete the line to fall back to the pstack skill default. The main session verifies every result itself before reporting.
-- **Maps:** [`docs/internal/maps/`](docs/internal/maps/README.md) — 46 pages, one per subsystem (`ls docs/internal/maps/*.md` minus `README.md`), each with a `Last verified: <date> at <sha>` line and `file:line` citations. Read the page before working in a subsystem; if your change makes it false, refresh it in the same PR (rewrite in place, bump the verified line) and refresh the matching `features/<feature>.md`. Product bugs a mapping pass finds go to `unreleased.md` as findings, not into the map PR as fixes.
-- **Changelog is the checklist.** Every product change appends to the current changelog; the pack step reads it back; the verify pass drives it. Harness-only changes (skills, `.vscode`, `biome.json`) are labelled “harness, never ship” and stay out of the installer.
-
-## After the harness pass: 0.14.26 — host-side gateway gate, then portal login
-
-Read this before any work on onboarding, Settings, `/api/v1/settings`, keys, or the desktop shell.
-
-**Phase 0 (landed 2026-09-15 on this branch): the host owns the key gate.** Contract: [`packages/core/src/gateway/gate-types.ts`](packages/core/src/gateway/gate-types.ts) — `{ status, allowed, grace, endpoint, endpointLocked: true, checkedAt, lastOkAt, message? }`, `status` in `stub | needs_key | ok | invalid_key | unreachable | error`. Host: [`packages/host/src/gateway-gate.ts`](packages/host/src/gateway-gate.ts) derives the payload from `<dataDir>/gateway-gate.json` (verdict per key fingerprint, never the key), `settingsPayload()` carries it as `gateway`, saving a key runs one 3 s live `GET <endpoint>/models`, and `POST /api/v1/settings/gateway/check` re-validates. Renderer: [`apps/web/lib/gateway-gate.ts`](apps/web/lib/gateway-gate.ts) parses it, [`apps/web/src/App.tsx`](apps/web/src/App.tsx) calls `resolveGate(payload.gateway, isElectron())` and listens for `GATE_EVENT`. **Start over** (Settings card `settings-reset`): `POST /api/v1/settings/reset` with `scope: "key"` forgets the gateway key on every desk and drops to onboarding; `scope: "all"` + `confirm: "RESET"` queues `reset-pending.json`, which [`packages/db/src/reset.ts`](packages/db/src/reset.ts) applies on the next boot before SQLite opens (named entries only — the data dir is also Electron userData), then the shell relaunches over IPC `app:relaunch` and clears Chromium storage. Proven on webdev with a throwaway data dir on 2026-09-15 (live check, sign-out, wipe on reboot); packaged Windows drive still owed. Every gateway-calling handler (runs, jobs, finance, market, legal, knowledge, enhance, edit agent) calls `requireGatewayAllowed()` and answers a flat `403 { error: "gateway_blocked", status, message }` when `allowed` is false; settings, workspaces, threads, artifacts, media, usage and the model refresh stay open so a closed gate is always recoverable. A saved key with no verdict on disk opens under grace and the host re-checks in the background (throttled, 10 min); an `ok` verdict older than 24 h falls back to the 7-day grace. Owed: the packaged Windows drive of all of it. Rules that still hold:
-
-- The host decides, the renderer displays. `allowed` is the only thing the renderer branches on; it never re-derives a decision from `hasOpenai` or key shape. Grace = the same key validated within 7 days (`lastOkAt`), so the app opens offline.
-- Every route that calls the gateway checks the same gate and answers `403 gateway_blocked` when `allowed` is false. Stub runtime reports `status: "stub", allowed: true` so Cloud / Playwright keep working.
-- `endpoint` is the pinned gateway URL and `endpointLocked` is always `true` in the payload. Since 0.14.26 (`8831bc4`) the endpoint is pinned to `https://api.tokotokenai.com/v1` and the owner cannot change it — the 0.14.21 override is gone, and `POST /api/v1/settings` no longer reads `openaiBaseUrl` from the body. Since 2026-09-17 it is also hidden from Settings and onboarding: neither surface renders the URL. `AGENTFORGE_GATEWAY_URL` is a dev/test-only hook, ignored when packaged or when `NODE_ENV=production`; a packaged brand flavor gets its gateway only through `AGENTFORGE_BRAND_GATEWAY_URL`, which `bootstrapPackaged` sets from `brand.json` (SR-85).
-- The key validation call reuses the 3 s budget in [`packages/core/src/gateway/account.ts`](packages/core/src/gateway/account.ts) and never blocks first paint.
-
-**The gate is advisory, and that is on purpose.** `allowed` is a UX signal — it decides what the desk shows and which local handlers answer `403 gateway_blocked`. It is not an entitlement check and must never be read as one. Every rule in it fails **open**: `deriveGatewayGate` opens the gate when `gateway-gate.json` is missing or unreadable (the upgrade case, and any desk whose data dir was rolled back), the background re-check swallows its own failures, a verdict that cannot be written costs a cached decision and nothing else, and the whole file is plain JSON in a directory the owner can edit, delete or replace. Anyone who wants past it can delete one file. That is the right trade for a local-first desk that has to keep working offline — and it is exactly why **the 20-seat entitlement, plan limits and any spend cap have to be enforced server-side, by the gateway and the licence service, against the bearer on the request.** The client is a thin display of a decision made elsewhere (see Phase 1 below); `gateway-gate.json` is a cache of the last answer, never the authority. If a limit can be defeated by editing a local file, it was never enforced.
-
-**Portal login (in this branch since Phase 9).** The design below was written when device-code login was still next. The client and `apps/portal` now implement it; the invariants still hold. Design is locked in [`docs/internal/portal/device-code-login.md`](docs/internal/portal/device-code-login.md) (flow, endpoints, tokens, reason codes, client integration plan), [`docs/internal/portal/schema.md`](docs/internal/portal/schema.md) (control-plane Postgres, RLS, seat count, wallet) and [`docs/internal/portal/migrations/`](docs/internal/portal/migrations/README.md) (SQL 0001–0005). The portal side was the backend team’s when this was written. Since **Phase 9 (2026-09-21)** this repo also builds `apps/portal`, a stand-in that implements those docs on the wire; see the Phase 9 section below for what that does and does not change. Names in code match those docs. Client invariants:
-
-- **Thin client.** The app holds no licence state and makes no entitlement decision. Seats, plan, spend, model allowlist are rows in the portal DB; the client only shows the reason code it was given.
-- **BYO key stays the floor.** Pasting a raw gateway key keeps working exactly as today. Login is a second, additive door. Bearer choice happens in one place, `resolveProviderKeys` in [`packages/core/src/secrets.ts`](packages/core/src/secrets.ts): explicit workspace key (unless `allow_byo_key` is `false`) → live session access token → stub.
-- **New machine-scoped `StoredSession`** in `packages/core/src/session.ts`, persisted to `<localDataDir()>/session.enc` by `packages/host/src/session-store.ts` using `encryptJson` / `decryptJson` from [`packages/core/src/crypto/envelope.ts`](packages/core/src/crypto/envelope.ts). Not new fields on `StoredSecrets` (that struct is per workspace and has a renderer-facing masked projection). No new keychain slot: `apps/desktop/main.cjs` does not change for login. That is the desktop path, unchanged; the hosted web app needs a server-side equivalent for the session store and its wrap key — open decision 2 in [`docs/internal/web-pivot-2026-09-18.md`](docs/internal/web-pivot-2026-09-18.md) (browser login flow with the portal).
-- **Tokens never reach the renderer and never cross IPC.** Access token lives in host memory only; a cold start refreshes. `GET /api/v1/auth/session` returns ids, email, org, seats, device label, expiry — never tokens. `MaskedSecrets` gains no token field.
-- **Two device identifiers, never interchangeable.** `install_id` is client-minted (UUIDv4 in `<localDataDir()>/device.json`, mirrored in `session.enc`, never hardware-derived, survives sign-out). `device_id` is the server’s `devices.id`, returned by the token response, sent on every refresh, carried as the `did` claim.
-- **Boot never waits on the network.** `hasSession` is read from disk; refresh, tenant-config revalidation and the poll all run after first paint with 3 s / 5 s timeouts and backoff. A `401` with a terminal reason clears the session; a timeout does not.
-- **Tenant comes from brand config.** Add `tenantSlug` to `apps/desktop/branding/<brand>/brand.json` (history: `agentforge` was deleted on 2026-11-06; `kemenkeu` and `metranet` are local-only; no `tenantSlug` yet) and send it as `tenant_hint`. Never resolve a tenant from an e-mail domain.
-- **Renderer gate (as built 2026-10-01):** on hosted, a closed gate opens the desk only for a live session plus the host's per-person `keyLater` record (the onboarding "Add it later" choice, `POST /api/v1/settings/key-later`, `apps/web/lib/gateway-gate.ts:101`); a session alone does not open it, and Personal never. The host keeps refusing every model route with `403 gateway_blocked` until a key is saved; each pane shows a needs-key note with a Settings link. Reason codes (`seat_cap_reached`, `device_revoked`, `org_past_due`, …) map to the copy table in the login doc, in both locales, through the `onboarding` catalog — not to a generic “API error”.
-- New host routes go through [`packages/host/src/router.ts`](packages/host/src/router.ts) with handlers in `packages/host/src/handlers/auth.ts`; the renderer reaches them through `@/lib/api-client` like everything else. Portal calls reuse `assertAllowedEndpointUrl` and `redactSecrets`; `user_code`, `device_code`, refresh tokens and JWTs are never logged.
-
-**Decisions Rizky has not made — do not assume an answer in code or copy:** offline grace length (7 days is the draft), whether a pasted key beats a live session, seat reclamation after 30 idle days, where BYO-key spend is billed (schema open question 7 / login doc open question 9 — there is no per-user wallet), and a per-device keypair (v1.1, needs a shell change). Payment provider (Xendit / Paddle / Stripe) is still undecided, which is why the webhook is provider-neutral. **Answered on 2026-09-21, do not re-open in code:** every tier name, price, seat cap and number is a placeholder in one config file, and there is **no token allowance** — see Phase 9 below. The "20-seat free tier" above is a draft number of that kind, not a rule.
-
-Product rules for the client stay as before: no password, no Better Auth, no “join Harbor State”. (The portal's password mode, added 2026-10-07 and the Enterprise bundle default since 2026-10-09, is a portal mode; the client still holds no password.) Mail and sessions belong to the portal, not to a package inside `apps/web`. Everything local still works without the portal.
-
-## Phase 9 — portal login and pricing (in progress, 2026-09-21)
-
-Plan of record: [`docs/internal/web-phase9-portal-login.md`](docs/internal/web-phase9-portal-login.md). Read it before touching auth, billing or `apps/portal`. The owner's rulings, one line each:
-
-- **Real portal login, not a dev bypass.** `apps/portal` is a new workspace app that implements `docs/internal/portal/**` on the wire. It is reached only over HTTP through `AGENTFORGE_PORTAL_URL`, never imported by the product, and it never imports `@agentforge/db` or `@agentforge/host`.
-- **Postgres from day one for the portal.** `PORTAL_DATABASE_URL` is required and is never `DATABASE_URL`; `docs/internal/portal/migrations/0001-0005` run unchanged and new tables go in `apps/portal/migrations/0006+`. `apps/portal/compose.yml` carries `postgres:16` and `mailpit`, both published on `127.0.0.1` only. This says nothing about the product database, which is still SQLite.
-- **Real SMTP against a sandbox** (Mailpit locally). Until a mail provider is bound the owner's team hands codes out by hand with the portal's `otp` script, which needs `PORTAL_ALLOW_MANUAL_OTP=1`, is refused in production, and writes an `otp.issued_manually` audit row. No plaintext outbox files.
-- **Two placeholder plans, Personal and Enterprise**, in `packages/core/src/plans/catalog.ts`, every number marked `placeholder: true`. **No token allowance:** tiers leave `allowance_usd_micros` null, the catalog has no `tokenAllowance`, and the usage panel shows seats and plan status only.
-- **Review instance on 4000 / 3100 / 3443** through `scripts/review-instance.ps1`, with its own data dir under `$HOME\.nultron-review` and **never** `.webdev-data`. `scripts/review-proxy.mjs` terminates TLS on 3443. Harness, never ships.
-- **Build local, owner reviews, then a PR.** The branch is [PR #97](https://github.com/Kyoo032/agentforge/pull/97). It is not merged and not deployed.
-
-## On `main`, not in an installer (the 0.15.0 ship list, 2026-09-17 onward)
-
-Everything here is proven by unit tests and webdev only; none of it is packed. The log is [`docs/internal/unreleased.md`](docs/internal/unreleased.md); each line below names the map page to read before touching it.
-
-- **Finance is task-based.** Five tasks under the rail entry — brief, ratios, budget, cash flow, appraisal — registered in `packages/core/src/finance/tasks.ts` + `tasks/`, with the maths in `packages/core/src/finance/{ratios,budget,cashflow,appraisal}/`. **Figures are computed in core, deterministically; the model names categories and writes the narrative, it never produces an amount** (`number-guard.ts`, `stated-facts.ts`, `packages/host/src/finance-section-repair.ts`). Host pipeline: `packages/host/src/finance-task.ts` → `finance-tasks/runner.ts`. Files come in through `POST /api/v1/finance/import` (25 MB / 30 sheets / 5000 rows, `import-table/limits.ts`) and go out through `POST /api/v1/finance/export` (`packages/host/src/renderers/`: xlsx, pptx, docx; pdf answers 501). An unknown `?task=` resolves to `brief`, never an error. Maps: [`finance-parse-and-generate.md`](docs/internal/maps/finance-parse-and-generate.md), [`finance-tasks.md`](docs/internal/maps/finance-tasks.md).
-- **Local file extraction.** `packages/host/src/file-extract` reads pdf / docx / pptx / xlsx / odt / rtf / epub and friends on the machine through `@firecrawl/anydoc` (a napi-rs native module) with a fallback reader; 25 MB / 20 s caps, extension and magic bytes must agree or the file is refused as `format_mismatch`. **No hosted OCR, ever**: a scan is refused locally as `needs_ocr` and `no-hosted-ocr.test.ts` holds that line. Knowledge ingest and Finance import both use it. **The owner never installs it.** It is a dependency of `apps/desktop` and `asarUnpack`ed, so a packaged Windows build carries it, and the Docker mac route swaps in the pinned darwin package per arch (`build-mac.sh`, sha512 from the same manifest — a Linux install would otherwise ship ELF binaries into the `.app`, which is how the first 0.14.27 mac pack failed); where the bundled copy does not load the first-run **component installer** fetches it — see **Components** below. Not yet proven on a packed installer or on Mac hardware.
-- **Components (first-run installer, 2026-09-17).** `packages/host/src/components/` is the only way the app installs a native dependency, modelled on Hermes' bootstrap: a frozen manifest → stages `check, download, verify, unpack, probe, marker` → `job.phase` / `job.step` events → an atomic completion marker → every stage `skipped` on the next launch. `GET /api/v1/components` reports `ready | missing | installing | failed | unsupported` with `source: bundled | downloaded`; `POST /api/v1/components/install/stream` runs it. Neither is gated — it runs during onboarding, before a key exists. Onboarding shows the panel (`component-setup`) and starts it on its own; an already-onboarded desk runs it silently after the gate opens. Rules: URLs and sha512 integrity come **only** from `manifest.ts`, never from a request; the hash is checked before a byte reaches the final directory; the tar reader refuses absolute paths, `..`, links and oversize archives; files land in `<dataDir>/components/<id>/<version>/` and Start over (`scope: "all"`) removes them; a failure never blocks onboarding because `file-extract` falls back. `auto` is `false` when `AGENTFORGE_RUNTIME=stub` is set or under test, so Cloud and Playwright never download. **A new native dependency is a manifest entry, never an instruction to the owner** — ffmpeg is the next candidate and today still shows the manual `ffmpeg-setup-notice`.
-- **PII on the outbound copy** masks eight kinds including Indonesian identifiers (`packages/core/src/security/pii.ts`, `pii-id.ts`), and Finance adds a column-aware scanner (`finance/pii-scan.ts`, `pii-columns.ts`). Rule: redaction may hide an identifier, never a figure — `restoreFinanceAmounts` in `packages/host/src/finance-privacy.ts` puts any masked amount back. Map: [`pii-and-key-security.md`](docs/internal/maps/pii-and-key-security.md).
-- **Job model fallback.** A job call that fails with a transport-class error (502/503/504, refused socket, no first token) retries once on the next live model of that mode's list (`packages/core/src/models/job-fallback.ts`, `mode-defaults.ts`, `packages/host/src/job-model-fallback.ts`), never on a pinned model, never to a second gateway; a failed model is skipped for five minutes and saving Settings clears the breaker. The result carries a `model_fallback` notice. Recipe: `features/models.md`.
-- **Market Watch team.** Eleven specialist agents share one pipeline (`packages/core/src/market/specialists.ts`), a team run in `packages/host/src/market-team.ts`, per-desk watchlists, and new keyless sources (CoinGecko, metals, Reddit, StockTwits, fundamentals, global news) beside Yahoo. The host computes every number in the packet; the briefing is guarded and always carries the disclaimer. Plans: [`market-team-plan.md`](docs/internal/market-team-plan.md); map: [`market-watch.md`](docs/internal/maps/market-watch.md).
-- **Rail.** Up to four recent Chat sessions sit under the Chat entry with `All sessions` expanding in place (owner decision 2026-09-17, see `docs/product-modes.md`); Finance tasks and Market specialists are rail submenus (`rail-submenu.tsx`, `rail-finance-tasks.tsx`, `rail-market-specialists.tsx`, `rail-recent-threads.tsx`). `chat-thread-list.tsx` is deleted — there is no second column. Maps: [`chat-sessions-and-rail.md`](docs/internal/maps/chat-sessions-and-rail.md), [`shell-rail-and-workspaces.md`](docs/internal/maps/shell-rail-and-workspaces.md).
-- **Knowledge.** Soul store, graph prune and source-delete cascade (`knowledge-soul.ts`, `knowledge-graph-prune.ts`), a health summary in the renderer (`apps/web/lib/knowledge-health.ts`), and Market briefings now leave a work card like every other analyst desk. Maps: [`knowledge-flows.md`](docs/internal/maps/knowledge-flows.md), [`knowledge-base-page.md`](docs/internal/maps/knowledge-base-page.md).
-- **Music (2026-09-21).** The rail always offers the relay-only model `suno_music`, whatever the gateway catalog lists (`RELAY_ONLY_MUSIC_MODEL_IDS`, `packages/core/src/models/media-kind.ts`). It is not a `/v1` route: requests go to `{gateway origin}/suno/*` with the gateway key and a browser `User-Agent` (`packages/core/src/tools/platform/gateway-audio.ts`). The origin is derived only from the validated gateway base URL, never from a request. The wire has never been driven live. Map: [`music-mode.md`](docs/internal/maps/music-mode.md).
-- **Meeting (2026-09-21).** Mode has a live in-browser recorder as well as upload: microphone, or microphone plus tab audio (`apps/web/lib/meeting-recorder.ts`, `components/meeting-recorder.tsx`). The transcription leg walks a preference chain of gateway models and must be **proven against the live gateway**, not against a stub. Recording in the hosted app also needs the `Permissions-Policy` change in [`docs/internal/security-register.md`](docs/internal/security-register.md), SR-14. Map: [`meeting-minutes.md`](docs/internal/maps/meeting-minutes.md).
-- **Finance eval harness — dev only, never ships.** `packages/host/eval/finance/` (runner, synthetic cases, README): loopback-only against webdev, `results/` gitignored, not reachable from any build. Synthetic data only; never put a real filing or a real person in a case.
-
-## Product (locked 2026-09-02 GTM; closed beta)
-
-- **Gateway-first.** Nultron exists because buying a key at `api.tokotokenai.com` leaves the question “where do I use this?” Open the hosted app, sign in, work. A pasted gateway key still runs the models. Native Anthropic / Google / Ark stay in the settings store, unexposed. The endpoint is pinned to `https://api.tokotokenai.com/v1` since 0.14.26 (`8831bc4`) — the 0.14.21 owner override is gone — and hidden from Settings and onboarding: since 2026-09-26 onboarding does not show the gateway address at all, and Settings still names the host in its intro sentence. `AGENTFORGE_GATEWAY_URL` is a dev/test-only hook, ignored when packaged or when `NODE_ENV=production`.
-- **Two doors, no password.** Portal sign-in (browser one-time code and device code) is the account. A pasted gateway key stays the floor for model calls. No password, no Better Auth, and no account stack inside `apps/web` or `packages/host`. One exception, by Rizky on 2026-10-07: the portal can sign people in with a username and password; since 2026-10-09 that is the Nultron Enterprise bundle's default, with the e-mailed code selectable. The password lives in the portal, never in the product app. Mail and portal sessions live in the portal, reached over HTTP. `apps/portal` is the in-repo stand-in for that portal; the product never imports it.
-- **One server, many tenants.** Every row belongs to a tenant; the host enforces tenancy, the renderer displays. Data lives in the server's data dir, not on a user's machine.
-- **First-run guide (2026-09-29).** When first-run setup ends, a short guided tour is offered once: coach marks on the real rail, Workspaces, the Chat composer, the Knowledge Base and Settings, each with Next, Back (not on the first), a visible Skip and a close button; Esc closes and a click outside does nothing. It is a state machine (`idle | offered | step(n) | done`, `apps/web/lib/guide-machine.ts`) over a step registry (`guide-steps.ts`). How it ended is stored by the host beside the language (`users[…].guide` in the sealed `settings.enc`, `POST /api/v1/settings/guide`, `guide` on `GET /api/v1/settings`), so it is machine-wide on a desk, never opens on its own again, and "Start over" (which removes `settings.enc`) shows it again. Settings has "Replay the guide". Map: [`docs/internal/maps/first-run-desk-and-guide.md`](docs/internal/maps/first-run-desk-and-guide.md); recipe: `features/guide.md`.
-- **First-run needs:** a gateway API key or a portal sign-in (and later optional local models such as Ollama). The wrap key comes from `AGENTFORGE_SECRETS_KEY` (env / secret manager) on the server; keys never reach the renderer, never go in git, never in `NEXT_PUBLIC_*`. The OS keychain is the desktop path only.
-- **Workspaces** are the user’s own desks (which tabs they need) — not an org membership table they must join. On both **Personal** (`FIRST_RUN_MODES = ["chat"]`) and **Enterprise** (`HOSTED_FIRST_DESK_MODES = FIRST_RUN_MODES`), the first desk of a fresh install starts with `["chat"]` alone (**hard rule, 2026-10-21**, replacing the 2026-09-29 five-mode starter set; see Non-negotiables), while Specialist Modes (`research`, `images`, `videos`, `presentation`, `spreadsheets`, `documents`) remain available on the Virtual agents page (`/workspaces`) and chat handles specialist work inline via `research_dossier`, `finance_task`, `build_deck`, `image_generate`, `video_generate`, and `delegate`. An existing desk keeps whatever it has. Hiring an agent on `/workspaces` adds its mode to the current desk, which is how the owner adds the rest. The chat-first shell does not offer creating, switching, renaming or deleting desks there (`apps/web/components/virtual-agents-page.tsx:22-24`).
-- Chat is ready immediately. Model picker + composer. Building custom agents is parked, not a gate.
-- Pack templates are optional workspace presets. Default Chat never uses a pack template.
-- University/Harbor State is an **optional pack of templates**, not the identity of the app. Kernel stays industry-neutral (`student` / `course` do not belong in core schema).
-- Custom agents / Studio stay in the tree and redirect to Chat. Do not add a GTM “hidden Build” door.
-
-### Web target
-
-The product is the existing **Express host** (`apps/web/server.ts`) serving the built **Vite renderer**, over HTTPS behind a reverse proxy on Rizky's server. **SQLite** in the server data dir for the first deployment; the tenancy model in the schema and SQLite vs Postgres are open decision 1 in [`docs/internal/web-pivot-2026-09-18.md`](docs/internal/web-pivot-2026-09-18.md), not rules — do not write "use Postgres".
-
-### Desktop (Personal product; retired 2026-10-14)
-
-Installer (**Electron**) + **SQLite** in the user data dir. No Docker Postgres. **Retired on 2026-10-14 (Rizky).** 0.15.1 (2026-09-28) is the last published installer, 0.16.0 was packed on 2026-10-06 and never published, and no new cut is made. The code stays in the tree. Before that it was under active development from 2026-09-23 (0.15.0 was a product release), and maintenance-only from 2026-09-18 to 2026-09-22 (frozen at 0.14.27).
-
-### What to keep from this repo
-
-Chat composer, job-mode studios, workspace templates, modality-fail-closed run APIs, OpenAI-compatible wire (`/v1/chat/completions` + `/v1/responses`) against the gateway. Agent tables and Studio files stay for a later “show Build again” pass — they are not GTM surfaces.
-
-### What to remove from the product (later)
-
-Harbor State seed as identity leftovers (`packages/university/src/labels.ts` still names the org). Better Auth is already gone from code; keep it gone. Public rename / UI redesign / customer-only ship is parked until closed beta feedback lands.
-
-## Non-negotiables
-
-- Kernel schema, APIs, and packages must not use `student`, `course`, or campus nouns. Those live in `packages/university` (optional pack).
-- **The first desk of a fresh install on both Personal and Enterprise has `["chat"]` alone (Rizky, 2026-10-21, replacing the 2026-09-29 five-mode starter set; a hard rule, not a default).** Every path that writes a local first desk goes through the one constant `FIRST_RUN_MODES` (`["chat"]`) by way of `firstDeskModes(isServerMode())` in `ensureLocalOwner`; the hosted path (`ensurePortalOwner`) reads `HOSTED_FIRST_DESK_MODES` (`FIRST_RUN_MODES`, also `["chat"]`) and is a separate function. Specialist Modes (`research`, `images`, `videos`, `presentation`, `spreadsheets`, `documents`) remain available on the Virtual agents page (`/workspaces`), while chat handles specialist work inline via `research_dossier`, `finance_task`, `build_deck`, `image_generate`, `video_generate`, and `delegate`. `packages/host/src/first-run-modes.test.ts` fails if a fresh data dir's first desk has any other mode, through the real router and through Start over; `packages/db/src/first-desk-modes.test.ts` fails if a second place starts writing desk rows. Changing the list is an owner decision made in that test's literal, in the same commit. It never rewrites an existing desk.
-- Modalities are fail-closed: wrong content type on `/runs/text|image|video` is **400**, never silently dropped. `text` is always on; image/video are optional per agent and per model.
-- Never commit `.env`, API keys, or passwords.
-- Do not commit or push unless Rizky asks.
-- **Never `git add -A` or `git add .` in the webdev worktree `C:\Users\rizky\agentforge-webdev-0f994f5`.** It holds uncommitted work from several lanes at once plus untracked binaries such as `apps/web/public/brand/logo.png`. Stage files explicitly by path. See [`docs/internal/security-register.md`](docs/internal/security-register.md), SR-17.
-- Login is the portal flow in `docs/internal/portal/`: browser one-time code and device code. No password, no Better Auth, and no account stack inside the product app. The client makes no entitlement decision: the host enforces, the renderer displays. The one exception is the portal's password mode (Rizky, 2026-10-07), the Enterprise bundle default since 2026-10-09: still the portal, still no account stack in the product app.
-- **The HTTP server is the product.** Local webdev binds `127.0.0.1:3000`; the hosted app is the same Express host behind a reverse proxy. The loopback-only Origin allowlist in `packages/host/src/local-request.ts:75-84` (`isAllowedMutatingApiRequest`, wired at `packages/host/src/http-adapter.ts:188`) must become a trusted-origin allowlist **plus CSRF protection** before the web app is exposed — open decision 3. Until that lands the host still binds loopback and sits behind the proxy. Personal desktop: packaged Electron has **no HTTP server** — the renderer talks to the host over IPC (`window.agentforge`). Outbound HTTPS from the host to the gateway and the portal is the only network traffic that carries anything of a tenant's. One exception, and it carries nothing: the component installer fetches pinned, sha512-verified packages from `registry.npmjs.org` (see **Components**); plus the keyless public market and search sources a mode calls by design. Since 2026-09-20 there is a second destination that *does* carry a desk's content, by the owner's own act: **`api.telegram.org`**, for the Channels page (`docs/internal/telegram-channels-plan.md`). It is pinned in code like the gateway, HTTPS only, never followed through a redirect, and **pull-only** — inbound messages are fetched with `getUpdates`, never pushed to a webhook, so it opens no inbound route.
-- Every row belongs to a tenant; the host enforces tenancy, the renderer displays.
-- Every user-facing string exists in both `en` and `id` catalogs, and every job harness applies the output-language rule (see **Locale**).
-
-## Layout
-
-```
-apps/web                 Vite + React Router renderer; Express is the product server (webdev on :3000, hosted behind a proxy)
-apps/web/locales         en/ and id/ catalogs, one JSON per namespace (see Locale)
-apps/portal              Portal stand-in (Postgres, Mailpit). The product reaches it over HTTP only; it never imports the host or the product database.
-apps/desktop             Electron shell + Windows installer (the Personal product, retired 2026-10-14, last published 0.15.1; packaged: IPC host, no loopback HTTP)
-apps/desktop/branding    Gone since 2026-11-06 (the agentforge kit was deleted; kemenkeu and metranet were always local-only)
-apps/desktop/platform    Per-OS shell rules: README.md matrix + windows/ + macos/ (read before touching menus, quit, keychain, paths, installer, updater)
-apps/mobile              Mobile client home (Expo, Android first, iOS after). Rules only until Phase 0 scaffold; see apps/mobile/AGENTS.md
-packages/host            Local API dispatch (webdev HTTP adapter + Electron IPC); job harnesses; locale boot; file-extract/ (local document reading); renderers/ (xlsx, pptx, docx export)
-packages/host/eval       Dev-only eval harnesses (finance); loopback against webdev, never bundled
-packages/core            Content parsers, tools, AgentRuntime, AgentService, secrets, gateway gate types, locale primitives; channels/ (channel records + the pinned Telegram origin)
-packages/host/src/channels  Telegram Bot API client + the per-desk channel store (account-rail Channels page)
-packages/db              Drizzle schema (SQLite in the user data dir); localDataDir()
-packages/university      Optional Students templates and mock campus tools
-packages/marketing       Optional Marketing templates
-packages/legal           Optional Legal templates
-docs/                    Product docs + docs/internal engineering notes (index: docs/internal/README.md); docs/internal/maps = one how-it-works page per subsystem
+| Feature, UI/UX, bug fix, or security work | `main` | `nultron` or worktree `nultron-<topic>` | `main` | `pnpm ci:local` passing (tester sync paused until live) |
+| Docs, maps, or skills | `main` | `nultron` or worktree | `main` | `pnpm lane-guard` and relevant checks |
+| Release or deploy | `main` only | `nultron` | none | Rizky's explicit go at that moment |
+
+Rules that always apply:
+
+- Read [`docs/internal/release-targets.md`](docs/internal/release-targets.md) first and name the target your task serves. The one active ship target is `nultron-enterprise` (hosted web app and OPC desk). Nultron Personal (Electron) was retired on 2026-10-14 (`Kyoo032/Nultron-Desktop` archived), and `apps/desktop/**`, desktop scripts, retired desktop skills, and the Electron web bridge were deleted on 2026-11-24 (DFIND-139).
+- Never release from `C:\Users\rizky\agentforge-chat` or from a Cloud VM.
+- Shared code and copy never hard-code `Toko Token`. Read `gatewayName` and `productName` instead. `Nultron` may appear in this repo because it is the Nultron core.
+- `Kyoo032/hyp-ai` is a standalone codebase. Nothing syncs between it and `Kyoo032/Nultron`.
+- Include a `Lanes:` line (using `enterprise` and/or `tester` from [`lanes.json`](lanes.json)) in PR descriptions and commits touching protected files.
+- Never commit or push unless Rizky asks.
+
+## Product direction and boundaries
+
+Nultron is a chat-first workbench for a one-person company (OPC). One owner works with built-in harnesses and virtual agents inside one desk (`SHELL_LAYOUT = "chat-first"` in [`packages/core/src/agents/product-modes.ts`](packages/core/src/agents/product-modes.ts)).
+
+- **14 built-in harnesses.** `chat`, `documents`, `research`, `finance`, `data`, `market`, `legal`, `meeting`, `images`, `videos`, `music`, `edit`, `presentations`, and `education`. Do not add new product modes, harnesses, rail entries, or packs without Rizky's explicit approval.
+- **Prompt first.** Every harness starts from one prompt box with optional files, puts results before controls, and preserves user edits during regeneration. Put capability in the harness, not in upfront setup forms.
+- **Fresh desk invariant (hard rule).** Every fresh install starts with `["chat"]` alone (`FIRST_RUN_MODES` and `HOSTED_FIRST_DESK_MODES` in `packages/core/src/agents/product-modes.ts`), enforced by `packages/host/src/first-run-modes.test.ts` and `packages/db/src/first-desk-modes.test.ts`. Never rewrite an existing desk. Specialist agents are added or deleted on `/workspaces`, and Chat invokes specialist work inline.
+- **Custom-agent builder stays parked.** `/studio/**` redirects to Chat. Do not build a custom-agent builder or team workspace board here.
+- **Industry-neutral kernel.** Schema, APIs, and core packages must not contain `student`, `course`, or campus nouns. Optional templates live in `packages/university`, `packages/marketing`, and `packages/legal`.
+- **Entitlements.** Routines are free on every plan. Cloud computer / VPS access requires a paid plan. The host enforces entitlements from the portal; the renderer only displays state.
+- **Tenancy and privacy.** Every row belongs to a tenant, enforced by the host. On hosted desks, Chat knowledge cards are visible only to the thread owner (`knowledge-visibility.ts`), and each person's chat upload folder is private.
+- **Single-process SQLite architecture.** The hosted app runs one Node process against one SQLite file (`data/agentforge.sqlite` or `AGENTFORGE_DATA_DIR`) with local file storage (`webapp-deploy/k8s/` pins one app pod with `strategy: Recreate`). Do not migrate the product database to Postgres or multi-replica scaling without Rizky's explicit go.
+- **Public copy rule.** On public pages, Nultron is "coming soon". Never publish GitHub download links, public preview links, or "closed beta" / "testers" copy on public marketing sites.
+
+## Repository layout
+
+```text
+apps/web                 Vite + React Router renderer and Express product server (server.ts)
+apps/web/locales         en/ and id/ JSON catalogs across 33 namespaces
+apps/portal              Standalone portal control plane (Postgres via PORTAL_DATABASE_URL; HTTP only, never imported by product)
+apps/mobile              Planning rules only (apps/mobile/AGENTS.md); no shipped mobile app
+packages/core            AgentRuntime, tools, product-modes, harness/modes, providers, security (PII, redact, outbound guard), mcp, voice, inbox, channels, finance, market, locale, output-language
+packages/host            HTTP adapter, router, handlers, job harnesses, mcp, voice, delegation, channels (Telegram), inbox (WhatsApp), code-runner (WASM), file-extract, components, renderers, auth, eval
+packages/db              Drizzle SQLite schema, ensureSchema migrations, vault-key.ts, reset.ts
+packages/legal           Optional Legal pack templates
+packages/marketing       Optional Marketing pack templates
+packages/university      Optional University pack templates
+webapp-deploy            Dockerfile, Compose stack, K8s manifests (k8s/), AEAD backup and restore scripts
+docs/                    Public docs and docs/internal/ (release-targets, security-register, unreleased, 52 maps in docs/internal/maps/)
+scripts/                 ci-local, lane-guard, where-am-i, release-web, formal checks, map-rot, sandbox build
+.cursor/skills/          change-agentforge, verify-agentforge, chat-run-settle, verify-paid-media-gate
 ```
 
-**Shell vs app (locked).** UI lives in `apps/web`, and `apps/web` is the renderer for **both** products — the packaged desktop app compiles it into the installer (`apps/desktop/package.json`, `stage-renderer.mjs`). The desktop app was retired on 2026-10-14, and its last published installer is `0.15.1`. The packaged-build steps in this paragraph describe that app, not a current ship path. Do not import `electron` from the renderer. The only file that may read `window.agentforge` is `apps/web/lib/desktop-bridge.ts`; everything else goes through `@/lib/api-client`. Lint/format is **Biome** (`pnpm lint`) — do not add ESLint or Prettier. Agents use `pnpm dev` for features. Packaged Windows: `pnpm desktop:build` + WinApp F5. Packaged Mac: on a Mac, `pnpm desktop:build:mac` / `desktop:build:mac:dir` then F5 the `.app` or `pnpm desktop:mac`. This Windows checkout cannot run Apple’s Simulator or a `.app`. **Platform rules (2026-09-07):** every OS-specific shell behavior is owned by a folder with its own `AGENTS.md`: [`apps/desktop/platform/windows`](apps/desktop/platform/windows/AGENTS.md), [`apps/desktop/platform/macos`](apps/desktop/platform/macos/AGENTS.md), and [`apps/mobile`](apps/mobile/AGENTS.md). A change to `main.cjs`, menus, quit, keychain, paths, installer, or updater is checked against each affected folder before it ships. Mobile lives in-repo under `apps/mobile` (supersedes the earlier sibling-repo note); Expo / iOS Simulator work starts there, not in `apps/desktop`.
+Gitignored local directories:
 
-**`nultron-files/` (Rizky, 2026-10-01)** holds every Nultron working file that is not code: marketing videos, the Lumina kit, brand art, IP (KI) filings and deploy decks. It is gitignored and cursorignored, so never `git add` it. New Nultron documents go there, not to Desktop or Downloads. Its `README.md` is the index.
+- `.ref/` holds read-only third-party reference repos (`OpenMausBot`, `hermes-agent`). Take ideas only, never copy code, and never read or copy from `OpenMausBot/enterprise/`.
+- `nultron-files/` holds non-code working assets (media, brand kits, deploy decks, `release/nda-terms.txt`). Never `git add` it.
 
-pnpm 9.15.9 + Turborepo. If corepack hits EPERM on Windows, use `npx pnpm@9.15.9`.
+## Subsystem invariants
 
-## Locale (en / id)
+### Gateway gate, auth, and BYOK
 
-Bahasa Indonesia landed across every mode in PRs #37–#49 (2026-09-14/15). The rules that keep it whole:
+- **Advisory gateway gate.** [`packages/host/src/gateway-gate.ts`](packages/host/src/gateway-gate.ts) owns `allowed` (`gateway-gate.json`, 7-day offline grace, 3 s validation budget). Every gateway-calling route checks `requireGatewayAllowed()` and returns `403 gateway_blocked` when closed. The renderer branches only on `allowed`. Stub runtime reports `status: "stub", allowed: true`.
+- **Pinned gateway endpoint.** The default endpoint is pinned to `https://api.tokotokenai.com/v1` and hidden from onboarding and Settings. `AGENTFORGE_GATEWAY_URL` is a dev/test hook ignored in production.
+- **Portal login.** `apps/portal` is reached over HTTP via `AGENTFORGE_PORTAL_URL`. The Enterprise deploy bundle defaults `PORTAL_SIGNIN_MODE=password`; unset defaults to e-mailed one-time codes. Access tokens stay in host memory only; refresh tokens live in sealed `session.enc` (`HKDF(wrapKey, "session-v1")`). Tokens never reach the renderer. Never add a password or account stack inside `apps/web` or `packages/host`.
+- **Provider key resolution.** [`packages/core/src/secrets.ts`](packages/core/src/secrets.ts) (`resolveProviderKeys`) is the single bearer resolution path. BYO gateway keys remain the floor. Multi-provider BYOK (`packages/core/src/providers/registry.ts`) is server-mode only with pinned provider base URLs. OpenRouter's `provider.zdr: true` is sent only to OpenRouter, never to Toko Token.
 
-- **Primitives:** [`packages/core/src/locale.ts`](packages/core/src/locale.ts) — `APP_LOCALES = ["en", "id"]`, `DEFAULT_APP_LOCALE = "en"`, `parseAppLocale()`. An unknown or missing value becomes English; a typo is never treated as Indonesian.
-- **Storage and boot:** the owner settings file carries one machine-wide `locale` (not per desk). [`packages/host/src/locale-boot.ts`](packages/host/src/locale-boot.ts) freezes it on the first read of the host process; Settings’ language select saves via `POST /api/v1/settings`, and the “Restart” banner applies it via `POST /api/v1/settings/apply-locale`. There is no product env override; `AGENTFORGE_LOCALE` is not read on the boot path.
-- **Renderer:** [`apps/web/lib/i18n.ts`](apps/web/lib/i18n.ts) — `t("namespace.path.key", vars)`, `freezeLocale`, `applyLocale`, `getLocale`. Catalogs are `apps/web/locales/{en,id}/<namespace>.json`, one namespace per surface (common, rail, settings, onboarding, guide, chat, documents, research, images, videos, presentation, knowledge, workspaces, usage, market, data, finance, legal, edit). A missing `id` key falls back to `en`; a missing key returns the raw key.
-- **Rule for new UI copy:** add the key to **both** `en` and `id` JSON in the same change. Each namespace has a parity test in `apps/web/lib/*locale*.test.ts` that asserts identical sorted leaf keys — keep it green, and add one for a new namespace. No English literals in product JSX.
-- **Rule for job harnesses:** read `localeForRun()` from [`packages/host/src/run-context.ts`](packages/host/src/run-context.ts) and apply `withOutputLanguage(prompt, surface, locale)` from [`packages/core/src/output-language.ts`](packages/core/src/output-language.ts) (surfaces: documents, research, finance, data, videos, edit, knowledge, meeting) or the mode-specific helper (`agents/chat-locale.ts`, `legal/locale.ts`, host `presentation-locale.ts`, host `image-output-locale.ts`, market `briefing-prompt.ts`). A new mode adds its surface there before it ships. A harness that writes English when the owner chose `id` is a bug, not a default.
-- **Host copy stays host-side.** Model instructions and stub replies live in TS beside the mode (comments point at the JSON they mirror); the host never imports the renderer catalogs.
-- **Portal copy:** the portal returns `message_en` / `message_id`; the client prefers its own catalog copy for known reason codes and shows the portal text verbatim only for unknown ones.
+### Secrets, at-rest encryption, and PII
 
-## How to run
+- **At-rest encryption.** Settings, portal sessions, message bodies, tool I/O, knowledge vector bodies, and knowledge graph labels are sealed with AES-256-GCM under `AGENTFORGE_SECRETS_KEY` (env / secret manager; local fallback `data/.master-key`), with SQLite `secure_delete` enabled and wrap-key rotation in `scripts/rotate-wrap-key.ts`. Backups use AEAD `NAEAD001` GCM with legacy CBC restore detection in `webapp-deploy/scripts/restore.sh`.
+- **Outbound PII masking.** [`packages/core/src/security/pii.ts`](packages/core/src/security/pii.ts) and [`pii-id.ts`](packages/core/src/security/pii-id.ts) mask identifiers including Indonesian NIK, NPWP, phones, and bank accounts. Redaction must never mask financial figures (`restoreFinanceAmounts` in `packages/host/src/finance-privacy.ts`).
+- **Transport and external egress.** Remote inference, portal, and channel URLs must be HTTPS (`http://` is allowed only for loopback). Telegram (`packages/host/src/channels/`) is pinned to `api.telegram.org` and pull-only (`getUpdates`, no inbound webhook).
+- **Security register.** Record every security finding (or verified non-issue) in [`docs/internal/security-register.md`](docs/internal/security-register.md) in the same change with `file:line` evidence, severity, status, and gate.
+- Never process Nultron keys with Hermes tools or Hermes dashboard tokens.
 
-```
-npx pnpm@9.15.9 install
-npx pnpm@9.15.9 db:seed          # optional; first visit also creates the local owner
-npx pnpm@9.15.9 dev               # http://127.0.0.1:3000 → /chat, no login
-```
+### Sandboxed MCP, voice, and delegation
 
-Root `pnpm dev` also starts `apps/portal`, which exits without `PORTAL_DATABASE_URL` (Postgres) and takes the whole turbo run down with it. For webdev alone, run `npx pnpm@9.15.9 --filter @agentforge/web dev`.
+- **MCP connectors.** Gmail, Google Drive, OneDrive, and Notion (`packages/core/src/mcp/`, `packages/host/src/mcp/`) run strictly read-only. Write, delete, and harness mutation actions are blocked before any network call. `query` and `resourceId` pass through `currentOutboundGuard()` (fail-closed inside `inToolCall`), and changing an endpoint URL requires a fresh access token.
+- **Team sessions and voice.** Delegated subagent runs (`packages/host/src/delegation/`) track child sessions per desk and enforce connector `allowSubagents` policies. Interactive voice (`packages/core/src/voice/`, `packages/host/src/voice/`) enforces outbound PII masking on talker payloads.
 
-**Webdev check before any drive (Rizky, 2026-09-17).** `http://127.0.0.1:3000` is Rizky's **isolated** webdev: throwaway data, no real key, kept up for agents. Every agent that verifies UI or host behaviour drives that instance — including locale switches, seeded threads, desks, datasets, matters — and cleans up what it created. Check first: `GET http://127.0.0.1:3000/api/v1/workspaces` returning 200 means it is on. Do **not** start a second instance on another port while :3000 answers; Rizky has had to repeat this. Remember `tsx server.ts` has no watcher: after host or core edits the :3000 process must be restarted (agents cannot kill node processes here, so say “restart :3000” in the report and Rizky restarts it); Vite hot-reloads only the renderer. Doctor it before driving (`scripts/doctor.mjs`).
+### Finance, extraction, code runner, and modalities
 
-**Where :3000 comes from (2026-09-23).** It is served from **this checkout**, `C:\Users\rizky\agentforge\apps\web` (`tsx server.ts`, data dir `.webdev-data-design`, `.env` with `AGENTFORGE_RUNTIME=ai` and a real key), so it follows whatever branch the main checkout has out — on 2026-09-23 that was `design/warm-desk-0.15`. Check with the listening pid's command line before assuming otherwise. The worktree `C:\Users\rizky\agentforge-webdev-0f994f5` (PR #97's review desk) is idle and no longer serves anything. Renderer edits hot-reload; host and core edits need the process restarted, and only Rizky restarts it — a host fix is "not driven" until then, say so in the report. Stage by path everywhere — the `git add -A` rule in **Non-negotiables** still holds.
+- **Deterministic Finance.** `packages/core/src/finance/` computes all financial figures deterministically (`number-guard.ts`, `stated-facts.ts`). Models write narrative and labels only; they never invent amounts.
+- **Local file extraction.** `packages/host/src/file-extract/` uses `@firecrawl/anydoc` with magic-byte checks and 25 MB / 20 s limits. **No hosted OCR, ever** (`no-hosted-ocr.test.ts` enforces this).
+- **Component installer.** `packages/host/src/components/` fetches native dependencies only from pinned URLs and sha512 hashes in `manifest.ts`. Never ask users to install binaries manually.
+- **Code runner.** `packages/host/src/code-runner/` executes Python (Pyodide) and JavaScript (QuickJS) in WASM. On hosted deployments, `run_code` stays off unless `AGENTFORGE_CODE_RUNS=on`.
+- **Fail-closed modalities.** Wrong content types on `/runs/text|image|video` return `400`, never silently drop content.
 
-Optional: `npx pnpm@9.15.9 db:push` (`drizzle-kit push` escape hatch). Canonical path is `drizzle-kit generate` in `packages/db` + app-side migrate (`ensureSchema`) on SQLite open.
+### Locale (`en` / `id`)
 
-SQLite file: `data/agentforge.sqlite` (or `AGENTFORGE_DATA_DIR`). **SQLite until the tenancy design says otherwise** — do not set `DATABASE_URL` to Postgres on a hunch; Postgres for tenancy is open decision 1 in the pivot record. That rule is about the **product** database and still holds. The Postgres in `docs/internal/portal/migrations/` is the portal’s own control plane, and since Phase 9 `apps/portal` runs it locally under `PORTAL_DATABASE_URL`. It is never a product dependency, and `DATABASE_URL` is never its variable.
+- Primitives live in [`packages/core/src/locale.ts`](packages/core/src/locale.ts) (`APP_LOCALES = ["en", "id"]`, default `"en"`).
+- Catalogs live in `apps/web/locales/{en,id}/<namespace>.json` across 33 namespaces (`ls apps/web/locales/en`). Add every new UI key to both `en` and `id` in the same change and keep `apps/web/lib/*locale*.test.ts` green. No hardcoded English literals in product JSX.
+- Job harnesses read `localeForRun()` (`packages/host/src/run-context.ts`) and apply `withOutputLanguage()` (`packages/core/src/output-language.ts`) or the mode-specific locale helper.
 
-**Desktop (the Personal product; retired 2026-10-14, last published installer 0.15.1):**
+## Guardrails, maps, and formal checks
 
-- **Webdev window:** `pnpm desktop:dev` — Electron around local Vite/Express on `:3000` (no preload / no IPC). Not the installed product.
-- **Packaged app:** `pnpm desktop:build` → NSIS x64 (Windows product path). Stages the Vite renderer + esbuild `host.cjs` (no bundled `node.exe`, no loopback port). Native modules (`better-sqlite3`, `keytar`) need `@electron/rebuild` **on Windows** — do not run that on Cloud. On launch the main process loads the renderer from `extraResources` and dispatches APIs over IPC. Writes `host-status.json` under Electron userData. Window close exits the whole process tree. Running setup.exe again replaces the existing install and keeps `%APPDATA%\Nultron`. Uninstall (not upgrade) kills `Nultron.exe`, deletes `%APPDATA%\Nultron`, and removes Credential Manager `Nultron` / `wrap-key`, plus the pre-rename `%APPDATA%\DPSBuddy` and `DPSBuddy` / `wrap-key`. mac/linux: `pnpm desktop:build:mac` / `pnpm desktop:build:linux` on that OS (unsigned; notarization is not done); `pnpm desktop:build:mac:docker --arch all` builds the static mac bundle from this Windows desk. Cloud cannot prove packaged Windows and must not run `pnpm desktop:build`. Move log: [`docs/internal/moves.md`](docs/internal/moves.md).
-- **Ship list for 0.16.0 (the Personal app, cut 2026-10-06):** see [`docs/internal/0.16.0-changelog.md`](docs/internal/0.16.0-changelog.md) and [`docs/public/0.16.0-notes.md`](docs/public/0.16.0-notes.md). The first installer under the Nultron name, with no data migration from DPSBuddy. It carries the first-run desk and guide, the 3D mascot and desk buddy, the model policy table, the mode harness and agent tools (desk files, the Personal folder with an approval per write, `knowledge_search`, `run_code` on by default on Personal), the per-mode checks from PRs #119 to #133, and stepped motion in the packaged app. The DPSBuddy → Nultron upgrade on Windows and SR-112's injected-file drive were owed before it was published. It was never published, and with the desktop retired it will not be. macOS stays preview until a Mac opens the dmg.
-- **Ship list for 0.15.1 (the Personal app, cut 2026-09-28):** see [`docs/internal/0.15.1-changelog.md`](docs/internal/0.15.1-changelog.md) and [`docs/public/0.15.1-notes.md`](docs/public/0.15.1-notes.md). In-app update checks retry a dropped GitHub connection, and the feed repo is `Nultron`. The installer also carries Education, the simpler Presentation and Open Slide stage, the Finance guided path, the Chat figure and cards, the three-step welcome, keyless Research search, and the desk scroll lanes. macOS stays preview until a Mac opens the dmg.
-- **Ship list for 0.15.0 (the Personal app, cut 2026-09-23):** see [`docs/internal/0.15.0-changelog.md`](docs/internal/0.15.0-changelog.md) and [`docs/public/0.15.0-notes.md`](docs/public/0.15.0-notes.md) — a light-first warm desk with a blue float and 4px corners, DM Sans + Source Serif 4 bundled locally, every mode cut to title + one outcome line with optional controls behind disclosures, the Chat empty state rebuilt as intent cards, tool calls folded into the Thinking disclosure, and a batch of bugs the pass exposed (dark-on-dark rail footer, Market/Finance names squeezed out, three invisible prompt boxes, "Offline demo" claiming a connection that did not exist). **Nothing is packed** — the changelog's "What is NOT proven at this cut" says exactly what is owed, and its pack block is still a skeleton. **The enterprise Phase 9 plans/pricing/portal work in the same working tree is deliberately not in this cut** — it belongs to its own pull request. See the Personal / Enterprise table at the top of this file.
-- **Ship list for 0.14.27 (published 2026-09-18):** see [`docs/internal/0.14.27-changelog.md`](docs/internal/0.14.27-changelog.md) and [`docs/public/0.14.27-notes.md`](docs/public/0.14.27-notes.md) — Finance task modes with deterministic figures and file import/export, local file extraction through anydoc with no hosted OCR, the first-run component installer, PII's eight kinds including Indonesian identifiers, job model fallback, the Market Watch specialists and analyst team, rail recent sessions and submenus, the Knowledge hygiene and health work, the hidden gateway endpoint, and the five findings fixes. All of it landed as PR #52 (`e8a7118`) plus the bump `e2e477e`. What is proven and what is not is in that changelog's "What is NOT proven at the 0.14.27 cut".
-- **Ship list for 0.14.26 (published 2026-09-15):** see [`docs/internal/0.14.26-changelog.md`](docs/internal/0.14.26-changelog.md) and [`docs/public/0.14.26-notes.md`](docs/public/0.14.26-notes.md) — host gateway gate + Start over, the Bahasa Indonesia sweep across every mode, the Finance fixes, the Images/Videos cost estimate, and the security passes; Rizky overrode the harness-first order above for this cut, so 0.14.26 was cut before the harness pass landed.
-- **Ship list for 0.14.25 (published 2026-09-12):** Market Watch, workspace desk management, and builtin Knowledge Phases 0–4, listed in [`docs/internal/0.14.25-changelog.md`](docs/internal/0.14.25-changelog.md); public notes in [`docs/public/0.14.25-notes.md`](docs/public/0.14.25-notes.md). Windows + mac preview (7 assets) on `Kyoo032/DPSBuddy`. Previous: [`docs/public/0.14.24-notes.md`](docs/public/0.14.24-notes.md) (published 2026-09-09, Windows-only); what is on `main` but not in the public installers is tracked in [`docs/internal/unreleased.md`](docs/internal/unreleased.md). Shipped: [`docs/internal/0.14.22-changelog.md`](docs/internal/0.14.22-changelog.md) (Research dossier / Data / Finance, macOS preview; plan in [`docs/internal/research-dossier-analyst-modes-plan.md`](docs/internal/research-dossier-analyst-modes-plan.md)), [`docs/internal/0.14.21-changelog.md`](docs/internal/0.14.21-changelog.md). Earlier: [`docs/internal/0.14.1-changelog.md`](docs/internal/0.14.1-changelog.md) is the reference of everything that must be inside the 0.14.1 `setup.exe`. Development and quick testing happen on **webdev** (`pnpm dev`, `:3000`), so a feature that works there is *not shipped* until it is staged into `host.cjs` + the renderer, packed, and driven on the installed app (`doctor --desktop`). Every agent that changes product code after 0.14.0 appends to the current changelog (`docs/internal/0.14.27-changelog.md` for this cut; `unreleased.md` for anything that lands after it, until the next changelog exists); the pack step reads it back as the checklist.
+- **Change workflow.** Follow [`.cursor/skills/change-agentforge/SKILL.md`](.cursor/skills/change-agentforge/SKILL.md). Paste [`preamble.md`](.cursor/skills/change-agentforge/preamble.md) at the top of subagent prompts for shared code.
+- **Lane guard.** `pnpm lane-guard` (`scripts/lane-guard.mjs`) blocks on never-promote paths, protected files without a `Lanes:` line, and `Toko Token` literals in shared code. Unrefreshed map pages warn by default and fail under `--strict`.
+- **Subsystem maps.** [`docs/internal/maps/`](docs/internal/maps/README.md) holds 52 subsystem map pages (`ls docs/internal/maps/*.md` excluding `README.md`). Read the relevant map before editing, and refresh the map (`Last verified` line and citations) plus its matching `.cursor/skills/verify-agentforge/features/<feature>.md` recipe in the same PR.
+- **Paid media gate.** Run `pnpm verify:paid-gate` before merging changes to SR-167 run gates, run entrypoints, or `image_generate` / `video_generate`.
+- **Formal checks.** Run `pnpm formal:settle` (Java + TLC; [`.cursor/skills/chat-run-settle/SKILL.md`](.cursor/skills/chat-run-settle/SKILL.md)) before editing `startModalityRun`, `finishRun`, `recordChatRunUsage`, or the DB driver. Run `pnpm formal:sync-check` to verify formal scripts match source.
+- **Model routing.** Per-role pstack model choices live in [`.claude/rules/pstack-models.md`](.claude/rules/pstack-models.md) (and each harness's own global rule file). Do not duplicate model tables here.
 
-### Web release (hosted)
+## How to run and test
 
-- **What runs is an image.** `webapp-deploy/Dockerfile` builds the renderer (`vite build` → `apps/web/dist`) and runs `tsx server.ts` behind the reverse proxy on Rizky's server. Secrets come from the environment, starting with `AGENTFORGE_SECRETS_KEY`, and never from a file in the repo or the image.
-- **Nothing counts as shipped until it is deployed to the hosted environment and driven there.** A green webdev, a green `tsc` or a passing test is not a deploy.
-- **A web release is a deploy bundle, cut by one script.** `node scripts/release-web.mjs --tag <tag> --sha <sha>` (`--dry-run` first) does, in order: preflight (clean tree unless `--allow-dirty`, sha resolves, `docs/public/<tag>-notes.md` exists and is free of banned marks); `git archive <sha>` into a temp dir and `docker build` + `docker push` of `ghcr.io/kyoo032/nultron-ent:<tag>` from there (`--skip-image` skips only this step); a temp clone of `Kyoo032/Nultron-Releases` gets `compose.yml` pinned to that tag, `.env.example` (the names the hosted app refuses to boot without), `DEPLOY.md` and `Caddyfile`, committed as `Release <tag>` and pushed to `main`; then `gh release create` and `gh release view`. The temp dir is deleted on every exit. The deploy that goes with it is logged by sha, with the tag beside it, in the deploy log in [`docs/internal/web-pivot-2026-09-18.md`](docs/internal/web-pivot-2026-09-18.md). The script constant `RELEASE_REPO` is `Kyoo032/Nultron-Releases` since 2026-10-15 (before that `Kyoo032/Nultron`, `Kyoo032/NultronEnt` and `Kyoo032/DPSBuddy-Ent`).
-- **The image is private and builds only from a sha.** Today the image carries the whole TypeScript source tree, because the runtime stage copies the build tree wholesale. A build from a working checkout would also pick up untracked local state such as a webdev data dir or `apps/web/.env.local`. The script builds only from `git archive <sha>`, and the ghcr package stays private until the Dockerfile ships compiled output only ([`security-register.md`](docs/internal/security-register.md), SR-49).
-- **Web deploys carry no semver.** The release and image tag is `ent-YYYY.MM.DD` (`ent-YYYY.MM.DD.2` for a second release the same day), and the release body always ends with `Source: agentforge@<sha>`, `Image: ghcr.io/kyoo032/nultron-ent:<tag>` and `Portal image: ghcr.io/kyoo032/nultron-portal:<tag>`, all appended by the script. Since 2026-10-01 the release builds and pushes both images from the same sha and the bundle's compose runs the app, Caddy (pinned `caddy:2.11-alpine`), the portal, its Postgres and a one-shot prepare step, with the portal's secrets in a separate `portal.env` the app never loads. Restart `app` and `proxy` together, never `app` alone (the proxy shares its network namespace). Rizky has not confirmed the tag scheme; ent-CalVer is the working default.
-- **The Dockerfile and the source stack live in [`webapp-deploy/`](webapp-deploy/README.md).** `webapp-deploy/Dockerfile` builds from the repo root, and `webapp-deploy/compose.yml` is the stack that builds from source. The released `compose.yml` on `Kyoo032/Nultron-Releases` is generated from the same hardening and pins the pulled image instead. `webapp-deploy/scripts/deploy.sh` still builds on the server from a checkout; moving the Jakarta box to the released bundle is not done yet. Which server, TLS, and backups of the data dir stay in the pivot record. Do not invent a third deploy path in passing. **Kubernetes is the one sanctioned addition (Rizky, 2026-10-01):** manifests live in `webapp-deploy/k8s/` (base, `overlays/local` for a Docker Desktop rehearsal on localhost, `overlays/production` for Tencent TKE, not applied). They run exactly one app pod and one portal pod (`strategy: Recreate`), because the host is single-process (SQLite, SR-66, SR-29). A local rehearsal image is built from a git-ls-files snapshot and is never pushed. Phase 0 (10 testers) still ships on one Lighthouse box with compose; TKE is Phase 1.
+Requirements: Node >= 22, `pnpm@9.15.9` (use `pnpm.cmd` in Windows PowerShell if `.ps1` scripts are blocked, or `npx pnpm@9.15.9` if corepack hits EPERM).
 
-### Three repos: work in agentforge, release to Nultron (Personal) and NultronEnt (Enterprise)
-
-Rizky decided on 2026-09-23: one private source repo, one public release repo per product. The record is the "Three repos" entry in [`docs/internal/web-pivot-2026-09-18.md`](docs/internal/web-pivot-2026-09-18.md).
-
-**Changed 2026-10-14 and 2026-10-15 (Rizky): the repos today.** The source repo is `Kyoo032/Nultron` (private, renamed from `Kyoo032/agentforge`). Web releases go to `Kyoo032/Nultron-Releases` (private, `RELEASE_REPO` in `scripts/release-web.mjs`), which was `Kyoo032/NultronEnt` and then `Kyoo032/Nultron`. The desktop release repo is `Kyoo032/Nultron-Desktop` (was `Kyoo032/Nultron`), archived with the retired desktop app. The bullets below are the 2026-09-23 to 2026-09-25 record: read their `Kyoo032/Nultron` as the desktop repo and their `Kyoo032/NultronEnt` as the web release repo. Of their rules, four still hold for `Kyoo032/Nultron-Releases`: a release repo gets no source and no AI marks, only the release script publishes to it, and the NDA terms check applies. The desktop-side rules (`pnpm desktop:release`, `release-desktop.mjs` and the pack skill under **Pack/ship**) are retired with the app.
-
-- **`Kyoo032/agentforge` (private, this repo)** is the only source repo for both products: all code, docs, branches, webdev, packing, and the full verify pass. Nothing is released until it is proven here. For a Personal cut that means staged into `host.cjs` + renderer, packed, installed, and driven on the packaged app (`doctor --desktop`). For an Enterprise release it means deployed to the hosted environment, driven there, and logged by sha.
-- **`Kyoo032/Nultron` (public; renamed from `Kyoo032/DPSBuddy` on 2026-09-25)** is Personal releases only: README + `Nultron Setup <v>.exe` + `.blockmap` + `latest.yml` + the mac dmg/zip, published with `pnpm desktop:release`. From 0.15.1 the packaged app's updater requests `Kyoo032/Nultron` (`brand.json` `updates.repo`). Installs from 0.15.0 and earlier still request `Kyoo032/DPSBuddy`, and GitHub redirects that name. Release notes come from `docs/public/<version>-notes.md`. Nothing about the hosted web app is published there. The README was set to the Nultron text in `620689f`, outside a release.
-- **`Kyoo032/NultronEnt` (public; created 2026-09-23 as `Kyoo032/DPSBuddy-Ent`, renamed 2026-09-25, default branch `main`)** is the Enterprise deploy-bundle and release repo, in the same relationship to agentforge as `Kyoo032/Nultron` has to the installers. `main` holds the README, the LICENSE and the current bundle: `compose.yml` pinned to `ghcr.io/kyoo032/nultron-ent:<tag>`, `.env.example`, `DEPLOY.md` and `Caddyfile`. Each release is a `Release <tag>` commit plus a GitHub Release whose body is `docs/public/ent-YYYY.MM.DD-notes.md` followed by the `Source:` and `Image:` lines. Everything is written by `node scripts/release-web.mjs` (see **Web release (hosted)**). It never holds TypeScript source, and nothing about the desktop app is published there. The README was set to the Nultron Enterprise text in `54da47a`, outside a release.
-- **The only local checkout is `agentforge`.** `Kyoo032/Nultron` and `Kyoo032/NultronEnt` are written only by their release scripts (`pnpm desktop:release`, `node scripts/release-web.mjs`). Keep no clone of either on disk. `release-web.mjs` clones `Kyoo032/Nultron-Releases` into a temp dir under `%TEMP%` and deletes it before it exits. The 2026-09-25 README updates were a one-off through the GitHub contents API, not a clone and not a release.
-- **Rules for both public repos.** Never source, never flavor builds, never `docs/internal/` notes, never any AI/agent marks. Notes come only from `docs/public/`. Commits and releases are authored as Rizky, with plain messages and no trailers. Published by the script, never by hand, and never with a `git push` from agentforge. Both release scripts — `scripts/release-web.mjs` and `apps/desktop/scripts/release-desktop.mjs` — refuse a notes file that names `Claude`, `Anthropic`, `agent`, `Co-Authored` or `docs/internal`, from one shared list in `scripts/release-marks.mjs`. `release-desktop.mjs`, which takes `--notes <file>`, also refuses a notes path under `docs/internal` in any letter case or through a link; `release-web.mjs` only ever reads `docs/public/<tag>-notes.md`, and also runs the mark check on every file it would push and on the release body, and there the only exception is the source repo's own name `agentforge`, which the app's `AGENTFORGE_*` variables and the `Source:` line cannot avoid. `release-web.mjs` also refuses to run, dry runs included, unless `nultron-files/release/nda-terms.txt` exists with at least one term (Rizky, 2026-10-16). The notes, the release body, every bundle file (the company sites included) and every file in the release repo's clone must carry none of those terms. The file is gitignored, so it exists only in the main checkout; never commit it or copy its terms into the repo, and the refusal prints a count, never a term (`scripts/release-nda.mjs`).
-- Order is fixed: work → verify inside agentforge → only when everything on the ship list is proven, cut the release into that product's repo. A release to one repo never implies a release to the other.
-- **Pack/ship on this Windows desk (retired 2026-10-14 with the desktop app; do not run it):** [`.cursor/skills/pack-nultron`](.cursor/skills/pack-nultron/SKILL.md) (isolated NSIS worktree + Docker mac dmg). Cloud must not run it.
-- **Versioning (Rizky, 2026-09-07; re-scoped 2026-09-23):** two products, two schemes. **Personal (the desktop app, retired 2026-10-14)** used semver. `0.15.1` (2026-09-28) is the last published installer. `0.16.0` (Rizky asked for v0.16 on 2026-10-06; the first installer under the Nultron name) was packed and never published, and no further cut is made. Do not use `0.14.3+`. The old "never bump to 0.15 until Rizky says so" rule is spent: he said so on 2026-09-23. The `0.14.21`…`0.14.27` line was scoped to desktop *maintenance* cuts while the desktop was frozen; 0.15.0 is a product release and takes the next minor. Semver still orders these correctly for the updater. Current tree: `apps/desktop/package.json` is `0.16.0`. **Enterprise (the hosted web app)** is tracked by commit sha, not by this scheme; its release tag on `Kyoo032/Nultron-Releases`, which is also the image tag on ghcr, is `ent-YYYY.MM.DD` (working default, not yet confirmed by Rizky — see **Web release (hosted)**).
-
-**Packaged Windows installer exists.** Cloud Linux must not run `pnpm desktop:build`.
-
-- Artifacts: `apps/desktop/dist/Nultron Setup <v>.exe` + mac arm64/x64 `Nultron-<v>-mac-<arch>.dmg|zip` (gitignored). 0.16.0 is the first Nultron-named pack (2026-10-06, see its changelog's pack block). The 0.15.1 files in the main checkout's `dist/` are named `DPSBuddy Setup 0.15.1.exe` and `DPSBuddy-0.15.1-mac-<arch>.*`; archive them into `published-0.15.1/` before a release runs from that `dist/`. Anything older in `dist/` (`published-*`, `superseded-*`) is history, not current.
-- Packaged proof is an Electron window + `doctor.mjs --desktop` (in `.cursor/skills/verify-agentforge/scripts/`) reading `host-status.json` (`transport: "ipc"`). There is no `app-url.txt` and no child `node.exe`.
-
-Webdev has no account: workspaces belong to the local owner and the gateway key is pasted in Settings. On the hosted app the portal session is the account and workspaces belong to the tenant (open decision 2 in the pivot record). `AGENTFORGE_RUNTIME=stub` until a key is saved (then live models from the gateway). Env `AGENTFORGE_RUNTIME=ai` still uses `.env` keys.
-
-## Runtime and tools
-
-- `createRuntime()` selects stub vs Vercel AI SDK. Live chat uses the gateway base URL unless the owner pasted a different one. Provider keys come from `resolveProviderKeys` and nowhere else; the session access token joins that function in Phase 1.
-- Tools: `defineTool` + registry + bindings. Platform: `calculator`, `datetime`, `web_search`, `image_generate`, `video_generate`. Packs add more.
-- Gateway key runs chat **and** image/video generation (`POST /v1/images/generations`, `POST /v1/video/generations` + poll). Search still needs Tavily/Brave. FAL is optional BYOK.
-- New industry = new pack package, not kernel tables.
-
-## Secrets and prompt security
-
-The user pastes their gateway key into settings. The host process holds it. Runs use it. The UI never gets the raw key back after save (`hasOpenai` only). Optional extras: native Google / Anthropic / Ark, plus dedicated tool keys (Tavily/Brave/FAL) in Settings Extras.
-
-Do not use Hermes tools or Hermes dashboard tokens to process Nultron keys.
-
-- **Gateway key** → `settings.enc` (AES-256-GCM), per workspace.
-- **Portal session (Phase 1)** → `session.enc` next to it, machine-scoped, encrypted under a key derived from the same wrap key (`HKDF(wrapKey, "session-v1")`). Refresh token on disk only there; access token in host memory only.
-- **Wrap key** → `AGENTFORGE_SECRETS_KEY` from the environment / a secret manager on the server: [`packages/db/src/vault-key.ts:37-51`](packages/db/src/vault-key.ts) reads the env first and only falls back to `data/.master-key` in the local data dir. That env path is the hosted product's; never a file in the repo. Electron keytar `Nultron` / `wrap-key` (injected as the same env var by `apps/desktop/main.cjs`) is the **desktop** path. Never in the renderer, never in git, never in `NEXT_PUBLIC_*`. Login adds no keychain slot.
-- Remote inference and portal URLs must be HTTPS. `http://` is only for loopback (Ollama).
-- Nultron does not log prompts. Message bodies, system prompts, and tool I/O are encrypted at rest. Gateway retention is Toko Token’s policy, not ours.
-- OpenRouter’s `provider.zdr: true` is sent only when the saved URL is OpenRouter. Do not send that field to Toko Token.
-- Wallet / usage / key-admin on the gateway stay parked until this privacy pass is solid; the portal’s wallet is server-side and the client only displays balances it is told.
-- Never commit `.env`, `data/settings.enc`, `data/session.enc`, `data/.master-key`, or API keys. `.gitignore` enforces those four and `.webdev-data*/`; it did not until 2026-09-21, so check `git check-ignore -v <path>` before trusting it for a path not on that list.
-- **Every security flag raised in a session is recorded in [`docs/internal/security-register.md`](docs/internal/security-register.md) in the same change**, with `file:line` evidence, a severity, a status and the gate it blocks (`blocks Tencent deploy`, `blocks PR merge`, `dev only`). A flag that turns out to be nothing is recorded as "checked, not an issue" with the evidence, so nobody chases it twice. That file also carries the must-be-true checklist for the Tencent Cloud deploy. The OWASP pass it builds on is [`docs/internal/security-owasp-2026-09.md`](docs/internal/security-owasp-2026-09.md); the hosted perimeter is [`docs/internal/maps/hosted-security-controls.md`](docs/internal/maps/hosted-security-controls.md).
-
-## Tests
-
-**Local CI (Rizky, 2026-09-24).** CI is local. There is no GitHub Actions workflow in this repo and none is coming back: every Actions run on this account has ended in `startup_failure` since the repo was created (billing lock, `docs/internal/0.14.22-changelog.md:118`), and Rizky decided not to rely on them at all. `.github/workflows/` (`ci.yml`, `e2e.yml`, `desktop-mac.yml`) is deleted.
-
-- Run `npx pnpm@9.15.9 ci:local` (`node scripts/ci-local.mjs`) before any PR, merge or pack. It runs Biome lint, `tsc --noEmit` per workspace with a tsconfig, `vitest run` per package one at a time with a fresh `AGENTFORGE_DATA_DIR`, `node --test scripts/*.test.mjs`, the `apps/desktop` node tests, the deployed-closure audit gate (`scripts/audit-deployed.mjs --level high`), `where-am-i` and `lane-guard`'s blocking rules, and as advisory steps the workspace-wide `pnpm audit --audit-level moderate`, `maps:check`, `lane-guard:map`, `edit:starters:check`, `videos:examples:check` and `sandbox:manifest` (`scripts/ci-local.mjs:32-38`). `--install` adds the `--frozen-lockfile` check; `--e2e` adds Playwright (off by default, per the rule below). `--only <step|group>` and `--skip <step|group>` narrow it; `--help` lists the steps.
-- Every step runs even after a failure. Exit 1 means a required step failed. Logs land in `.ci-local/<timestamp>/<step>.log` (gitignored), and `summary.md` beside them is the table to paste into the PR. A PR without that table has not been through CI.
-- It only runs when someone runs it. Nothing checks a push on its own; that is the residual risk, recorded as SR-80 in [`docs/internal/security-register.md`](docs/internal/security-register.md).
-
-- Unit: Vitest in `packages/core`, `packages/host`, `packages/db`, `packages/legal`, `packages/marketing`, `packages/university`, `apps/web` (`pnpm test` runs all through Turbo). `apps/desktop` has plain Node tests (`pnpm --filter @agentforge/desktop test`). Local coding agents run these. Run host tests with `AGENTFORGE_DATA_DIR` pointed at a temp dir so stub media rows do not land in the dev desk.
-- Locale parity tests live in `apps/web/lib/*locale*.test.ts`; the gate contract test is `apps/web/lib/gateway-gate.test.ts`. Both must stay green on every UI change.
-- Do **not** run Playwright locally — `foundation.spec.ts` is a long serial pass (Vite dev server + stub chat + workspaces).
-- E2E: Playwright `apps/web/tests/e2e/foundation.spec.ts` (Chat → Settings → job modes → Legal workspace smoke). Owned by **Cursor Cloud Agents**, not the local Windows session. See **Cursor Cloud specific instructions** below.
-- Verify UI in the IDE browser when changing layout. Do not block on `pnpm test:e2e` on this machine.
-- **No known local reds (2026-09-24).** Every suite is green on this Windows desk, and a red is now a regression. The old reds were test-harness problems, fixed without touching product code: the SSRF tests mock `node:dns/promises` (a real lookup of `example.test` took 11 s to fail) and still assert the loopback / private / metadata refusals; `wrap-key-rotation-script.test.ts` and `scripts/components-cli.test.mjs` spawn `process.execPath` with tsx's JS entry (`createRequire(...).resolve("tsx/cli")`), never the `.bin` shim; suites that import `@agentforge/db` close `sql` before `rmSync(..., { maxRetries: 10, retryDelay: 100 })`, so no more `EPERM` in `afterAll`; router-importing setups share the 180 s budget in `packages/host/src/__fixtures__/test-budgets.ts`; and `packages/host/test/setup.ts` gives every test file a unique `mkdtemp` data dir (it used the pid, which Windows reuses, so files silently shared a database). Keep cleanup hooks, never raise the global vitest timeout, and never skip a test to get `ci:local` green.
-- Feature verification recipes: [`.cursor/skills/verify-agentforge/features/`](.cursor/skills/verify-agentforge/features/README.md). `locale.md`, `gateway-gate.md`, `rail.md`, `login.md`, and `plans.md` exist. A feature without a recipe is not verified.
-
-## Cursor Cloud specific instructions
-
-Cloud clones GitHub. Push the branch first; uncommitted local files are not on the VM. Launch from the Cursor **Cloud** agent dropdown, or `/in-cloud` from a local chat.
-
-Boot uses [`.cursor/environment.json`](.cursor/environment.json): `install` → `scripts/cloud-install.sh` (pnpm 9.15.9, Playwright Chromium). `start` → `scripts/cloud-start.sh` (prepares the data dir only; the host creates the schema on first open). Stub runtime only — no gateway key.
-
-This image has **no Docker**. `docker`, `dockerd`, and `sudo service docker start` fail (`docker: unrecognized service`). Do not run `docker compose`. Product DB is SQLite. Default file: `data/agentforge.sqlite`.
-
-The Windows closed-beta checkout also uses SQLite (`ensureSchema` migrates on open; `pnpm db:push` is optional). On the **Personal** desktop app, Electron injects the wrap key from the OS keychain and packaged uses IPC in-process — no loopback HTTP server. On the **Enterprise** hosted web app the wrap key is `AGENTFORGE_SECRETS_KEY` from the environment.
-
-### What a Cloud Agent on this VM can do
-
-- Node 22 + pnpm 9.15.9 (corepack). Workspace `node_modules` after `install`.
-- SQLite via `ensureSchema` on open (not Docker Compose, not required Postgres). `pnpm db:push` is optional.
-- Run the stub Playwright suite against `http://127.0.0.1:3000` (`pnpm test:e2e` from repo root also works). That is **webdev**, not the packaged app. Playwright `webServer` starts `pnpm dev` if needed. Do not use a LAN IP.
-
-```
-cd apps/web
-AGENTFORGE_RUNTIME=stub npx playwright test
+```bash
+pnpm install
+pnpm --filter @agentforge/web dev   # http://127.0.0.1:3000 (webdev alone)
+pnpm test                           # Vitest across all packages via Turbo
+pnpm lint                           # Biome check (do not add ESLint or Prettier)
+pnpm ci:local                       # Full local CI suite
 ```
 
-- Run Vitest unit tests (`pnpm test` / package `vitest run`).
-- **Knowledge Base (builtin only).** Prove Phases 0–4 with [`.cursor/skills/verify-agentforge/features/knowledge-phases.md`](.cursor/skills/verify-agentforge/features/knowledge-phases.md). No WeKnora sidecar, no `AGENTFORGE_WEKNORA_BIN`, no `:3100`. Stub Chat injects chunks but cannot write `cites`; skip live cites on this VM.
-- **Gate and login in stub mode.** The host gate reports `status: "stub", allowed: true`; the portal is unreachable, so login tests use a mocked portal (`msw` or an in-process fake) and never a real `api.tokotokenai.com` call.
-- Browser / computer-use against the local **webdev** app when those tools are available. Bind is `127.0.0.1:3000`. Packaged desktop is not on this VM.
-- Read GitHub with `gh` (PRs). Do not use `gh` to create PRs — use the Cursor PR tool.
+- **Local webdev (`:3000`).** Check `GET http://127.0.0.1:3000/api/v1/workspaces` before launching a server. Do not start a second port while `:3000` responds. Root `pnpm dev` also starts `apps/portal`, which exits if `PORTAL_DATABASE_URL` is unset. Vite hot-reloads renderer edits; `tsx server.ts` requires a manual restart after host or core edits.
+- **Local CI is the CI.** There is no GitHub Actions workflow in this repo. Run `pnpm ci:local` (`node scripts/ci-local.mjs`) before PRs or merges and include `.ci-local/<timestamp>/summary.md` in the PR. Required steps cover `where-am-i`, `lint`, `tsc` across all 8 workspaces, Vitest across all 8 workspaces, `node --test` on `scripts/`, `audit:deployed`, `lane-guard`, and `sandbox:integration`. Nix checks (`pnpm ci:nix`, `pnpm ci:nix:fast`) are also available where Nix is installed.
+- **Playwright E2E.** `apps/web/tests/e2e/foundation.spec.ts` (`pnpm test:e2e`, stub runtime) runs on Cloud VMs (configured by [`.cursor/environment.json`](.cursor/environment.json), no Docker, no live gateway keys). Do not block local Windows runs on `pnpm test:e2e`.
+- **Database migrations.** Canonical path is `drizzle-kit generate` in `packages/db` plus app-side `ensureSchema` on SQLite open (`pnpm db:push` is optional). `PORTAL_DATABASE_URL` (Postgres) belongs only to `apps/portal`, never to the product database (`DATABASE_URL`).
 
-### What a Cloud Agent on this VM cannot do
+## Releases and repos
 
-- Docker Postgres / `docker compose` (not installed).
-- Live Toko Token / gateway inference or a live portal login. There is no gateway key. Keep `AGENTFORGE_RUNTIME=stub`. Do not paste keys into the VM or commit `.env`.
-- Product password login, e-mail, or session. There is none.
-- See the operator’s unpushed Windows working tree.
-- Merge PRs or enable auto-merge unless Rizky asks.
-
-There is no GitHub Actions CI any more (see **Local CI** under **Tests**). Cloud Agents still own the stub Playwright suite on this VM; locally it runs only through `pnpm ci:local --e2e`.
+- **`Kyoo032/Nultron` (private, this repo).** The only local checkout and source repository.
+- **`Kyoo032/Nultron-Releases` (private).** Enterprise deploy bundles (`compose.yml` pinned to `ghcr.io/kyoo032/nultron-ent:<tag>` and `nultron-portal:<tag>`, `.env.example`, `DEPLOY.md`, `Caddyfile`) and GitHub Releases (`ent-YYYY.MM.DD`). Written only by `node scripts/release-web.mjs --tag <tag> --sha <sha>` (run `--dry-run` first). Requires `docs/public/<tag>-notes.md` and local `nultron-files/release/nda-terms.txt`. Never publish source code, `docs/internal/` paths, or AI/agent marks (`scripts/release-marks.mjs`).
+- **`Kyoo032/Nultron-Desktop` (archived).** Retired Personal desktop releases (`0.15.1` final).
+- **`webapp-deploy/`.** Source Dockerfile, Compose stack, K8s manifests (`k8s/`), and backup/restore scripts. Do not invent a third deploy path.
 
 ## Known traps
 
-- Cursor’s browser can inject `data-cursor-ref` and block clicks. Use Chrome or Playwright.
-- Playwright `/studio/**` redirects to Chat (Build is parked).
-- Dev server binds `127.0.0.1:3000` (webdev only: Vite + Express + `@agentforge/host`). Playwright and the IDE browser must use `http://127.0.0.1:3000` (not a LAN IP). (desktop) Packaged Nultron has no HTTP port; `doctor.mjs --desktop` reads Electron userData `host-status.json` (Windows `%APPDATA%\Nultron`, Linux `$XDG_CONFIG_HOME/Nultron` or `~/.config/Nultron`, macOS `~/Library/Application Support/Nultron`). A phone on a LAN `:3000` is not a product surface — see [`docs/mobile.md`](docs/mobile.md).
-- **Start over is destructive.** `settings-reset-all-submit` erases the desk it runs on and relaunches; `settings-reset-key-submit` forgets the key on every desk. Never press either on the operator’s shared Windows instance unless asked. Drive them on a throwaway `AGENTFORGE_DATA_DIR`.
-- Host tests read the operator’s `data/` unless the test file sets its own `AGENTFORGE_DATA_DIR` (`enhance-prompt.test.ts` fails when the desk locale is `id`). Do not fix that with one shared temp dir for the whole run: parallel workers then race `ensureSchema` (`table agent_tool_bindings already exists`). Isolation is a per-file `mkdtempSync`.
-- `pnpm -r test` stops at the first failing package and the db `drizzle-kit check` drift test is timing-sensitive under a full parallel run; re-run a package alone before calling it red.
-- A literal control character in source (a raw NUL used as a split sentinel, for instance) makes git treat the file as binary and hides every later diff. Write the escape (`"\u0000"`), never the byte.
-- `@firecrawl/anydoc` is a native module loaded through `createRequire`; esbuild leaves it as a runtime require, so it must exist as a real `node_modules` entry outside the asar in the packaged app. A green webdev says nothing about the installer here. Inside the esbuild CJS bundle `import.meta` is `{}`: `createRequire(import.meta.url)` throws there, so every runtime require in host code uses the guard `typeof require === "function" ? require : createRequire(import.meta.url)` (`file-extract/anydoc.ts`, `sql-runner.ts`).
-- Unit tests with an injected probe are not proof for the component installer: the first live run failed `probe_failed` because the probe wanted the marker that is written after it. Prove installer changes with one real install into a temp `AGENTFORGE_DATA_DIR`.
-- `docs/internal/unreleased.md` was started over at the **0.16.0** cut (2026-10-06) and is titled "after the 0.16.0 cut". Its whole log from after 0.15.0 (the 0.15.1 cut never started it over) is folded into [`docs/internal/0.16.0-changelog.md`](docs/internal/0.16.0-changelog.md), and the full old text is readable from git at `de95267`. Append only what lands *after* the 0.16.0 cut, and start the file over again when the next `<version>-changelog.md` is created rather than appending under a stale header.
+- **Stage explicitly by path.** Never run `git add -A` or `git add .`. Local checkouts may hold untracked directories (such as `evidence/` or leftover local folders).
+- **Never commit secrets.** `.env`, `data/settings.enc`, `data/session.enc`, `data/.master-key`, and `.webdev-data*/` must stay untracked.
+- **Start over is destructive.** `settings-reset-all-submit` wipes the desk and `settings-reset-key-submit` clears keys across desks. Drive them only on a throwaway `AGENTFORGE_DATA_DIR`.
+- **Isolate SQLite in host tests.** Give each test file its own `mkdtempSync` `AGENTFORGE_DATA_DIR` (sharing one temp dir causes parallel `ensureSchema` races) and close `sql` in `afterAll` before `rmSync(..., { maxRetries: 10, retryDelay: 100 })` so Windows does not throw `EPERM`.
+- **Avoid raw NUL bytes in source.** Write `"\u0000"` instead of a literal control byte so git does not classify the file as binary.
+- **Loopback host only for webdev.** Use `http://127.0.0.1:3000`, never a LAN IP, for local dev and Playwright.
+- **Dynamic native requires.** Keep `typeof require === "function" ? require : createRequire(import.meta.url)` in host native-module loaders (`file-extract/anydoc.ts`, `sql-runner.ts`), and verify component-installer changes with a real install into a temp `AGENTFORGE_DATA_DIR`.
+- **Parallel test noise.** `pnpm -r test` stops on the first failing package, and `packages/db`'s `drizzle-kit check` test can flake under heavy parallel load. Re-run the package alone before calling a failure a regression.
+- **Browser automation.** Avoid Cursor's injected `data-cursor-ref` overlay when clicking; use Chrome or Playwright directly.
