@@ -32,6 +32,25 @@ describe("assertReadOnlySelect", () => {
     }
   });
 
+  it("refuses server-side functions that read outside the table allowlist", () => {
+    const bypasses = [
+      // Server filesystem: names no relation, so a FROM/JOIN check would never see it.
+      "SELECT pg_read_file('/etc/passwd')",
+      "SELECT pg_ls_dir('/var/lib/postgresql')",
+      "SELECT * FROM pg_stat_file('postgresql.conf')",
+      // dblink runs its argument SQL on any reachable database — off-allowlist by construction.
+      "SELECT * FROM dblink('dbname=other', 'SELECT pw FROM users') AS t(pw text)",
+      // Replication slots stream WAL contents.
+      "SELECT * FROM pg_logical_slot_get_changes('slot1', NULL, NULL)",
+      // The http extension turns a SELECT into outbound HTTP.
+      "SELECT content FROM http_get('https://evil.example.com')",
+      "SELECT content FROM http('GET', 'https://evil.example.com', NULL, NULL, NULL)",
+    ];
+    for (const sql of bypasses) {
+      expect(() => assertReadOnlySelect(sql), sql).toThrow(ApiError);
+    }
+  });
+
   it("refuses every statement-splitting and hiding trick", () => {
     const tricks = [
       "SELECT 1; DROP TABLE orders",

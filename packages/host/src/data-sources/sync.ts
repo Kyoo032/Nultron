@@ -6,8 +6,8 @@
  * connector's cards die in the same orphan sweep as a removed thread's. Only counts and an error
  * code land in `data_source_sync_runs` — never a filename, never content (migration 0027's note).
  */
-import { ApiError, reportAuditEvent, type TenantContext } from "@agentforge/core";
-import { indexKnowledgeSource } from "../knowledge";
+import { ApiError, maskPii, reportAuditEvent, type TenantContext } from "@agentforge/core";
+import { indexKnowledgeSource, injectionRule } from "../knowledge";
 import { extractFile } from "../file-extract";
 import type { DataSourceRow } from "./store";
 import { getS3Object, listS3Objects } from "./s3";
@@ -52,12 +52,21 @@ export async function syncDataSource(
         }
         const buffer = await getS3Object(row, object.key);
         const parsed = await extractFile({ filename: object.key.split("/").pop() ?? object.key, bytes: buffer });
+        // The same gates a manual upload passes: injection scan first, PII masked into the index.
+        const rule = injectionRule(tenant, object.key, parsed.text);
+        if (rule) {
+          failed += 1;
+          errorCode = errorCode ?? "injection_blocked";
+          continue;
+        }
         await indexKnowledgeSource(tenant, {
           id: `data-source/${row.id}/${object.key}`,
           name: object.key,
           type: extOf(object.key) || "file",
-          text: parsed.text,
-          origin: { kind: "data_source", id: row.id },
+          text: maskPii(parsed.text),
+          // One origin per object: the unique origin index folds same-origin writes, so a
+          // shared `row.id` origin would keep only the last synced file searchable.
+          origin: { kind: "data_source", id: `${row.id}/${object.key}` },
         });
         ok += 1;
       } catch {

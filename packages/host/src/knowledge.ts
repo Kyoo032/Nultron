@@ -489,7 +489,7 @@ function injectionGuardBypass(tenant: TenantContext): boolean {
  * The name is scanned too: it becomes the `[n] <name>` citation line, and an upload filename or a
  * remote `<title>` is attacker-controlled in exactly the same way the body is.
  */
-function injectionRule(tenant: TenantContext, name: string, text: string): string | null {
+export function injectionRule(tenant: TenantContext, name: string, text: string): string | null {
   if (injectionGuardBypass(tenant)) {
     return null;
   }

@@ -79,7 +79,12 @@ export type SourceSecretInput = z.infer<typeof secretInput>;
 
 export function secretLast4(input: SourceSecretInput): string | null {
   const raw = input.kind === "s3" ? input.s3SecretAccessKey : input.secret;
-  return raw ? raw.slice(-4) : null;
+  // A tail is only a hint when it shows strictly less than the whole secret — a secret of four
+  // characters or fewer would otherwise be returned in full. "••••" says "stored, not shown".
+  if (!raw) {
+    return null;
+  }
+  return raw.length > 4 ? raw.slice(-4) : "••••";
 }
 
 export type DataSourceRow = {
