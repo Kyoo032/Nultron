@@ -7265,6 +7265,30 @@ Gate: none for week one (voice is Rizky's only); before customer voice or any al
 
 ### SR-214 {#sr-214}
 
+**The OPC `auditor` role and the tenant model allowlist (F8a/F8d) — built 2026-11-26, branch `devin/1795686920-opc-auditor-allowlist`; in the tree, not deployed.** Informational control entry, not a finding.
+
+- **Role gate in one place.** `routeGate` + `roleDenied` (`packages/host/src/role-policy.ts`), evaluated in `dispatch` (`packages/host/src/router.ts`) before the handler on every non-session-exempt `/api/v1/*` route, server mode only. Classes: `administer` (mutations to agents, data sources, keys, channels, settings — owner/admin), `audit` (owner/auditor), `auditor-read` (the auditor's explicit allowlist), `read`, `agents` (auditor refused). Denials are one `403 forbidden` shape. Pinned by `packages/host/src/role-matrix.test.ts`, which dispatches every registered route as each of the four roles.
+- **Auditor reach.** Auditor reads only ping, auth session/logout/refresh, usage, storage/usage, workspaces, organizations, settings GET, billing plan/plans and health; a thread's messages, any run and any mutation are refused. Provisioned through `ensurePortalOwner`; the portal widens `users_role_chk` and `invites_role_chk` in `migrations/0015_auditor_role.sql` and accepts `auditor` in the `invite`/`account` CLIs.
+- **Model allowlist.** `model_allowlist` travels in the `POST /auth/token` body (`apps/portal/src/flows/token.ts`, from `tenant_config.model_allowlist`); the host holds it per tenant in memory (`packages/host/src/model-allowance.ts`) — no host migration. A `null` body field never clears a list an older token carried. Off-portal, the desk's `modelAllowlist` setting is the fallback (`mergeSecrets`). Empty or absent keeps allow-everything.
+- **Residual.** The gate resolves the tenant through `getTenant` per request; a session whose membership cannot resolve skips the check and the handler answers with its own tenancy error (the pre-gate behaviour, kept so unprovisioned test identities behave as before).
+
+### SR-215 {#sr-215}
+
+**A bucket writer could re-offer one desk's valid archive under another desk's name, and restore.sh would overwrite the named desk with it.**
+Raised 2026-11-26 by an independent review of PR #285 (the per-desk F12 backup change). Medium. Status: fixed in the same PR.
+
+Evidence: `webapp-deploy/scripts/restore.sh` resolved the desk id from `--desk` or the archive filename (`nultron-data-<desk>-<stamp>.tar.gz.enc`); nothing inside the archive bound it to its desk. AEAD (NAEAD001) proves the archive is authentic and untampered only up to the bucket — anyone who can write the bucket can copy desk A's `*.enc` to desk B's filename without the wrap key, and restore would decrypt it cleanly and replace desk B's volume with desk A's data.
+
+Fix: `backup.sh` writes `backup-meta.json` (`{"desk","createdAt"}`) into the desk's `/data` before tarring, so the desk id is inside the encrypted archive (`webapp-deploy/scripts/backup.sh` `write_desk_meta`). `restore.sh` extracts that member, refuses a mismatch against `--desk`/the filename, and — because a run pinned by `COMPOSE_PROJECT_NAME` or `-p`/`--project-name` in `DC_ARGS` must not widen — refuses any resolved desk outside the pin. Archives without the member (older backups) keep the name-based behaviour.
+
+Proof: `webapp-deploy/scripts/backup-restore.test.mjs` "refuses an archive whose embedded desk id does not match --desk". Not driven on a real server or against a real COS bucket.
+
+Residual: a bucket writer can still swap an archive for an older valid archive of the *same* desk (rollback, not cross-desk substitution) — accepted; the wrap key stays the confidentiality boundary. Old archives carry no meta and are trusted by name, as before.
+
+Gate: none; the fix ships with the per-desk backup change it protects.
+
+### SR-216 {#sr-216}
+
 **A per-user assigned gateway endpoint was sent the company key.** DFIND-155 (Ethan). High.
 Status: `fixed-unverified`, not hosted.
 
@@ -7308,7 +7332,7 @@ file is applied. Voice (`packages/host/src/voice/ask.ts`, `upgrade.ts`) and deta
 
 Gate: Marcus review before merge (secrets and migration paths touched).
 
-### SR-215 {#sr-215}
+### SR-217 {#sr-217}
 
 **`auth_sessions.gateway_endpoint` was unauthenticated plaintext, and a future `portal_checked_at`
 could freeze the portal re-check.** DFIND-160 (Marcus). High. Status: `fixed-unverified`, not hosted.
@@ -7342,30 +7366,6 @@ Residual: a writer who has both the SQLite file and the vault key can re-MAC a f
 vault key is the boundary every sealed value in the product already stands on.
 
 Gate: Marcus review before merge (secrets and migration paths touched).
-
-### SR-214 {#sr-214}
-
-**The OPC `auditor` role and the tenant model allowlist (F8a/F8d) — built 2026-11-26, branch `devin/1795686920-opc-auditor-allowlist`; in the tree, not deployed.** Informational control entry, not a finding.
-
-- **Role gate in one place.** `routeGate` + `roleDenied` (`packages/host/src/role-policy.ts`), evaluated in `dispatch` (`packages/host/src/router.ts`) before the handler on every non-session-exempt `/api/v1/*` route, server mode only. Classes: `administer` (mutations to agents, data sources, keys, channels, settings — owner/admin), `audit` (owner/auditor), `auditor-read` (the auditor's explicit allowlist), `read`, `agents` (auditor refused). Denials are one `403 forbidden` shape. Pinned by `packages/host/src/role-matrix.test.ts`, which dispatches every registered route as each of the four roles.
-- **Auditor reach.** Auditor reads only ping, auth session/logout/refresh, usage, storage/usage, workspaces, organizations, settings GET, billing plan/plans and health; a thread's messages, any run and any mutation are refused. Provisioned through `ensurePortalOwner`; the portal widens `users_role_chk` and `invites_role_chk` in `migrations/0015_auditor_role.sql` and accepts `auditor` in the `invite`/`account` CLIs.
-- **Model allowlist.** `model_allowlist` travels in the `POST /auth/token` body (`apps/portal/src/flows/token.ts`, from `tenant_config.model_allowlist`); the host holds it per tenant in memory (`packages/host/src/model-allowance.ts`) — no host migration. A `null` body field never clears a list an older token carried. Off-portal, the desk's `modelAllowlist` setting is the fallback (`mergeSecrets`). Empty or absent keeps allow-everything.
-- **Residual.** The gate resolves the tenant through `getTenant` per request; a session whose membership cannot resolve skips the check and the handler answers with its own tenancy error (the pre-gate behaviour, kept so unprovisioned test identities behave as before).
-
-### SR-215 {#sr-215}
-
-**A bucket writer could re-offer one desk's valid archive under another desk's name, and restore.sh would overwrite the named desk with it.**
-Raised 2026-11-26 by an independent review of PR #285 (the per-desk F12 backup change). Medium. Status: fixed in the same PR.
-
-Evidence: `webapp-deploy/scripts/restore.sh` resolved the desk id from `--desk` or the archive filename (`nultron-data-<desk>-<stamp>.tar.gz.enc`); nothing inside the archive bound it to its desk. AEAD (NAEAD001) proves the archive is authentic and untampered only up to the bucket — anyone who can write the bucket can copy desk A's `*.enc` to desk B's filename without the wrap key, and restore would decrypt it cleanly and replace desk B's volume with desk A's data.
-
-Fix: `backup.sh` writes `backup-meta.json` (`{"desk","createdAt"}`) into the desk's `/data` before tarring, so the desk id is inside the encrypted archive (`webapp-deploy/scripts/backup.sh` `write_desk_meta`). `restore.sh` extracts that member, refuses a mismatch against `--desk`/the filename, and — because a run pinned by `COMPOSE_PROJECT_NAME` or `-p`/`--project-name` in `DC_ARGS` must not widen — refuses any resolved desk outside the pin. Archives without the member (older backups) keep the name-based behaviour.
-
-Proof: `webapp-deploy/scripts/backup-restore.test.mjs` "refuses an archive whose embedded desk id does not match --desk". Not driven on a real server or against a real COS bucket.
-
-Residual: a bucket writer can still swap an archive for an older valid archive of the *same* desk (rollback, not cross-desk substitution) — accepted; the wrap key stays the confidentiality boundary. Old archives carry no meta and are trusted by name, as before.
-
-Gate: none; the fix ships with the per-desk backup change it protects.
 
 ## Must be true before the Tencent Cloud deploy
 

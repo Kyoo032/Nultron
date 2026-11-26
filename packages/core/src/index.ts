@@ -240,6 +240,20 @@ export {
   readHttpErrorBody,
   temperatureMustBeOneOrOmitted,
 } from "./models/request-constraints";
+export {
+  MEMBERSHIP_ROLES,
+  PORTAL_ROLES,
+  INDUSTRY_PACKS,
+  VISIBILITIES,
+  INPUT_MODALITIES,
+  requireTenant,
+  canBuild,
+  canAdminister,
+  canAudit,
+  canUseAgents,
+  membershipRoleForPortal,
+  parsePortalRole,
+} from "./tenancy/types";
 export type {
   MembershipRole,
   PortalRole,
@@ -1058,6 +1072,7 @@ export type { EnhanceSurface } from "./enhance-prompt";
 // Phase 9: the placeholder plan catalog the pricing page renders (`@agentforge/core/plans`).
 export { PLAN_CATALOG_CURRENCY, PLAN_TIERS, findTier, formatPlanPrice, matchTier } from "./plans/catalog";
 export type { PlanTier } from "./plans/catalog";
+
 // Per-key model availability and the gateway catalog (2026-11-11): what a key can actually use.
 export {
   MODEL_STATUSES,
@@ -1111,17 +1126,3 @@ export { fetchPricingHints, fetchPricingWithMedia } from "./models/pricing-hints
 export { reportModelOutcome, setModelOutcomeSink } from "./models/outcome-sink";
 export type { ModelOutcomeReport } from "./models/outcome-sink";
 export { generateGatewayOmniSpeech, omniAudioChunks, wavFromPcm16 } from "./tools/platform/gateway-audio";
-export {
-  MEMBERSHIP_ROLES,
-  PORTAL_ROLES,
-  INDUSTRY_PACKS,
-  VISIBILITIES,
-  INPUT_MODALITIES,
-  requireTenant,
-  canBuild,
-  canAdminister,
-  canAudit,
-  canUseAgents,
-  membershipRoleForPortal,
-  parsePortalRole,
-} from "./tenancy/types";
