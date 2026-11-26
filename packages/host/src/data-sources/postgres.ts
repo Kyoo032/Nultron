@@ -77,7 +77,9 @@ export async function runPostgresSelect(
       return {
         columns: result.fields.map((f) => f.name),
         rows: rows.slice(0, limits.sqlMaxRows),
-        rowCount: rows.length,
+        // The same contract MySQL can honor: rows in this response, never a total it cannot
+        // know without buffering the whole result. `truncated` says more rows matched.
+        rowCount: Math.min(rows.length, limits.sqlMaxRows),
         truncated: rows.length > limits.sqlMaxRows,
       };
     } finally {

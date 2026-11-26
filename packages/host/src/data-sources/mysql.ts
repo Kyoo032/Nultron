@@ -64,6 +64,80 @@ export async function testMysql(row: DataSourceRow): Promise<void> {
   }
 }
 
+/** One top-level `limit` keyword's position in the checked text, or null. */
+function scanTopLevelLimit(sql: string): { index: number; length: number } | null {
+  let depth = 0;
+  let i = 0;
+  const n = sql.length;
+  let found: { index: number; length: number } | null = null;
+  while (i < n) {
+    const c = sql[i]!;
+    if (c === "'" || c === '"' || c === "`") {
+      // Quoted span: the guard's tokenizer already proved these terminate, and a doubled
+      // quote escapes itself inside one.
+      const q = c;
+      i += 1;
+      while (i < n) {
+        if (sql[i] === q && sql[i + 1] === q) {
+          i += 2;
+        } else if (sql[i] === q) {
+          i += 1;
+          break;
+        } else {
+          i += 1;
+        }
+      }
+      continue;
+    }
+    if (c === "(") {
+      depth += 1;
+    } else if (c === ")") {
+      depth -= 1;
+    } else if (depth === 0 && /[A-Za-z_]/.test(c)) {
+      const start = i;
+      while (i < n && /[A-Za-z0-9_]/.test(sql[i]!)) {
+        i += 1;
+      }
+      if (sql.slice(start, i).toLowerCase() === "limit") {
+        found = { index: start, length: i - start };
+      }
+      continue;
+    }
+    i += 1;
+  }
+  return found;
+}
+
+/**
+ * The checked SELECT with a top-level row cap the server itself enforces — `maxRows + 1`, the
+ * extra row being what marks `truncated`. This is a rewrite of the statement's own LIMIT clause,
+ * not a derived-table wrap: MySQL demands unique column names inside a derived table, and a join
+ * of two allowlisted tables legitimately selects two columns both named `id`, so the wrap failed
+ * valid queries outright. A query whose own LIMIT already binds tighter keeps it; one that binds
+ * looser is tightened to the cap, never widened.
+ */
+export function capMysqlQueryText(checked: string, maxRows: number): string {
+  const cap = maxRows + 1;
+  const limit = scanTopLevelLimit(checked);
+  if (!limit) {
+    return `${checked} LIMIT ${cap}`;
+  }
+  const rest = checked.slice(limit.index + limit.length);
+  const match = /^\s*(\d+)(?:\s*,\s*(\d+)|\s+offset\s+(\d+))?/i.exec(rest);
+  if (!match) {
+    // A LIMIT the scanner cannot read is malformed SQL and fails closed on the server.
+    return checked;
+  }
+  // `LIMIT offset, count` or `LIMIT count` / `LIMIT count OFFSET n` — the count is what caps.
+  const countText = match[2] ?? match[1]!;
+  const count = Number(countText);
+  if (count <= maxRows) {
+    return checked;
+  }
+  const countIndex = limit.index + limit.length + match[0].lastIndexOf(countText);
+  return `${checked.slice(0, countIndex)}${cap}${checked.slice(countIndex + countText.length)}`;
+}
+
 /**
  * A pre-checked SELECT (already through `assertReadOnlySelect` and the table allowlist in
  * `sql-query.ts`) inside `START TRANSACTION READ ONLY`, with the query-level `timeout` mysql2
@@ -77,10 +151,11 @@ export async function runMysqlSelect(
   const client = await connect(row);
   try {
     await client.query("START TRANSACTION READ ONLY");
-    // The derived-table `LIMIT max+1` caps what the server can return — no unbounded buffering
-    // — and the extra row is what marks `truncated`. `checked` keeps its own ORDER BY/LIMIT.
+    // The capped statement caps what the server can return — no unbounded buffering — and the
+    // extra row is what marks `truncated`. `checked` keeps its own ORDER BY/LIMIT semantics:
+    // a tighter user LIMIT wins, a looser one is tightened, never widened.
     const [rows, fields] = await client.query({
-      sql: `SELECT * FROM (${checked}) AS __agentforge_q LIMIT ${limits.sqlMaxRows + 1}`,
+      sql: capMysqlQueryText(checked, limits.sqlMaxRows),
       rowsAsArray: true,
       timeout: Math.floor(limits.sqlTimeoutMs),
     });

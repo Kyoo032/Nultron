@@ -23,6 +23,7 @@ import type { ApiError } from "@agentforge/core";
 import { getDataSource, insertDataSource, markSourceStatus } from "./store";
 import { mysqlConfig } from "./mysql";
 import { runSourceQuery } from "./sql-query";
+import { capMysqlQueryText } from "./mysql";
 
 const TENANT = "mysql-tenant";
 
@@ -97,5 +98,40 @@ describe("mysql connector (F1 W1)", () => {
     await expect(runSourceQuery(active, "SELECT 1 FROM salaries")).rejects.toMatchObject({
       code: "table_not_allowed",
     });
+    // Backtick-quoted identifiers are MySQL's own quoting style: missing them in the table scan
+    // is how a backticked table would have walked past the allowlist entirely (SR-223).
+    await expect(runSourceQuery(active, "SELECT * FROM `salaries`")).rejects.toMatchObject({
+      code: "table_not_allowed",
+    });
+    await expect(runSourceQuery(active, "SELECT * FROM `d`.`salaries`")).rejects.toMatchObject({
+      code: "table_not_allowed",
+    });
+    // The same quoting on an allowlisted table passes the table check (failing later, at the
+    // unroutable host — never with table_not_allowed).
+    const quoted = (await runSourceQuery(active, "SELECT * FROM `orders`").catch((e: unknown) => e)) as ApiError;
+    expect(quoted.code).not.toBe("table_not_allowed");
+    expect(quoted.code).not.toBe("sql_read_only");
+  });
+
+  it("caps the statement with its own LIMIT clause, never a derived-table wrap", () => {
+    // No wrap anywhere: a join selecting two columns both named `id` is valid top-level SQL but
+    // illegal inside a MySQL derived table, which is what the wrap made every such query.
+    const join = capMysqlQueryText(
+      "SELECT orders.id, customers.id FROM orders JOIN customers ON orders.customer_id = customers.id",
+      500,
+    );
+    expect(join).not.toContain("__agentforge_q");
+    expect(join.endsWith("LIMIT 501")).toBe(true);
+    // Appended when absent, tightened when looser, untouched when tighter.
+    expect(capMysqlQueryText("SELECT * FROM orders", 500)).toBe("SELECT * FROM orders LIMIT 501");
+    expect(capMysqlQueryText("SELECT * FROM orders LIMIT 1000", 500)).toBe("SELECT * FROM orders LIMIT 501");
+    expect(capMysqlQueryText("SELECT * FROM orders LIMIT 10", 500)).toBe("SELECT * FROM orders LIMIT 10");
+    expect(capMysqlQueryText("SELECT * FROM orders LIMIT 10, 1000", 500)).toBe("SELECT * FROM orders LIMIT 10, 501");
+    expect(capMysqlQueryText("SELECT * FROM orders LIMIT 1000 OFFSET 5", 500)).toBe(
+      "SELECT * FROM orders LIMIT 501 OFFSET 5",
+    );
+    // LIMIT inside a subquery or a string literal is not the statement's own clause.
+    expect(capMysqlQueryText("SELECT * FROM (SELECT * FROM orders LIMIT 3) t", 500).endsWith("LIMIT 501")).toBe(true);
+    expect(capMysqlQueryText("SELECT * FROM orders WHERE name = 'limit 5'", 500).endsWith("LIMIT 501")).toBe(true);
   });
 });

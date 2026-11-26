@@ -31,10 +31,14 @@ function checkedSelect(row: DataSourceRow, sqlText: string): string {
   }
   // Every table the statement reads must be on the list: pull the identifiers after FROM/JOIN
   // (string literals were already stripped by the guard's tokenizer rules — its output text is
-  // what we checked, and this regex runs on the same checked text).
+  // what we checked, and this regex runs on the same checked text). Each part may be bare,
+  // double-quoted (Postgres) or backtick-quoted (MySQL) — missing the quoting style here is how
+  // a backticked table would otherwise extract no reference at all and walk past the allowlist,
+  // so the quotes are part of the pattern and stripped before the compare (SR-223).
   const allowed = new Set(allowlist);
-  const tableRefs = [...checked.matchAll(/\b(?:from|join)\s+"?([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)?)"?/gi)].map((m) =>
-    m[1]!.toLowerCase(),
+  const part = '(?:"[^"]+"|`[^`]+`|[a-zA-Z0-9_]+)';
+  const tableRefs = [...checked.matchAll(new RegExp(String.raw`\b(?:from|join)\s+(${part}(?:\.${part})?)`, "gi"))].map(
+    (m) => m[1]!.replace(/["`]/g, "").toLowerCase(),
   );
   for (const ref of tableRefs) {
     const bare = ref.split(".").pop()!;

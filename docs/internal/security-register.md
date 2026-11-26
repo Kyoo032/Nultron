@@ -7746,3 +7746,21 @@ connection rolls its read-only transaction back — instead of awaiting `ROLLBAC
 `bigNumberStrings` + `supportBigNumbers` hand oversized integers to the agent as strings.
 
 Gate: closed — deadline, buffer and precision all fail closed; `mysql.test.ts` pins the dispatch.
+
+### SR-223 {#sr-223}
+
+**Backtick-quoted tables walked past the data-source table allowlist.** Found by local QA on the F1
+head `b7bb643a`, still open at `ccc232d0` (2026-11-26): the table scan in `runSourceQuery` matched
+bare and double-quoted identifiers after FROM/JOIN but not MySQL's own backtick quoting, so
+``SELECT * FROM `salaries`` extracted no table reference at all and the allowlist check passed
+vacuously — on a live MySQL the query would have read any table in the database. High
+(confidentiality; W1.2/W1.3 bypass). **Fixed in this change.**
+
+Evidence: the FROM/JOIN scan in `checkedSelect` (`packages/host/src/data-sources/sql-query.ts:36`).
+Postgres was not exploitable (it rejects backticks server-side); the hole opened the moment the
+mysql2 connector landed.
+
+Fix: the scan accepts bare, double-quoted and backtick-quoted identifier parts and strips the quotes
+before the allowlist compare (`packages/host/src/data-sources/sql-query.ts`). Regression:
+`mysql.test.ts` refuses ``SELECT * FROM `salaries``` and ``SELECT * FROM `d`.`salaries``` with
+`table_not_allowed` while ``SELECT * FROM `orders``` passes the table check.
