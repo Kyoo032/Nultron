@@ -47,6 +47,7 @@ export function UsersRolesPage() {
           `--username ${shellQuote(trimmedUsername)}`,
           `--email ${shellQuote(trimmedEmail)}`,
           "--role auditor",
+          tenant.trim() ? `--tenant ${shellQuote(tenant.trim().toLowerCase())}` : null,
         ]
           .filter(Boolean)
           .join(" ")

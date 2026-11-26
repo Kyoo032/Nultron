@@ -157,7 +157,7 @@ describe("the role × action matrix", () => {
       { role: "auditor", method: "POST", path: "/api/v1/settings", denied: true },
       { role: "auditor", method: "GET", path: "/api/v1/settings", denied: false },
       { role: "member", method: "POST", path: "/api/v1/billing/top-up", denied: true },
-      { role: "admin", method: "POST", path: "/api/v1/billing/top-up", denied: false },
+      { role: "admin", method: "POST", path: "/api/v1/settings", denied: false },
       { role: "owner", method: "GET", path: "/api/v1/threads", denied: false },
     ];
     for (const entry of cases) {
@@ -170,6 +170,11 @@ describe("the role × action matrix", () => {
         isRoleDenial(result, entry.role, gate),
         `${entry.role} ${entry.method} ${entry.path}`,
       ).toBe(entry.denied);
+      // An "allowed" cell is proven by the handler answering, not by any absence of the gate's 403:
+      // a 404 would mean the route never resolved, which proves nothing about the gate.
+      if (!entry.denied) {
+        expect(result.status, `${entry.role} ${entry.method} ${entry.path} resolved`).not.toBe(404);
+      }
     }
   });
 });
