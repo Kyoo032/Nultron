@@ -350,6 +350,39 @@ describe("concurrency", () => {
     expect(aAgain.reason).toBe("busy");
     expect((await a).ok && (await b).ok).toBe(true);
   });
+
+  it("production wiring: the pool follows AGENTFORGE_MAX_CODE_RUNS so the operator override admits the runs", async () => {
+    ship = makeFakeShip();
+    resetShipVerdictForTests();
+    setShipDirForTests(ship.dir);
+    const saved = {
+      server: process.env.AGENTFORGE_SERVER,
+      maxRuns: process.env.AGENTFORGE_MAX_CODE_RUNS,
+    };
+    process.env.AGENTFORGE_SERVER = "true";
+    process.env.AGENTFORGE_MAX_CODE_RUNS = "2";
+    try {
+      // No injected limiter or pool: both are built from the environment, as in production.
+      runner = createSandboxRunner({});
+      const a = runner.run(request("sleep:1200", { tenantId: "tenant-a" }));
+      const b = runner.run(request("sleep:1200", { tenantId: "tenant-b" }));
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      // Both runs hold a child at once: before the fix the pool's one-child cap answered the second `busy`.
+      expect(trackedChildCount()).toBeGreaterThanOrEqual(2);
+      expect((await a).ok && (await b).ok).toBe(true);
+    } finally {
+      if (saved.server === undefined) {
+        delete process.env.AGENTFORGE_SERVER;
+      } else {
+        process.env.AGENTFORGE_SERVER = saved.server;
+      }
+      if (saved.maxRuns === undefined) {
+        delete process.env.AGENTFORGE_MAX_CODE_RUNS;
+      } else {
+        process.env.AGENTFORGE_MAX_CODE_RUNS = saved.maxRuns;
+      }
+    }
+  });
 });
 
 describe("when the sandbox is not there", () => {
