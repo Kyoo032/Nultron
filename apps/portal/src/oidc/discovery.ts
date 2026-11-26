@@ -4,6 +4,8 @@
  * stale document is in hand serves the stale one rather than denying sign-ins over a transient
  * outage.
  */
+import { isLoopbackHost } from "../security/cookies";
+
 export interface OidcDiscovery {
   readonly issuer: string;
   readonly authorizationEndpoint: string;
@@ -72,16 +74,17 @@ async function fetchDiscovery(url: string, fetchImpl: typeof fetch): Promise<Oid
     throw new OidcDiscoveryError("discovery document is missing required fields");
   }
   // An endpoint that is not https is not followed: the redirect off the portal would carry the
-  // round-trip secrets in cleartext. Loopback http is left for the test seam's stub IdP.
+  // round-trip secrets in cleartext. Loopback http is left for the test seam's stub IdP -- the
+  // check is on the hostname, not the prefix, so `http://127.0.0.1.evil.example` does not pass.
   for (const [name, endpoint] of [
     ["authorization_endpoint", authorizationEndpoint],
     ["token_endpoint", tokenEndpoint],
     ["jwks_uri", jwksUri],
   ] as const) {
+    const parsed = URL.parse(endpoint);
     if (
-      !endpoint.startsWith("https://") &&
-      !endpoint.startsWith("http://127.0.0.1") &&
-      !endpoint.startsWith("http://localhost")
+      !parsed ||
+      (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && isLoopbackHost(parsed.hostname)))
     ) {
       throw new OidcDiscoveryError(`${name} must be https`);
     }

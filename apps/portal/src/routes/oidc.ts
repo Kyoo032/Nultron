@@ -12,14 +12,15 @@
  */
 import type { PortalRuntime } from "../flows/context";
 import { type AuthorizeParams, checkClient, readAuthorizeParams } from "../flows/authorize";
-import { webSessionCookieFor } from "../flows/web-session";
-import { normaliseUserCode, sha256 } from "../crypto";
+import { mustChangePasswordFirst, webSessionCookieFor } from "../flows/web-session";
+import { hashEquals, normaliseUserCode, sha256 } from "../crypto";
 import { createDiscovery, type OidcDiscovery } from "../oidc/discovery";
 import { createJwks } from "../oidc/jwks";
 import { mintPkce } from "../oidc/pkce";
 import { sealJson, unsealJson } from "../oidc/seal";
 import { type OidcProvider, type OidcProviderId, oidcProviders } from "../oidc/providers";
 import { verifyIdToken } from "../oidc/verify-id-token";
+import { serialiseCookie } from "../security/cookies";
 import { redirectResponse } from "../security/headers";
 import type { PortalRequest, PortalResponse, PortalRoute } from "../server";
 import type { PortalOps, User } from "../store/types";
@@ -58,6 +59,11 @@ interface SealedState {
  * `start` with this door's own context. Empty when no provider is configured.
  */
 export function oidcSsoLinks(runtime: PortalRuntime, door: Door): readonly OidcSsoLink[] {
+  // On the activate door a link without a pending code can only fail at `start`: bare `/activate`
+  // gets no buttons, and `start` would have nothing to resume anyway.
+  if (door.kind === "activate" && !door.userCode) {
+    return [];
+  }
   const providers = oidcProviders(runtime.config.oidc);
   const links: OidcSsoLink[] = [];
   for (const provider of providers.values()) {
@@ -70,7 +76,8 @@ export function oidcSsoLinks(runtime: PortalRuntime, door: Door): readonly OidcS
       if (door.params.state) query.set("state", door.params.state);
     } else {
       query.set("door", "activate");
-      if (door.userCode) query.set("user_code", door.userCode);
+      // Named `code`, the parameter the deploy proxy strips from its request logs.
+      query.set("code", door.userCode as string);
     }
     links.push({ provider: provider.id, href: `/auth/oidc/${provider.id}/start?${query.toString()}` });
   }
@@ -159,7 +166,7 @@ async function startOidc(
     door = { kind: "authorize", params };
     tenantId = client.tenantId;
   } else if (doorKind === "activate") {
-    const raw = request.query.get("user_code");
+    const raw = request.query.get("code");
     const userCode = raw === null ? null : normaliseUserCode(raw);
     const resolved = userCode === null ? null : await runtime.store.resolve.byUserCode(userCode);
     if (!userCode || !resolved) {
@@ -205,7 +212,13 @@ async function startOidc(
   target.searchParams.set("nonce", pkce.nonce);
   target.searchParams.set("code_challenge", pkce.codeChallenge);
   target.searchParams.set("code_challenge_method", "S256");
-  return redirectResponse(target.toString());
+  // The browser binding: `callback` requires `sha256(state)` back in this cookie, so a callback
+  // link clicked in a browser that never started the sign-in cannot mint a session there.
+  const txCookie = serialiseCookie(runtime.cookies.oidcTx, sha256(pkce.state).toString("base64url"), {
+    secure: runtime.secureCookies,
+    maxAgeSeconds: STATE_TTL_MS / 1000,
+  });
+  return redirectResponse(target.toString(), { cookie: txCookie });
 }
 
 function sealedFor(door: Door, verifier: string): SealedState {
@@ -251,6 +264,12 @@ async function callbackOidc(
   const state = request.query.get("state");
   const code = request.query.get("code");
   if (request.query.get("error") !== null || !state || !code || code.length > 4096) {
+    return failed("oidc.denied");
+  }
+  // The state must also come back in the cookie `start` set: a valid callback arriving in a
+  // browser that never started the sign-in is a planted session, not a resumed one.
+  const txCookie = context.cookies[runtime.cookies.oidcTx];
+  if (!txCookie || !hashEquals(sha256(state), Buffer.from(txCookie, "base64url"))) {
     return failed("oidc.denied");
   }
   const stateHash = sha256(state);
@@ -303,7 +322,7 @@ async function callbackOidc(
   // Who the session is for: an existing (issuer, subject) binding first, then the seat the
   // provider's verified e-mail matches. Neither is a sign-in; there is no JIT account creation.
   const matched = await runtime.store.tx(tenantId, async (ops) => {
-    const boundId = await ops.oidc.findUserByIdentity(issuer, subject);
+    const boundId = await ops.oidc.findUserByIdentity(tenantId, issuer, subject);
     const member = boundId ? await ops.users.findById(boundId) : null;
     const candidate = member ?? (email === null ? null : await ops.users.findByEmail(tenantId, email));
     if (!candidate) {
@@ -314,6 +333,17 @@ async function callbackOidc(
       await denyOps(ops, tenantId, candidate, "user_not_active", context.ip);
       return { kind: "none" as const };
     }
+    const org = await ops.orgs.findById(candidate.orgId);
+    const ssoRequired = org?.ssoRequired === true && candidate.role !== "owner";
+    if (ssoRequired) {
+      // Mandatory SSO names its provider through `tenant_config.feature_flags.sso_provider`:
+      // sign-in through another enabled provider is not the SSO the org required.
+      const named = (await ops.tenantConfig.get(tenantId))?.featureFlags.sso_provider;
+      if (named && named !== provider.id) {
+        await denyOps(ops, tenantId, candidate, "oidc_wrong_provider", context.ip);
+        return { kind: "none" as const };
+      }
+    }
     if (!boundId) {
       // First sign-in through this provider: a seat check before the binding exists, the same
       // arithmetic `beginSignIn` applies before a code is ever sent.
@@ -323,7 +353,7 @@ async function callbackOidc(
       }
       await ops.oidc.bindIdentity({ tenantId, userId: candidate.id, issuer, subject });
     }
-    return { kind: "member" as const, member: candidate };
+    return { kind: "member" as const, member: candidate, ssoRequired };
   });
   if (matched.kind === "none") {
     return failed("oidc.denied");
@@ -344,24 +374,41 @@ async function callbackOidc(
     });
   });
 
+  // `orgs.sso_required` leaves a non-owner no password door: a pending forced change can never
+  // be satisfied by them, so the provider's proof stands in for it. Everyone else keeps it.
+  const mustChangeExempt = matched.ssoRequired;
+
   if (sealed.d === "a") {
     const params = readAuthorizeParams({ get: (name) => sealed.p[name] ?? null });
-    const response = await completeSignIn(runtime, context, params, tenantId, member.id);
+    // Validated again on this hop: a client or redirect_uri withdrawn while the browser was at
+    // the provider must not receive the authorization code the callback is about to mint.
+    const client = await checkClient(runtime, params);
+    if (!client.ok || client.tenantId !== tenantId) {
+      return failed("oidc.denied");
+    }
+    const response = await completeSignIn(runtime, context, params, tenantId, member.id, {
+      mustChangeExempt,
+    });
     return response ?? failed("oidc.denied");
   }
 
   // The activate door: the cookie is minted on the code sign-in's own install-id shape, and the
-  // browser re-hits `GET /activate` which now sees the live session and the pending code.
+  // browser re-hits `GET /activate` which now sees the live session and the pending code. A
+  // pending forced change gets no cookie -- the code door's own sign-in holds it to the change.
   const userCode = sealed.p.user_code;
-  const cookie = await runtime.store.tx(tenantId, (ops) =>
-    webSessionCookieFor(runtime, ops, {
+  const landing = `/activate?code=${encodeURIComponent(userCode)}`;
+  const cookie = await runtime.store.tx(tenantId, async (ops) => {
+    if (!mustChangeExempt && (await mustChangePasswordFirst(runtime, ops, member.id))) {
+      return null;
+    }
+    return webSessionCookieFor(runtime, ops, {
       tenantId,
       userId: member.id,
       orgId: member.orgId,
       installId: `web-client-activate-${member.id}`,
-    }),
-  );
-  return redirectResponse(`/activate?code=${encodeURIComponent(userCode)}`, { cookie });
+    });
+  });
+  return cookie ? redirectResponse(landing, { cookie }) : redirectResponse(landing);
 }
 
 /** A `login.denied` row inside the resolved tenant -- the failure half of AC-8b.5's audit pair. */

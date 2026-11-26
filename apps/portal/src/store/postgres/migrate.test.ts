@@ -154,6 +154,33 @@ describe("runMigrations", () => {
     ]);
   });
 
+  it("installs 0017's OIDC shape: per-tenant bindings, sso_required, the state resolver", async () => {
+    // The binding key carries the tenant: the same (issuer, subject) may bind a seat per tenant.
+    const { rows: pk } = await pool.query<{ column: string }>(
+      `SELECT a.attname AS column
+         FROM pg_constraint c
+         JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS ord(attnum, n) ON true
+         JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ord.attnum
+        WHERE c.conrelid = 'user_oidc_identities'::regclass AND c.contype = 'p'
+        ORDER BY ord.n`,
+    );
+    expect(pk.map((row) => row.column)).toEqual(["tenant_id", "issuer", "subject"]);
+
+    const { rows: col } = await pool.query<{ default: string | null; nullable: boolean }>(
+      `SELECT column_default AS "default", is_nullable = 'YES' AS nullable
+         FROM information_schema.columns
+        WHERE table_name = 'orgs' AND column_name = 'sso_required'`,
+    );
+    expect(col).toEqual([{ default: "false", nullable: false }]);
+
+    // The callback's way into a tenant scope: an unknown or expired state resolves to NULL.
+    const { rows: state } = await pool.query<{ tenant_id: string | null }>(
+      `SELECT resolve_tenant_for_oidc_state($1) AS tenant_id`,
+      [Buffer.alloc(32)],
+    );
+    expect(state).toEqual([{ tenant_id: null }]);
+  });
+
   it("widens users_role_chk to the auditor seat (0015)", async () => {
     const { rows } = await pool.query<{ check: string }>(
       `SELECT pg_get_constraintdef(oid) AS check FROM pg_constraint WHERE conname = 'users_role_chk'`,

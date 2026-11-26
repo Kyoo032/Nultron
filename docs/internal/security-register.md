@@ -7286,6 +7286,22 @@ Proof: `src/oidc/verify-id-token.test.ts` (6), `pkce.test.ts` (4), `jwks.test.ts
 
 Residual: client secrets for the providers are operator config (`PORTAL_OIDC_*`), shipped through environment like every other portal secret; ID-token verification trusts the provider's own discovery document, which is the stated model.
 
+### SR-216 {#sr-216}
+
+**OIDC review-round hardening (Devin Review on PR #293) — fixed 2026-11-26, same branch.** Twelve findings triaged, ten fixed, two dismissed as recorded decisions.
+
+- **Login CSRF (fixed).** `callbackOidc` accepted a valid callback in a browser that never started the sign-in, planting the signer's session there. `start` now sets `portal_oidc_tx` (`__Host-` in secure mode) carrying `sha256(state)` for the state's TTL (`src/routes/oidc.ts`, `security/cookies.ts`); the callback requires the same hash back in constant-time comparison before the state row is consumed.
+- **Entra UPN scope (fixed).** `preferred_username` proved tenant control, not mailbox ownership: an attacker-administered Entra tenant could set a victim's address as UPN and claim the seat. `microsoftEmail` accepts the UPN only when the token's `tid` is the configured `PORTAL_OIDC_MICROSOFT_TENANT` (`src/oidc/providers.ts`); anything else needs `email_verified`.
+- **Device code in proxy logs (fixed).** The activate door's start URL carried the live approval code as `user_code`; the deploy proxy strips only `code` and `state`. The parameter is renamed `code` (`src/routes/oidc.ts`).
+- **Redirect revalidation (fixed).** Door "a" reused the start-time client check; a `redirect_uri` withdrawn mid-round-trip still received the authorization code. The callback re-runs `checkClient` on the sealed params and requires the same tenant (`src/routes/oidc.ts`).
+- **Unbounded audit rows (fixed).** The SSO-blocked password path wrote `password.withheld` before any attempt was counted; the row is removed (`src/flows/password-sign-in.ts`), restoring "no row for an uncounted attempt".
+- **Forced-change lockout (fixed).** Under `orgs.sso_required` a non-owner has no password door, so `must_change` could never be satisfied — a permanent lockout after an operator reset. OIDC sign-in passes `mustChangeExempt` only for that case (`src/routes/authorize.ts`, `src/routes/oidc.ts`); door "c" now reads `mustChangePasswordFirst` inside the minting transaction like every other cookie path.
+- **Outstanding OTPs (fixed).** Codes minted before `sso_required` flipped still verified. `verifyLoginOtp` refuses non-owners under `sso_required` before the code is touched (`src/otp/verify.ts`); the Owner keeps them.
+- **Wrong-provider SSO (fixed).** Under `sso_required` with `sso_provider` named, a callback through another enabled provider no longer satisfies the requirement (`src/routes/oidc.ts`, `login.denied` with `oidc_wrong_provider`).
+- **Loopback prefix check (fixed).** `fetchDiscovery` matched `http://127.0.0.1` by prefix, admitting `http://127.0.0.1.evil.test`; the check is now on the parsed hostname (`src/oidc/discovery.ts`).
+- **Per-tenant bindings (fixed).** `user_oidc_identities` keyed on `(issuer, subject)` alone silently dropped the same identity's binding in a second tenant; the key is now `(tenant_id, issuer, subject)` (`migrations/0017_oidc_identities.sql`).
+- **Dismissed:** Google's `email_verified` is the spec'd seat-match signal (F8b); the SSO dead-end's member disclosure is the e-mail-step oracle the owner already approved, at the same derivation cost.
+
 ## Must be true before the Tencent Cloud deploy
 
 Each line names the row that owns it. A line that cannot be ticked is a reason not to hand out the

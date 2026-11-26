@@ -8,7 +8,7 @@ import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { randomToken } from "../crypto";
 import { addUser, type Fixture } from "../testing/fixtures";
 import { REDIRECT, authorizeUrl, browserAt, setupPilot } from "../testing/sign-in-kit";
-import { emailStep, startPage } from "../testing/sign-in-kit";
+import { emailStep, otpMails, startPage, verifyStep } from "../testing/sign-in-kit";
 import {
   makePerson,
   postPassword,
@@ -31,7 +31,7 @@ const idp = { tokenStatus: 200 };
 
 const idpFetch: typeof fetch = (async (input: string | URL | Request) => {
   const url = String(input);
-  if (url.startsWith("https://accounts.google.com/")) {
+  if (url.startsWith("https://accounts.google.com/") || url.startsWith("https://login.microsoftonline.com/")) {
     return new Response(JSON.stringify(DISCOVERY_DOC), {
       status: 200,
       headers: { "content-type": "application/json" },
@@ -72,18 +72,30 @@ function ssoLink(page: string, provider = "google"): string {
   return match[1].replace(/&amp;/g, "&");
 }
 
-async function startRoundTrip(agent: ReturnType<typeof browserAt>): Promise<string> {
+async function startRoundTrip(agent: ReturnType<typeof browserAt>, provider = "google"): Promise<string> {
   const page = await startPage(agent, "st-1");
-  const start = await agent.get(ssoLink(page.text));
+  const start = await agent.get(ssoLink(page.text, provider));
   expect(start.status).toBe(302);
   const target = new URL(start.location as string);
   expect(target.origin).toBe(IDP);
   expect(target.pathname).toBe("/authorize");
   expect(target.searchParams.get("response_type")).toBe("code");
-  expect(target.searchParams.get("client_id")).toBe("g-client");
   expect(target.searchParams.get("code_challenge_method")).toBe("S256");
   expect(target.searchParams.get("state")).toBeTruthy();
   return target.searchParams.get("state") as string;
+}
+
+/** The claims the microsoft stub returns next: Entra verified e-mail, or the own-tenant UPN. */
+function verifyAsMicrosoft(email: string | null, subject = "msub-1", tid = "tenant-1"): void {
+  nextVerify = {
+    ok: true,
+    claims: {
+      sub: subject,
+      iss: `https://login.microsoftonline.com/${tid}/v2.0`,
+      tid,
+      ...(email === null ? { preferred_username: "upn@pilot.test" } : { email, email_verified: true }),
+    },
+  };
 }
 
 async function auditActions(portal: PortalHarness, tenantId: string): Promise<string[]> {
@@ -184,7 +196,7 @@ describe("OIDC sign-in (F8b)", () => {
       (await agent.get(`/auth/oidc/google/callback?state=${encodeURIComponent(state)}&code=a`)).status,
     ).toBe(302);
     const bound = await portal.store.store.tx(fixture.tenant.id, (ops) =>
-      ops.oidc.findUserByIdentity("https://accounts.google.com", "subj-bound"),
+      ops.oidc.findUserByIdentity(fixture.tenant.id, "https://accounts.google.com", "subj-bound"),
     );
     expect(bound).toBe(member.id);
 
@@ -195,6 +207,47 @@ describe("OIDC sign-in (F8b)", () => {
     expect(
       (await agent.get(`/auth/oidc/google/callback?state=${encodeURIComponent(state)}&code=b`)).status,
     ).toBe(302);
+  });
+
+  it("refuses a callback in a browser that never started the sign-in", async () => {
+    verifyAs(fixture.user.email);
+    const starter = browserAt(portal);
+    const state = await startRoundTrip(starter);
+    // Another browser never received the transaction cookie, so a forwarded callback URL cannot
+    // plant this sign-in's session in it -- and the real browser's round trip still works.
+    const outsider = browserAt(portal);
+    const planted = await outsider.get(
+      `/auth/oidc/google/callback?state=${encodeURIComponent(state)}&code=abc`,
+    );
+    expect(planted.status).toBe(400);
+    const reply = await starter.get(`/auth/oidc/google/callback?state=${encodeURIComponent(state)}&code=abc`);
+    expect(reply.status).toBe(302);
+  });
+
+  it("does not trust a Microsoft UPN a different tenant asserted", async () => {
+    // preferred_username is tenant-verified only inside the deployment's own Entra tenant: a
+    // foreign tenant's admin can set any UPN they like, so it matches no seat.
+    nextVerify = {
+      ok: true,
+      claims: {
+        sub: "msub-foreign",
+        iss: "https://login.microsoftonline.com/other-tid/v2.0",
+        tid: "other-tid",
+        preferred_username: fixture.user.email,
+      },
+    };
+    const agent = browserAt(portal);
+    const state = await startRoundTrip(agent, "microsoft");
+    const reply = await agent.get(`/auth/oidc/microsoft/callback?state=${encodeURIComponent(state)}&code=abc`);
+    expect(reply.status).toBe(400);
+    const actions = await auditActions(portal, fixture.tenant.id);
+    expect(actions).toContain("login.denied:oidc_no_member");
+  });
+
+  it("shows no SSO buttons on a bare /activate with no pending code", async () => {
+    const reply = await browserAt(portal).get("/activate");
+    expect(reply.status).toBe(200);
+    expect(reply.text).not.toContain("/auth/oidc/");
   });
 
   it("redirects /activate to the tenant's sso_provider instead of the e-mail page", async () => {
@@ -225,6 +278,46 @@ describe("sso_required", () => {
       expect(reply.text).toContain("single sign-on");
       // And no code was sent.
       expect(portal.mailer.newest()?.to).not.toBe(member.email);
+    } finally {
+      await portal.store.store.tx(fixture.tenant.id, (ops) => ops.orgs.setSsoRequired(fixture.org.id, false));
+    }
+  });
+
+  it("denies a non-owner who signed in through the provider sso_provider does not name", async () => {
+    const member = await addUser(portal.store.store, fixture, "wrongprov@pilot.test");
+    await portal.store.store.tx(fixture.tenant.id, async (ops) => {
+      await ops.orgs.setSsoRequired(fixture.org.id, true);
+      await ops.tenantConfig.upsert({ tenantId: fixture.tenant.id, featureFlags: { sso_provider: "google" } });
+    });
+    try {
+      verifyAsMicrosoft(member.email, "msub-wrong");
+      const agent = browserAt(portal);
+      const state = await startRoundTrip(agent, "microsoft");
+      const reply = await agent.get(
+        `/auth/oidc/microsoft/callback?state=${encodeURIComponent(state)}&code=abc`,
+      );
+      expect(reply.status).toBe(400);
+      const actions = await auditActions(portal, fixture.tenant.id);
+      expect(actions).toContain("login.denied:oidc_wrong_provider");
+    } finally {
+      await portal.store.store.tx(fixture.tenant.id, async (ops) => {
+        await ops.orgs.setSsoRequired(fixture.org.id, false);
+        await ops.tenantConfig.upsert({ tenantId: fixture.tenant.id, featureFlags: { sso_provider: null } });
+      });
+    }
+  });
+
+  it("refuses an e-mail code that was still live when sso_required flipped on", async () => {
+    const member = await addUser(portal.store.store, fixture, "pending@pilot.test");
+    const agent = browserAt(portal);
+    const codePage = await emailStep(agent, "st-pend", member.email);
+    const code = otpMails(portal).at(-1)?.code;
+    expect(code).toBeTruthy();
+    await portal.store.store.tx(fixture.tenant.id, (ops) => ops.orgs.setSsoRequired(fixture.org.id, true));
+    try {
+      const reply = await verifyStep(agent, codePage, "st-pend", member.email, code as string);
+      expect(reply.status).toBe(400);
+      expect(reply.location ?? "").not.toContain(REDIRECT);
     } finally {
       await portal.store.store.tx(fixture.tenant.id, (ops) => ops.orgs.setSsoRequired(fixture.org.id, false));
     }

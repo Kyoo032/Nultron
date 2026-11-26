@@ -71,7 +71,7 @@ export function oidcProviders(config: OidcConfig | undefined): ReadonlyMap<OidcP
       issuerOk: preset.issuerOk,
       clientId: config.microsoft.clientId,
       clientSecret: config.microsoft.clientSecret,
-      emailFromClaims: microsoftEmail,
+      emailFromClaims: microsoftEmail(config.microsoft.tenant),
     });
   }
   return map;
@@ -103,12 +103,19 @@ function googleEmail(claims: Readonly<Record<string, unknown>>): string | null {
 /**
  * Microsoft (Entra): `email_verified` when it is present, and otherwise the tenant-verified
  * `preferred_username` -- a managed account's UPN is an address the tenant asserts, while a plain
- * `email` claim an end user typed is not.
+ * `email` claim an end user typed is not. The UPN is only trusted from the deployment's own
+ * configured tenant (`tid === PORTAL_OIDC_MICROSOFT_TENANT`): in any other Entra tenant an
+ * attacker administers the UPN themselves, so it proves nothing about the mailbox it names.
  */
-function microsoftEmail(claims: Readonly<Record<string, unknown>>): string | null {
-  if (claims.email_verified === true) {
-    return claimsEmail(claims);
-  }
-  const upn = claims.preferred_username;
-  return typeof upn === "string" && upn.includes("@") ? upn.trim().toLowerCase() : null;
+function microsoftEmail(trustedTenant: string) {
+  return (claims: Readonly<Record<string, unknown>>): string | null => {
+    if (claims.email_verified === true) {
+      return claimsEmail(claims);
+    }
+    if (claims.tid !== trustedTenant) {
+      return null;
+    }
+    const upn = claims.preferred_username;
+    return typeof upn === "string" && upn.includes("@") ? upn.trim().toLowerCase() : null;
+  };
 }

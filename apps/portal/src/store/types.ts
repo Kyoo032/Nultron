@@ -306,7 +306,7 @@ export interface PortalOps {
    */
   readonly oidc: {
     /** The user a binding points at, inside the door's tenant scope; NULL when unbound. */
-    findUserByIdentity(issuer: string, subject: string): Promise<string | null>;
+    findUserByIdentity(tenantId: string, issuer: string, subject: string): Promise<string | null>;
     /**
      * First sign-in through this provider: bind (issuer, subject) to the seat the verified
      * e-mail matched. `ON CONFLICT DO NOTHING` -- a raced first sign-in keeps the first binding.

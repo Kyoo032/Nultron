@@ -8,20 +8,22 @@ import type { PortalOps } from "../types";
 
 export function oidcOps(client: PoolClient): PortalOps["oidc"] {
   return {
-    async findUserByIdentity(issuer, subject) {
+    async findUserByIdentity(tenantId, issuer, subject) {
       const { rows } = await client.query<{ user_id: string }>(
-        `SELECT user_id FROM user_oidc_identities WHERE issuer = $1 AND subject = $2`,
-        [issuer, subject],
+        `SELECT user_id FROM user_oidc_identities
+         WHERE tenant_id = $1 AND issuer = $2 AND subject = $3`,
+        [tenantId, issuer, subject],
       );
       return rows.length > 0 ? rows[0].user_id : null;
     },
 
     async bindIdentity(input) {
-      // A raced first sign-in keeps whichever binding landed first; (issuer, subject) is the key.
+      // A raced first sign-in keeps whichever binding landed first; (tenant_id, issuer, subject)
+      // is the key, so the same identity can bind a seat per tenant.
       await client.query(
         `INSERT INTO user_oidc_identities (user_id, tenant_id, issuer, subject)
          VALUES ($1, $2, $3, $4)
-         ON CONFLICT (issuer, subject) DO NOTHING`,
+         ON CONFLICT (tenant_id, issuer, subject) DO NOTHING`,
         [input.userId, input.tenantId, input.issuer, input.subject],
       );
     },

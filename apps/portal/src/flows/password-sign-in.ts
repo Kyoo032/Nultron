@@ -246,15 +246,12 @@ export async function verifyPasswordStep(
   }
 
   // The org's Owner may require SSO for non-owners (0017). Before the lock and before the
-  // derivation: a refused-elsewhere policy costs nobody an attempt, and the row it writes is the
-  // one place the refusal is on record.
+  // derivation: a refused-elsewhere policy costs nobody an attempt. No audit row is written here:
+  // no attempt was counted, and one row per submission would let anyone who knows a username
+  // grow the audit table without bound -- the dead-end page is the refusal's record.
   const ssoGate = await deps.store.tx(tenantId, async (ops) => {
     const org = await ops.orgs.findById(user.orgId);
-    if (org?.ssoRequired && user.role !== "owner") {
-      await outsiderRow(ops, user, "password.withheld", "sso_required", ip);
-      return true;
-    }
-    return false;
+    return org?.ssoRequired === true && user.role !== "owner";
   });
   if (ssoGate) {
     await deps.passwords.verifyDummy(password);

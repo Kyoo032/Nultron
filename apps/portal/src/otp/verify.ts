@@ -55,6 +55,12 @@ export async function verifyLoginOtp(
 
   const purpose: OtpPurpose = input.purpose ?? "activate";
   return deps.store.tx(tenantId, async (ops) => {
+    // `orgs.sso_required` retires the code door for non-owners at send time, and here at verify
+    // time for codes minted before the switch was flipped: the Owner keeps them for recovery.
+    const member = await ops.users.findByEmail(tenantId, email);
+    if (member && member.role !== "owner" && (await ops.orgs.findById(member.orgId))?.ssoRequired) {
+      return { ok: false as const, reason: "no_code" as const, attemptsRemaining: 0 };
+    }
     const result = await ops.loginOtps.verify({ tenantId, email, code: input.code, purpose });
     const user = await ops.users.findByEmail(tenantId, email);
 

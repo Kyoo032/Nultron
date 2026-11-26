@@ -30,6 +30,11 @@ export interface CookieMode {
 export interface CookieNames {
   readonly session: string;
   readonly csrf: string;
+  /**
+   * The OIDC round-trip binding: `start` sets `sha256(state)`, `callback` requires it back, so a
+   * callback link forwarded into a browser that never started the sign-in cannot mint a session.
+   */
+  readonly oidcTx: string;
 }
 
 const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["::1", "localhost", "[::1]"]);
@@ -79,8 +84,12 @@ export function cookiesAreSecure(mode: CookieMode): boolean {
 
 export function cookieNames(mode: CookieMode): CookieNames {
   return cookiesAreSecure(mode)
-    ? Object.freeze({ session: "__Host-portal_session", csrf: "__Host-portal_csrf" })
-    : Object.freeze({ session: "portal_session", csrf: "portal_csrf" });
+    ? Object.freeze({
+        session: "__Host-portal_session",
+        csrf: "__Host-portal_csrf",
+        oidcTx: "__Host-portal_oidc_tx",
+      })
+    : Object.freeze({ session: "portal_session", csrf: "portal_csrf", oidcTx: "portal_oidc_tx" });
 }
 
 /** Only what this app sets. A value with an `=` in it (base64url has none) keeps its tail. */

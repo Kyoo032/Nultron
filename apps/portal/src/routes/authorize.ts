@@ -358,7 +358,15 @@ export async function completeSignIn(
   params: AuthorizeParams,
   tenantId: string,
   userId: string,
-  options: { readonly resume?: WebSession; readonly ifChangeRequired?: () => PortalResponse } = {},
+  options: {
+    readonly resume?: WebSession;
+    readonly ifChangeRequired?: () => PortalResponse;
+    /**
+     * An OIDC sign-in under `orgs.sso_required` for a non-owner: their password door is off, so
+     * a pending forced change can never be satisfied and the provider's proof stands in for it.
+     */
+    readonly mustChangeExempt?: boolean;
+  } = {},
 ): Promise<PortalResponse | null> {
   const clientId = params.clientId as string;
   const redirectUri = params.redirectUri as string;
@@ -376,7 +384,7 @@ export async function completeSignIn(
       return { kind: "unknown_user" as const };
     }
     // Neither a cookie nor a password that was right a moment ago is a way past the forced change.
-    if (await mustChangePasswordFirst(runtime, ops, userId)) {
+    if (!options.mustChangeExempt && (await mustChangePasswordFirst(runtime, ops, userId))) {
       return { kind: "change_required" as const };
     }
     const gate = await runBrowserLoginGate(ops, { tenantId, user, installId });

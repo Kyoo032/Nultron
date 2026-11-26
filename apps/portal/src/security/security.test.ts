@@ -20,6 +20,7 @@ describe("cookie names and the __Host- prefix", () => {
     expect(cookieNames({ production: false, host: "127.0.0.1" })).toEqual({
       session: "portal_session",
       csrf: "portal_csrf",
+      oidcTx: "portal_oidc_tx",
     });
     expect(cookiesAreSecure({ production: false, host: "127.0.0.1" })).toBe(false);
   });
@@ -57,6 +58,7 @@ describe("cookie names and the __Host- prefix", () => {
     expect(cookieNames(behindTunnel)).toEqual({
       session: "__Host-portal_session",
       csrf: "__Host-portal_csrf",
+      oidcTx: "__Host-portal_oidc_tx",
     });
   });
 

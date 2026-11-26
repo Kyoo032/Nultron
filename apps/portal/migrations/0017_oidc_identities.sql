@@ -12,8 +12,9 @@
 --
 -- ## user_oidc_identities
 --
---   * `(issuer, subject)` is the primary key: an OIDC subject is only unique inside its issuer, so the
---     pair is the identity. One row binds it to exactly one `users` row, in one tenant.
+--   * `(tenant_id, issuer, subject)` is the primary key: an OIDC subject is only unique inside its
+--     issuer, and the same identity can hold seats in several tenants -- each binding is that
+--     tenant's own row, to exactly one `users` row.
 --   * `tenant_id` is NOT NULL for the RLS policy below; the portal writes it from the `users` row, never
 --     from the caller.
 --   * The row is written once, the first time a verified e-mail matches a seat, and read every sign-in
@@ -64,7 +65,9 @@ CREATE TABLE IF NOT EXISTS user_oidc_identities (
   issuer     text NOT NULL,
   subject    text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (issuer, subject),
+  -- (issuer, subject) alone is not the key: the same identity (one Google account, say) can
+  -- hold seats in several tenants, and each binding is that tenant's own row.
+  PRIMARY KEY (tenant_id, issuer, subject),
   CONSTRAINT user_oidc_identities_issuer_len_chk CHECK (octet_length(issuer) BETWEEN 1 AND 512),
   CONSTRAINT user_oidc_identities_subject_len_chk CHECK (octet_length(subject) BETWEEN 1 AND 255)
 );
