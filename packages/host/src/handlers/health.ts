@@ -31,6 +31,8 @@
  * reports the deployment, not the caller — so it reads nothing of anybody's and returns the same
  * answer to every signed-in session.
  */
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { hostCapabilities, isServerMode, objectStorageKind } from "@agentforge/core";
 import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
@@ -52,7 +54,7 @@ export const LIVENESS_BODY = Object.freeze({ status: "ok" });
 
 /** One dependency's verdict. `detail` is a fixed phrase, never an exception message. */
 export type ReadinessCheck = {
-  readonly name: "database" | "storage" | "components";
+  readonly name: "database" | "storage" | "components" | "backup";
   readonly ok: boolean;
   /** A short, fixed phrase chosen from this file. Never a thrown message, path or credential. */
   readonly detail: string;
@@ -69,6 +71,8 @@ export type ReadinessDeps = {
   readonly storage?: () => { readonly kind: string };
   readonly components?: () => ReadonlyArray<{ readonly id: string; readonly state: string }>;
   readonly serverMode?: () => boolean;
+  /** Injected so a test can hand a heartbeat without touching the real data dir. */
+  readonly backup?: () => { readonly result: string; readonly finishedAt: string } | null;
 };
 
 /**
@@ -151,6 +155,59 @@ function checkComponents(deps: ReadinessDeps): ReadinessCheck & { readonly items
   };
 }
 
+/**
+ * `backup-status.json` in the desk's data dir, written by `webapp-deploy/scripts/backup.sh`
+ * after each run — timestamp and result only (spec R12.9). The desk app only ever reads it.
+ *
+ * The dir resolver mirrors `localDataDir()` in `@agentforge/db`'s vault-key.ts by hand: this
+ * module is imported in processes where opening the database as an import side effect would
+ * be wrong, the same reason `requireHealthSql` is injected below.
+ */
+function backupStatusPath(): string {
+  const env = process.env;
+  const settingsPath = env.AGENTFORGE_SETTINGS_PATH?.trim();
+  const dataDir = settingsPath
+    ? /\.(json|enc)$/i.test(settingsPath)
+      ? dirname(settingsPath)
+      : settingsPath
+    : env.AGENTFORGE_DATA_DIR?.trim() || resolve(process.cwd(), "../../data");
+  return join(dataDir, "backup-status.json");
+}
+
+function readBackupStatus(): { result: string; finishedAt: string } | null {
+  try {
+    const path = backupStatusPath();
+    if (!existsSync(path)) {
+      return null;
+    }
+    const parsed = JSON.parse(readFileSync(path, "utf8")) as { result?: unknown; finishedAt?: unknown };
+    return {
+      result: typeof parsed.result === "string" ? parsed.result : "unknown",
+      finishedAt: typeof parsed.finishedAt === "string" ? parsed.finishedAt : "unknown",
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The desk's own view of its last backup: a `backup-status.json` heartbeat the host-side
+ * backup job writes into the data volume. It is metadata (result + timestamp), never
+ * content, so it is safe to surface behind the session gate the way the rest of readiness is.
+ * Deliberately NOT part of `ready`: a desk serves traffic fine while its backup is pending,
+ * and the loud-failure path is the external heartbeat monitor, not this route.
+ */
+function checkBackup(deps: ReadinessDeps): ReadinessCheck {
+  const status = deps.backup ? deps.backup() : readBackupStatus();
+  if (status === null) {
+    return { name: "backup", ok: true, detail: "pending — none recorded" };
+  }
+  if (status.result === "ok") {
+    return { name: "backup", ok: true, detail: `ok at ${status.finishedAt}` };
+  }
+  return { name: "backup", ok: false, detail: `${status.result} at ${status.finishedAt}` };
+}
+
 let healthSql: HealthSql | null = null;
 
 /**
@@ -193,6 +250,7 @@ export async function handleGetHealth(request: HostRequest, deps: ReadinessDeps 
     const database = checkDatabase(deps);
     const storage = checkStorage(deps);
     const components = checkComponents(deps);
+    const backup = checkBackup(deps);
     return jsonOk({
       ready: database.ok && storage.ok && components.ok,
       mode: serverMode ? "server" : "desk",
@@ -201,6 +259,7 @@ export async function handleGetHealth(request: HostRequest, deps: ReadinessDeps 
         { name: database.name, ok: database.ok, detail: database.detail },
         { name: storage.name, ok: storage.ok, detail: storage.detail },
         { name: components.name, ok: components.ok, detail: components.detail, items: components.items },
+        { name: backup.name, ok: backup.ok, detail: backup.detail },
       ],
     });
   } catch (error) {
