@@ -16,7 +16,8 @@
     "missing": "Masukkan nama pengguna dan kata sandi Anda.",
     "invalid": "Nama pengguna atau kata sandi salah. Kalau masih gagal, hubungi admin Anda.",
     "rateLimited": "Terlalu banyak percobaan. Tunggu beberapa menit, lalu coba lagi.",
-    "busy": "Layanan masuk sedang sibuk. Tunggu sebentar, lalu coba lagi."
+    "busy": "Layanan masuk sedang sibuk. Tunggu sebentar, lalu coba lagi.",
+    "ssoRequired": "Organisasi Anda mewajibkan single sign-on. Gunakan tombol masuk di atas."
   },
   "change": {
     "title": "Pilih kata sandi baru",
@@ -83,6 +84,10 @@
     "seatCap": {
       "title": "Tidak ada seat tersisa",
       "next": "Minta admin Anda mengosongkan satu seat atau menambah seat."
+    },
+    "ssoRequired": {
+      "title": "Single sign-on wajib",
+      "body": "Organisasi Anda mewajibkan single sign-on. Gunakan tombol masuk di halaman masuk, atau hubungi pemilik jika penyedia tidak bisa diakses."
     }
   },
   "account": {
@@ -168,5 +173,15 @@
   "footer": {
     "note": "Jangan pernah membagikan kode masuk kepada siapa pun.",
     "notePassword": "Jangan pernah membagikan kata sandi Anda kepada siapa pun."
+  },
+  "sso": {
+    "divider": "Atau lanjutkan dengan",
+    "google": "Masuk dengan Google",
+    "microsoft": "Masuk dengan Microsoft"
+  },
+  "oidc": {
+    "error": "Masuk itu tidak bisa dimulai. Coba lagi.",
+    "unavailable": "Penyedia masuk tidak menjawab. Coba lagi sebentar lagi.",
+    "denied": "Masuk itu tidak bisa diselesaikan. Jika seharusnya Anda punya akses, hubungi pemilik."
   }
 }

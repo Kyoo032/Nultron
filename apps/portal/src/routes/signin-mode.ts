@@ -22,5 +22,7 @@ export function signInModeRoutes(runtime: PortalRuntime): readonly PortalRoute[]
   if (runtime.config.signInMode !== "password") {
     return [];
   }
+  // The host believes only the word `mode`: SSO needs no new sign-in mode, since its links sit on
+  // the sign-in page itself and it ends on this mode's own session.
   return [{ method: "GET", path: SIGNIN_MODE_PATH, handle: () => jsonResponse(200, { mode: "password" }) }];
 }

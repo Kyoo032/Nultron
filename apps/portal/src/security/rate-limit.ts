@@ -231,6 +231,14 @@ export interface PortalLimiters {
    * account is the lock.
    */
   readonly passwordAttemptIdentifier: RateLimiter;
+  /**
+   * The OIDC `start` route mints one login-state row per redirect to an IdP. Thirty per
+   * quarter-hour per IP, like `otpSendIp` above it -- the row a start abandons dies at its
+   * `expires_at`, so the bound is about code-challenge guessing, not table size.
+   */
+  readonly oidcStartIp: RateLimiter;
+  /** The OIDC `callback` route: consumed states are single-use; a retry storm finds nothing. */
+  readonly oidcCallbackIp: RateLimiter;
 }
 
 const TEN_MINUTES = 10 * 60 * 1000;
@@ -253,5 +261,7 @@ export function createPortalLimiters(clock: Clock): PortalLimiters {
     inviteAttemptIp: createRateLimiter({ clock, windowMs: FIFTEEN_MINUTES, max: 10 }),
     passwordAttemptIp: createRateLimiter({ clock, windowMs: FIFTEEN_MINUTES, max: 20 }),
     passwordAttemptIdentifier: createRateLimiter({ clock, windowMs: FIFTEEN_MINUTES, max: 10 }),
+    oidcStartIp: createRateLimiter({ clock, windowMs: FIFTEEN_MINUTES, max: 30 }),
+    oidcCallbackIp: createRateLimiter({ clock, windowMs: FIFTEEN_MINUTES, max: 60 }),
   });
 }

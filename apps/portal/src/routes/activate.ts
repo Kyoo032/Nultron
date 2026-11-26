@@ -63,6 +63,7 @@ import {
   type RequestContext,
 } from "./support";
 import { LOGOUT_PATH } from "./logout";
+import { oidcRedirectForActivate, oidcSsoLinks } from "./oidc";
 
 const ACTIVATE_PATH = "/activate";
 const EMAIL_PATH = "/activate/email";
@@ -100,19 +101,26 @@ export function activateRoutes(runtime: PortalRuntime): readonly PortalRoute[] {
     {
       method: "POST",
       path: EMAIL_PATH,
-      handle: (request) => activatePost(runtime, request, (flow) => handleEmailStep(runtime, flow.context, flow.spec, flow.fields)),
+      handle: (request) =>
+        activatePost(runtime, request, (flow) => handleEmailStep(runtime, flow.context, flow.spec, flow.fields)),
     },
     {
       method: "POST",
       path: INVITE_PATH,
-      handle: (request) => activatePost(runtime, request, (flow) => handleInviteStep(runtime, flow.context, flow.spec, flow.fields)),
+      handle: (request) =>
+        activatePost(runtime, request, (flow) => handleInviteStep(runtime, flow.context, flow.spec, flow.fields)),
     },
     {
       method: "POST",
       path: INVITE_RESEND_PATH,
-      handle: (request) => activatePost(runtime, request, (flow) => handleInviteResend(runtime, flow.context, flow.spec, flow.fields)),
+      handle: (request) =>
+        activatePost(runtime, request, (flow) => handleInviteResend(runtime, flow.context, flow.spec, flow.fields)),
     },
-    { method: "POST", path: VERIFY_PATH, handle: (request) => activatePost(runtime, request, (flow) => postVerify(runtime, flow)) },
+    {
+      method: "POST",
+      path: VERIFY_PATH,
+      handle: (request) => activatePost(runtime, request, (flow) => postVerify(runtime, flow)),
+    },
     { method: "POST", path: APPROVE_PATH, handle: (request) => postApprove(runtime, request) },
   ];
 }
@@ -137,7 +145,7 @@ async function loadPending(
   return { tenantId, code };
 }
 
-function specFor(userCode: string | null, tenantId: string | null): SignInSpec {
+function specFor(runtime: PortalRuntime, userCode: string | null, tenantId: string | null): SignInSpec {
   return {
     purpose: "activate",
     requiredTenantId: tenantId,
@@ -145,16 +153,18 @@ function specFor(userCode: string | null, tenantId: string | null): SignInSpec {
     hidden: { user_code: userCode ?? "" },
     // Nothing leaves this origin on the device-code screens: no client redirect to name.
     formActionOrigins: [],
+    sso: oidcSsoLinks(runtime, { kind: "activate", userCode }),
   };
 }
 
 /** The same, for the password sign-in's two posts. */
-function passwordSpecFor(userCode: string | null, tenantId: string | null): PasswordSpec {
+function passwordSpecFor(runtime: PortalRuntime, userCode: string | null, tenantId: string | null): PasswordSpec {
   return {
     requiredTenantId: tenantId,
     paths: { password: PASSWORD_PATH, change: PASSWORD_CHANGE_PATH },
     hidden: { user_code: userCode ?? "" },
     formActionOrigins: [],
+    sso: oidcSsoLinks(runtime, { kind: "activate", userCode }),
   };
 }
 
@@ -232,10 +242,15 @@ async function getActivate(runtime: PortalRuntime, request: PortalRequest): Prom
   // form exactly as an absent one does.
   const member = await liveWebSessionUser(runtime, context.webSession);
   if (!member || !context.webSession) {
-    if (runtime.config.signInMode === "password") {
-      return passwordEntryResponse(runtime, context, passwordSpecFor(userCode, pending?.tenantId ?? null));
+    // `tenant_config.feature_flags.sso_provider` names the provider this door redirects to (F8b).
+    const ssoRedirect = await oidcRedirectForActivate(runtime, pending?.tenantId ?? null, userCode);
+    if (ssoRedirect) {
+      return ssoRedirect;
     }
-    return emailEntryResponse(runtime, context, specFor(userCode, pending?.tenantId ?? null));
+    if (runtime.config.signInMode === "password") {
+      return passwordEntryResponse(runtime, context, passwordSpecFor(runtime, userCode, pending?.tenantId ?? null));
+    }
+    return emailEntryResponse(runtime, context, specFor(runtime, userCode, pending?.tenantId ?? null));
   }
 
   const account = accountFor(member.email, csrf.token);
@@ -281,8 +296,8 @@ async function activatePost(
     fields: body.fields,
     userCode,
     pending,
-    spec: specFor(userCode, pending?.tenantId ?? null),
-    password: passwordSpecFor(userCode, pending?.tenantId ?? null),
+    spec: specFor(runtime, userCode, pending?.tenantId ?? null),
+    password: passwordSpecFor(runtime, userCode, pending?.tenantId ?? null),
   });
 }
 

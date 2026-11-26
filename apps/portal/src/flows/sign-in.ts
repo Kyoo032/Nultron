@@ -89,10 +89,17 @@ export type SignInState =
    * is unredeemed, no wrong guess was counted and no code was sent. The exchange still checks
    * (`login_precheck`), because a seat can go between this page and that one.
    */
-  | { readonly kind: "seat_cap_reached" };
+  | { readonly kind: "seat_cap_reached" }
+  /**
+   * `orgs.sso_required` is on and this person is not an owner: the e-mailed code (and the
+   * password in `password` mode) is off for them. The Owner keeps both for recovery. Nothing was
+   * spent: no code was sent and no guess counted.
+   */
+  | { readonly kind: "sso_required" };
 
 const NO_ACCESS: SignInState = Object.freeze({ kind: "no_access" });
 const SEAT_CAP_REACHED: SignInState = Object.freeze({ kind: "seat_cap_reached" });
+const SSO_REQUIRED: SignInState = Object.freeze({ kind: "sso_required" });
 
 interface Found {
   readonly tenantId: string;
@@ -160,10 +167,7 @@ function withheld(ops: PortalOps, found: Found, member: User, reasonCode: string
   });
 }
 
-function stateAfterDelivery(
-  result: Awaited<ReturnType<typeof deliverLoginOtp>>,
-  afterInvite: boolean,
-): SignInState {
+function stateAfterDelivery(result: Awaited<ReturnType<typeof deliverLoginOtp>>, afterInvite: boolean): SignInState {
   switch (result.kind) {
     case "sent":
       return { kind: "code_sent", afterInvite };
@@ -226,7 +230,11 @@ export async function beginSignIn(
           ops,
           found,
           member,
-          inspection.kind === "live" ? "invite_required" : inspection.kind === "locked" ? "invite_locked" : "invite_unusable",
+          inspection.kind === "live"
+            ? "invite_required"
+            : inspection.kind === "locked"
+              ? "invite_locked"
+              : "invite_unusable",
           ip,
         );
         if (inspection.kind === "live") {
@@ -238,13 +246,23 @@ export async function beginSignIn(
 
     // An active member: a code is only worth sending to somebody the exchange will let in.
     const seatFree = await deps.store.tx(found.tenantId, async (ops) => {
+      // `orgs.sso_required` (0017) turns the e-mailed code off for non-owners; the Owner keeps
+      // it for recovery. Before the seat check: both refuse, and this one names the fix.
+      const org = await ops.orgs.findById(member.orgId);
+      if (org?.ssoRequired && member.role !== "owner") {
+        await withheld(ops, found, member, "sso_required", ip);
+        return "sso" as const;
+      }
       const free = await ops.orgs.hasSeatFor(member.orgId, member.id);
       if (!free) {
         await withheld(ops, found, member, "seat_cap_reached", ip);
       }
-      return free;
+      return free ? ("ok" as const) : ("cap" as const);
     });
-    if (!seatFree) {
+    if (seatFree === "sso") {
+      return SSO_REQUIRED;
+    }
+    if (seatFree === "cap") {
       return SEAT_CAP_REACHED;
     }
 
@@ -362,6 +380,19 @@ export async function submitInvite(
     if (outcome.kind === "state") {
       return outcome.state;
     }
+    // Invite redeemed (or already active): the member is real now, and an `sso_required` org
+    // sends non-owners to SSO rather than mailing them a code.
+    const ssoBlocked = await deps.store.tx(found.tenantId, async (ops) => {
+      const org = await ops.orgs.findById(outcome.member.orgId);
+      if (org?.ssoRequired && outcome.member.role !== "owner") {
+        await withheld(ops, found, outcome.member, "sso_required", ip);
+        return true;
+      }
+      return false;
+    });
+    if (ssoBlocked) {
+      return SSO_REQUIRED;
+    }
     const result = await deliverLoginOtp(deps, {
       tenantId: found.tenantId,
       member: outcome.member,
@@ -380,10 +411,7 @@ export async function submitInvite(
  * that is spent, expired or locked (that is the admin's call), and it is limited per address: a
  * minute between mails and four invites an hour, operator-issued ones included.
  */
-export async function resendInvite(
-  deps: SignInDeps,
-  input: SignInInput,
-): Promise<SignInState> {
+export async function resendInvite(deps: SignInDeps, input: SignInInput): Promise<SignInState> {
   return withFloor(deps, async () => {
     const found = await findTenant(deps, input);
     if (!found) {
@@ -405,7 +433,10 @@ export async function resendInvite(
       if (inspection.kind !== "live") {
         return {
           kind: "state" as const,
-          state: inspection.kind === "locked" ? ({ kind: "invite_locked" } as const) : ({ kind: "invite_unusable" } as const),
+          state:
+            inspection.kind === "locked"
+              ? ({ kind: "invite_locked" } as const)
+              : ({ kind: "invite_unusable" } as const),
         };
       }
 
@@ -478,6 +509,12 @@ export async function resendInvite(
 function continueAsMember(deps: SignInDeps, found: Found, input: SignInInput): Promise<SignInState> {
   return beginSignIn(
     { ...deps, minimumDurationMs: 0 },
-    { email: found.email, requiredTenantId: input.requiredTenantId, purpose: input.purpose, locale: input.locale, ip: input.ip },
+    {
+      email: found.email,
+      requiredTenantId: input.requiredTenantId,
+      purpose: input.purpose,
+      locale: input.locale,
+      ip: input.ip,
+    },
   );
 }

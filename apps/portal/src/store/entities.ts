@@ -92,6 +92,11 @@ export interface Org {
   readonly plan: OrgPlan;
   readonly seatCap: number;
   readonly seatBand: number;
+  /**
+   * Owner decision (`orgs.sso_required`, 0017): true turns password and OTP sign-in off for
+   * non-owner members; the Owner keeps them for recovery. False is the old behaviour bit for bit.
+   */
+  readonly ssoRequired: boolean;
   readonly currency: "USD" | "IDR";
   readonly billingEmail: string | null;
   readonly pastDueSince: Iso | null;
@@ -278,4 +283,3 @@ export interface AuditEntry {
   readonly userAgent: string | null;
   readonly createdAt: Iso;
 }
-
