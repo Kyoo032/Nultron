@@ -13,8 +13,8 @@
 import { Client } from "pg";
 import { ApiError, resolvePinnedDestination } from "@agentforge/core";
 import type { DataSourceRow } from "./store";
-import { openSourceConfig, openSourceSecret, openTableAllowlist } from "./store";
-import { assertReadOnlySelect, dataSourceLimits } from "./sql-guard";
+import { openSourceConfig, openSourceSecret } from "./store";
+import type { SourceQueryResult } from "./sql-query";
 
 export type PgConfig = { kind: "postgres"; host: string; port: number; database: string; user: string };
 type PgSecret = { secret: string };
@@ -57,45 +57,16 @@ export async function testPostgres(row: DataSourceRow): Promise<void> {
   }
 }
 
-export type SourceQueryResult = {
-  columns: string[];
-  rows: unknown[][];
-  rowCount: number;
-  truncated: boolean;
-};
-
 /**
- * A query against one source, inside `BEGIN READ ONLY` with `statement_timeout` — the table
- * allowlist is the operator's, and the SQL the model sent is shown back to the caller so the
- * answer can cite exactly what ran.
+ * A pre-checked SELECT (already through `assertReadOnlySelect` and the table allowlist in
+ * `sql-query.ts`) inside `BEGIN READ ONLY` with `statement_timeout` — the SQL the model sent
+ * is shown back to the caller so the answer can cite exactly what ran.
  */
-export async function runSourceQuery(row: DataSourceRow, sqlText: string): Promise<SourceQueryResult> {
-  if (row.kind !== "postgres") {
-    throw new ApiError("invalid_request", "Only postgres sources answer SQL in W1", 400);
-  }
-  if (row.status !== "active") {
-    throw new ApiError("invalid_request", "Data source is disabled", 400);
-  }
-  const checked = assertReadOnlySelect(sqlText);
-  const allowlist = openTableAllowlist(row).map((t) => t.toLowerCase());
-  if (allowlist.length === 0) {
-    // No table is open until the operator names one — the query surface fails closed.
-    throw new ApiError("table_not_allowed", "This source has no allowlisted tables", 403);
-  }
-  // Every table the statement reads must be on the list: pull the identifiers after FROM/JOIN
-  // (string literals were already stripped by the guard's tokenizer rules — its output text is
-  // what we checked, and this regex runs on the same checked text).
-  const allowed = new Set(allowlist);
-  const tableRefs = [...checked.matchAll(/\b(?:from|join)\s+"?([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)?)"?/gi)].map((m) =>
-    m[1]!.toLowerCase(),
-  );
-  for (const ref of tableRefs) {
-    const bare = ref.split(".").pop()!;
-    if (!allowed.has(ref) && !allowed.has(bare)) {
-      throw new ApiError("table_not_allowed", `Table "${ref}" is not on this source's allowlist`, 403);
-    }
-  }
-  const limits = dataSourceLimits();
+export async function runPostgresSelect(
+  row: DataSourceRow,
+  checked: string,
+  limits: { sqlMaxRows: number; sqlTimeoutMs: number },
+): Promise<SourceQueryResult> {
   const client = await connect(row);
   try {
     await client.query("BEGIN READ ONLY");

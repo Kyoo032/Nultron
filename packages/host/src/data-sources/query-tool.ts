@@ -9,7 +9,7 @@ import { defineTool, reportAuditEvent } from "@agentforge/core";
 import { z } from "zod";
 import { ApiError } from "@agentforge/core";
 import { type DataSourceRow, getDataSource, listDataSources } from "./store";
-import { runSourceQuery } from "./postgres";
+import { runSourceQuery } from "./sql-query";
 
 const schema = z
   .object({

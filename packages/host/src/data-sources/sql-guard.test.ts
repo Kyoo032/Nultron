@@ -51,6 +51,28 @@ describe("assertReadOnlySelect", () => {
     }
   });
 
+  it("refuses MySQL's side-effect and bypass functions", () => {
+    const bad = [
+      // Server filesystem, timing probes, session/gtid locks, replication waits, sys exec.
+      "SELECT load_file('/etc/passwd')",
+      "SELECT sleep(30) FROM orders",
+      "SELECT benchmark(1000000, md5('x')) FROM orders",
+      "SELECT get_lock('x', 10), release_lock('x') FROM orders",
+      "SELECT master_pos_wait('log', 123) FROM orders",
+      "SELECT wait_for_executed_gtid_set('gtid', 10) FROM orders",
+      "SELECT sys_exec('ls') FROM orders",
+      "SELECT sys_eval('rm -rf') FROM orders",
+      // `SET SESSION/TRANSACTION` and friends stay keywords: the word scan refuses them
+      // wherever they sit, and the read-only transaction is the connector's own statement.
+      "SELECT * FROM orders; SET GLOBAL read_only = OFF",
+    ];
+    for (const sql of bad) {
+      expect(() => assertReadOnlySelect(sql), sql).toThrow(ApiError);
+    }
+    // A column that shares a forbidden function's name still reads on an allowlisted table.
+    expect(assertReadOnlySelect("SELECT sleep, benchmark FROM perf_rows")).toContain("sleep");
+  });
+
   it("refuses every statement-splitting and hiding trick", () => {
     const tricks = [
       "SELECT 1; DROP TABLE orders",

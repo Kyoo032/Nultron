@@ -9,6 +9,7 @@ import { ApiError } from "@agentforge/core";
 import type { DataSourceRow } from "./store";
 import { headS3Bucket } from "./s3";
 import { testPostgres } from "./postgres";
+import { testMysql } from "./mysql";
 
 export async function testDataSourceConnection(row: DataSourceRow): Promise<void> {
   switch (row.kind) {
@@ -17,8 +18,7 @@ export async function testDataSourceConnection(row: DataSourceRow): Promise<void
     case "postgres":
       return testPostgres(row);
     case "mysql":
-      // Held behind Rizky's `mysql2` decision (S5): the code answers 501 until the driver lands.
-      throw new ApiError("driver_missing", "MySQL is waiting on the mysql2 decision", 501);
+      return testMysql(row);
     case "azure_blob":
       throw new ApiError("driver_missing", "Azure Blob is the W3 part of this work", 501);
   }

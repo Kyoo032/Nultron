@@ -2,12 +2,12 @@
 
 Product: both · Instance: hosted (server mode); the desk API is tenant-scoped
 
-Last verified: 2026-11-26, working tree on `devin/1795703673-data-sources`, not committed, for the whole page (read from `packages/host/src/data-sources/`, `handlers/data-sources.ts`, `security/tcp-pin.ts`, migrations `0027`/`0028`, proven by `data-sources.test.ts`, `tcp-pin.test.ts`, `sql-guard.test.ts`, `s3.test.ts`, `migrate-0027.test.ts`, `migrate-0028.test.ts`, `safe-fetch.test.ts`; not driven in a browser).
+Last verified: 2026-11-26, `devin/1795703673-data-sources` after the MySQL connector landed, for the whole page (read from `packages/host/src/data-sources/` incl. `mysql.ts` and `sql-query.ts`, `handlers/data-sources.ts`, `security/tcp-pin.ts`, migrations `0027`/`0028`, proven by `data-sources.test.ts`, `mysql.test.ts`, `tcp-pin.test.ts`, `sql-guard.test.ts`, `s3.test.ts`, `migrate-0027.test.ts`, `migrate-0028.test.ts`, `safe-fetch.test.ts`; not driven in a browser).
 
 ## Overview
 
 F1 lets an owner connect an external store — S3-compatible object storage (W1), PostgreSQL (W1),
-MySQL (held behind the `mysql2` driver decision, S5) and Azure Blob (W3) — strictly read-only.
+MySQL (W1, `mysql2` shipped under Rizky's S5 approval, 2026-11-26) and Azure Blob (W3) — strictly read-only.
 Two hard walls hold it:
 
 1. **Destination allowlist.** `assertAllowedDestination` (`packages/core/src/security/safe-fetch.ts`)
@@ -44,8 +44,15 @@ never content.
   (2026-11-26, QA regression `sql-guard.test.ts`). Even past it, the runner wraps the
   query in `BEGIN READ ONLY` + `SET LOCAL statement_timeout` + a row cap, so a write-capable
   login still cannot write.
-- **MySQL / Azure Blob**: `POST` returns `501 driver_missing` — MySQL waits on Rizky's `mysql2`
-  call (S5), Azure Blob is W3.
+- **MySQL** (`data-sources/mysql.ts`): `mysql2` (new dependency, Rizky's S5 approval) with the
+  same read-only envelope, run through the shared door in `sql-query.ts`. The `stream` option
+  pins the socket to `pinned.address` while `config.host` still drives TLS `servername` and
+  certificate identity (`verifyIdentity`), `START TRANSACTION READ ONLY` wraps the query, and
+  mysql2's per-query `timeout` plus the row cap match Postgres. The guard's forbidden-function
+  set carries the MySQL spellings too (`load_file`, `sleep`, `benchmark`, `get_lock`/`release_lock`,
+  `sys_exec`/`sys_eval`, replication waits) — refused as calls only, so a column named `sleep`
+  still reads.
+- **Azure Blob**: `POST` returns `501 driver_missing` — Azure Blob is W3.
 
 ## The desk API
 
@@ -93,7 +100,7 @@ Settings hub tab `data-sources` (`apps/web/components/settings-shell.tsx`,
 `settings-tab-data-sources`) → `/data-sources` (`apps/web/src/App.tsx`) →
 `data-sources-page.tsx`: the source list (status, last4, last sync), per-source
 Test/Sync/Disable/Remove-credentials, and one add form that switches config fields on kind —
-MySQL and Azure Blob are disabled options with the reason. Locale keys under
+Azure Blob is the only disabled option (`pendingW3`). Locale keys under
 `settings.dataSources.*` in `en`/`id`/`settings.json`; the KB badge uses
 `knowledge.sources.syncedTitle`.
 

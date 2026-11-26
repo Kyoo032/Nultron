@@ -13,7 +13,7 @@ import {
   type DataSource,
 } from "@/lib/data-sources-client";
 
-type Kind = "s3" | "postgres";
+type Kind = "s3" | "postgres" | "mysql";
 
 type LoadState =
   | { readonly status: "loading" }
@@ -238,13 +238,14 @@ export function DataSourcesPage() {
           <select
             className="rounded border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5 text-sm text-[var(--text)]"
             value={form.kind}
-            onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value as Kind }))}
+            onChange={(e) => {
+              const kind = e.target.value as Kind;
+              setForm((f) => ({ ...f, kind, port: kind === "mysql" ? "3306" : "5432" }));
+            }}
           >
             <option value="s3">S3</option>
             <option value="postgres">PostgreSQL</option>
-            <option value="mysql" disabled>
-              MySQL — {t("settings.dataSources.pendingDriver")}
-            </option>
+            <option value="mysql">MySQL</option>
             <option value="azure_blob" disabled>
               Azure Blob — {t("settings.dataSources.pendingW3")}
             </option>
@@ -261,7 +262,7 @@ export function DataSourcesPage() {
             {field("s3SecretAccessKey", "settings.dataSources.secretAccessKey", { type: "password" })}
           </>
         )}
-        {form.kind === "postgres" && (
+        {(form.kind === "postgres" || form.kind === "mysql") && (
           <>
             {field("host", "settings.dataSources.host")}
             {field("port", "settings.dataSources.port")}

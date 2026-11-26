@@ -145,6 +145,23 @@ const FORBIDDEN_FUNCTIONS = new Set([
   "http_patch",
   "http_set_curlopt",
   "http_reset_curlopt",
+  // MySQL's side-effect and bypass functions, same shape: server-side file reads, sleeps and
+  // timing probes, session/gtid locks, replication waits, and the `sys` schema's exec/eval.
+  // Function-call refusal only, so an allowlisted column named `sleep` or `benchmark` reads.
+  "load_file",
+  "sleep",
+  "benchmark",
+  "get_lock",
+  "release_lock",
+  "is_free_lock",
+  "is_used_lock",
+  "master_pos_wait",
+  "wait_for_executed_gtid_set",
+  "sys_exec",
+  "sys_eval",
+  "sys_get",
+  "sys_set",
+  "sys_get_config",
   // `comment`/`explain` can't appear mid-SELECT as a statement — the first-word check below is
   // what refuses them, and keeping them out of the scan keeps `SELECT comment FROM …` working.
 ]);

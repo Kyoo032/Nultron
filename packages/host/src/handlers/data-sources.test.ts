@@ -177,7 +177,7 @@ describe("F1 data-sources API", () => {
     expect(row.secretLast4).toBeNull();
   });
 
-  it("refuses mysql and azure_blob until their decisions land", async () => {
+  it("accepts mysql and still refuses azure_blob until its W3 decision lands", async () => {
     const mysql = await call("owner", "POST", "/api/v1/data-sources", {
       name: "m",
       kind: "mysql",
@@ -187,7 +187,10 @@ describe("F1 data-sources API", () => {
       user: "u",
       secret: "p",
     });
-    expect(code(mysql)).toBe("driver_missing");
+    expect(mysql.type).toBe("json");
+    // The mysql driver ships (Rizky's S5 approval); the row stores sealed like every other
+    // kind and the response still never echoes the password.
+    expect(JSON.stringify(body(mysql))).not.toContain('"p"');
     const azure = await call("owner", "POST", "/api/v1/data-sources", { name: "a", kind: "azure_blob" });
     expect(code(azure)).toBe("driver_missing");
   });

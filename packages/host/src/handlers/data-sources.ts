@@ -69,10 +69,6 @@ export async function handlePostDataSources(request: HostRequest): Promise<HostR
     const body = createInput.parse(request.body ?? {});
     const raw = body as unknown as Record<string, unknown>;
     const config = sourceConfigInput.parse(subset(raw, CONFIG_FIELDS[body.kind]));
-    if (config.kind === "mysql") {
-      // Held behind Rizky's mysql2 decision (S5): the shape validates, the driver does not ship.
-      throw new ApiError("driver_missing", "MySQL is waiting on the mysql2 decision", 501);
-    }
     if (config.kind === "azure_blob") {
       throw new ApiError("driver_missing", "Azure Blob is the W3 part of this work", 501);
     }
