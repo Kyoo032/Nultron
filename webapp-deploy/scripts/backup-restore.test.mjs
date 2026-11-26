@@ -189,7 +189,7 @@ function installBackupDockerStub(dir, { desks = [], tarPath }) {
       'if [ "$1" = "inspect" ]; then echo "nultron-web:stub"; exit 0; fi',
       'if [ "$1" = "exec" ]; then',
       '  case "$*" in',
-      '    *"tar -czf"*) cat "$STUB_TAR"; echo "tar_exit=0" >&2 ;;',
+      '    *"tar -czf"*) cat "$STUB_TAR"; echo "tar_exit=$?" >&2 ;;',
       "    # The stub stages no snapshot, so backup.sh's test -f probe answers false and",
       "    # verify requires only the embedded meta in the static fixture.",
       '    *"test -f"*) exit 1 ;;',
@@ -461,6 +461,21 @@ describe("backup/restore shell wiring", () => {
     for (const name of readdirSync(outDir)) {
       assert.doesNotMatch(name, /key|secret|master/i, name);
     }
+  });
+
+  it("backup.sh drops the staged snapshot copy when archiving fails (r4707956068)", { skip: SHELL_OPTS.shellSkip }, () => {
+    const dir = tempDir("backup-leak-");
+    const outDir = join(dir, "backups");
+    // A tarPath that does not exist: the stub's cat fails, tar_exit=1 reaches backup.sh's
+    // strict gate, and the run must still rm -rf its own .backup-staging-<stamp>-<pid> dir.
+    const run = runBackupScript("webapp-deploy/scripts/backup.sh", [outDir], {
+      desks: ["nultron-web"],
+      tarPath: join(dir, "missing.tar.gz"),
+      dir,
+      env: { BACKUP_REQUIRE_OFFSITE: "0" },
+    });
+    assert.notEqual(run.status, 0, "a failed archive must fail the run");
+    assert.match(run.logText, /rm -rf.*\.backup-staging-/, "the failed run must clean up its staged snapshot dir");
   });
 
   it("backup.sh respects BACKUP_DESK_GLOB when picking desks", { skip: SHELL_OPTS.shellSkip }, () => {

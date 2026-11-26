@@ -140,6 +140,13 @@ fail_desk() {
 
 # --- one desk ---------------------------------------------------------------
 
+# A failed backup must never leave its staged agentforge.sqlite copy on the live volume:
+# it would ride into the next run's archive as a stray member and leak database copies.
+# _clean_stage drops only THIS run's dir; an overlapping run's stage belongs to its archive.
+_clean_stage() {
+	docker exec "$1" sh -c 'rm -rf "${AGENTFORGE_DATA_DIR:-/data}/'"$SNAP_DIR"'"' 2>/dev/null || true
+}
+
 backup_desk() {
 	_desk="$1"
 	_cid="$(desk_container "$_desk")"
@@ -181,7 +188,7 @@ console.log("snapshot ok (VACUUM INTO)");
 fi
 INNER
 	then
-		fail_desk "$_desk" "$_cid" "the SQLite snapshot step failed"; return
+		fail_desk "$_desk" "$_cid" "the SQLite snapshot step failed"; _clean_stage "$_cid"; return 1
 	fi
 
 	# Whether this desk staged a snapshot decides what the archive must contain below.
@@ -216,17 +223,17 @@ INNER
 	' 2>"$_tarlog" | node "$AEAD_CRYPT" encrypt --out "$_out" ||
 		! grep -q 'tar_exit=0' "$_tarlog"; then
 		rm -f "$_out" "$_tarlog"
-		fail_desk "$_desk" "$_cid" "the archive or encryption step failed"; return
+		fail_desk "$_desk" "$_cid" "the archive or encryption step failed"; _clean_stage "$_cid"; return 1
 	fi
 	rm -f "$_tarlog"
 
 	if [ ! -s "$_out" ]; then
 		rm -f "$_out"
-		fail_desk "$_desk" "$_cid" "the encrypted archive is empty"; return
+		fail_desk "$_desk" "$_cid" "the encrypted archive is empty"; _clean_stage "$_cid"; return 1
 	fi
 
 	# Remove only this run's staging dir; an overlapping run's stage belongs to its archive.
-	docker exec "$_cid" sh -c 'rm -rf "${AGENTFORGE_DATA_DIR:-/data}/'"$SNAP_DIR"'"' 2>/dev/null || true
+	_clean_stage "$_cid"
 
 	# A backup nobody can open is not a backup, and one without the embedded desk meta is not
 	# restorable under its name either: an archive truncated at the front would still decrypt
