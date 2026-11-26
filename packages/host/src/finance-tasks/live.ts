@@ -15,7 +15,8 @@ import {
   type TenantContext,
 } from "@agentforge/core";
 import { localeForRun } from "../run-context";
-import { listSelectableModels, modeDefaultsFor } from "../selectable-models";
+import { modeDefaultsFor } from "../selectable-models";
+import { allowanceFor, catalogFor } from "../model-allowance";
 import { loadSettings } from "../settings-store";
 
 export type FinanceSettings = ReturnType<typeof loadSettings>;
@@ -61,6 +62,6 @@ export function resolveModel(body: unknown, settings: FinanceSettings, tenant: T
   return resolveChatModel(
     readOptionalModel(body),
     settings.documentGenModel || defaults.finance,
-    listSelectableModels(tenant),
+    catalogFor(tenant, allowanceFor(tenant)),
   );
 }

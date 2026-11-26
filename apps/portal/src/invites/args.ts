@@ -6,7 +6,7 @@ export const INVITE_MAX_TTL_DAYS = 30;
 const DEFAULT_TENANT = "nultron";
 const LANGUAGES = ["en", "id"] as const;
 export type InviteLanguage = (typeof LANGUAGES)[number];
-const ROLES = ["owner", "admin", "member"] as const;
+const ROLES = ["owner", "admin", "member", "auditor"] as const;
 export type InviteRole = (typeof ROLES)[number];
 
 /** One `@`, something either side, no whitespace. The portal does not validate deliverability. */
@@ -54,7 +54,7 @@ Options:
   --tenant <slug>     Tenant slug                                  (default: ${DEFAULT_TENANT})
   --org-slug <slug>   Org slug. Omit it when the tenant has exactly one org.
   --ttl-days <n>      How long the code works, 1-${INVITE_MAX_TTL_DAYS} days        (default: ${INVITE_DEFAULT_TTL_DAYS})
-  --role <role>       owner | admin | member: the role held once the invite is redeemed, and what
+  --role <role>       owner | admin | member | auditor: the role held once the invite is redeemed, and what
                       the host is told the person is. Default member. A tenant must always have an
                       owner, so the first invite for a tenant (and any that would leave it with none)
                       has to be --role owner. For an address that is already an active member this
@@ -131,7 +131,7 @@ ${INVITE_USAGE}`);
 
   const roleRaw = values.get("role")?.trim().toLowerCase();
   if (roleRaw !== undefined && !(ROLES as readonly string[]).includes(roleRaw)) {
-    throw new InviteArgsError(`--role must be owner, admin or member; got ${JSON.stringify(roleRaw)}`);
+    throw new InviteArgsError(`--role must be owner, admin, member or auditor; got ${JSON.stringify(roleRaw)}`);
   }
 
   const language = (values.get("lang") ?? "en").trim().toLowerCase();

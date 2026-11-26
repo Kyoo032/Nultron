@@ -23,7 +23,8 @@ import {
 import { DEFAULT_MODEL_TIER } from "@agentforge/core/tiers";
 import { getRunContext, localeForRun, withRunContext } from "../run-context";
 import { loadSettings } from "../settings-store";
-import { defaultSelectableModel, listSelectableModels, toolMediaModels } from "../selectable-models";
+import { defaultSelectableModel, toolMediaModels } from "../selectable-models";
+import { allowanceFor, catalogFor } from "../model-allowance";
 import { agentService } from "../tenant";
 import { chooseTierRun } from "../tier-resolve";
 import { createThread, finishRun, insertMessage, insertRun, insertToolInvocation, listMessages } from "../threads";
@@ -119,7 +120,7 @@ function clip(text: string, max: number): { text: string; truncated: boolean } {
  * better model. Changing the tier is this one line.
  */
 function delegateModel(tenant: TenantContext): { model: string; effort: ReasoningEffort; explicit: boolean } {
-  const catalog = listSelectableModels(tenant);
+  const catalog = catalogFor(tenant, allowanceFor(tenant));
   try {
     const tier = chooseTierRun({ tier: DEFAULT_MODEL_TIER }, "text", catalog, tenant);
     if (tier) {

@@ -21,6 +21,9 @@ type Options = {
   readonly runTimeoutMs?: number;
   readonly bootTimeoutMs?: number;
   readonly queueWaitMs?: number;
+  readonly hostedWarmTotal?: number;
+  readonly maxRuns?: number;
+  readonly maxPerTenant?: number;
 };
 
 function start(options: Options = {}): SandboxRunner {
@@ -31,9 +34,15 @@ function start(options: Options = {}): SandboxRunner {
   const dir = ship.dir;
   runner = createSandboxRunner({
     runTimeoutMs: options.runTimeoutMs,
-    limiter: createCodeLimiter({ serverMode, queueWaitMs: options.queueWaitMs ?? 3000 }),
+    limiter: createCodeLimiter({
+      serverMode,
+      maxRuns: options.maxRuns,
+      maxPerTenant: options.maxPerTenant,
+      queueWaitMs: options.queueWaitMs ?? 3000,
+    }),
     pool: createChildPool({
       serverMode,
+      hostedWarmTotal: options.hostedWarmTotal,
       spawn: (language) => spawnSandboxChild({ shipDir: dir, language, bootTimeoutMs: options.bootTimeoutMs }),
     }),
   });
@@ -120,7 +129,7 @@ describe("the child is a sandbox", () => {
     expect(flags).toContain("--permission");
     expect(flags).toContain(`--allow-fs-read=${ship?.dir}`);
     expect(flags).toContain("--disallow-code-generation-from-strings");
-    expect(flags).toContain("--max-old-space-size=256");
+    expect(flags).toContain("--max-old-space-size=128");
     // No write, child-process or worker grants.
     expect(flags.filter((flag) => /allow-(fs-write|child-process|worker|addons|wasi)/.test(flag))).toEqual([]);
   });
@@ -143,7 +152,7 @@ describe("warm children", () => {
   });
 
   it("never lets two tenants share a process", async () => {
-    const sandbox = start({ serverMode: true });
+    const sandbox = start({ serverMode: true, hostedWarmTotal: 2 });
     const a = await sandbox.run(request("pid", { tenantId: "tenant-a" }));
     const b = await sandbox.run(request("pid", { tenantId: "tenant-b" }));
     const aAgain = await sandbox.run(request("pid", { tenantId: "tenant-a" }));
@@ -321,8 +330,17 @@ describe("concurrency", () => {
     expect((await slow).ok).toBe(true);
   });
 
-  it("allows hosted tenants one run each and two in all", async () => {
+  it("allows hosted one run at a time, whichever tenant asks", async () => {
     const sandbox = start({ serverMode: true, queueWaitMs: 100 });
+    const a = sandbox.run(request("sleep:1200", { tenantId: "tenant-a" }));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const b = await sandbox.run(request("echo", { tenantId: "tenant-b" }));
+    expect(b.reason).toBe("busy");
+    expect((await a).ok).toBe(true);
+  });
+
+  it("allows hosted tenants the configured runs, capped per tenant and in all", async () => {
+    const sandbox = start({ serverMode: true, maxRuns: 2, maxPerTenant: 1, hostedWarmTotal: 2, queueWaitMs: 100 });
     const a = sandbox.run(request("sleep:1200", { tenantId: "tenant-a" }));
     const b = sandbox.run(request("sleep:1200", { tenantId: "tenant-b" }));
     await new Promise((resolve) => setTimeout(resolve, 800));
@@ -331,6 +349,39 @@ describe("concurrency", () => {
     expect(c.reason).toBe("busy");
     expect(aAgain.reason).toBe("busy");
     expect((await a).ok && (await b).ok).toBe(true);
+  });
+
+  it("production wiring: the pool follows AGENTFORGE_MAX_CODE_RUNS so the operator override admits the runs", async () => {
+    ship = makeFakeShip();
+    resetShipVerdictForTests();
+    setShipDirForTests(ship.dir);
+    const saved = {
+      server: process.env.AGENTFORGE_SERVER,
+      maxRuns: process.env.AGENTFORGE_MAX_CODE_RUNS,
+    };
+    process.env.AGENTFORGE_SERVER = "true";
+    process.env.AGENTFORGE_MAX_CODE_RUNS = "2";
+    try {
+      // No injected limiter or pool: both are built from the environment, as in production.
+      runner = createSandboxRunner({});
+      const a = runner.run(request("sleep:1200", { tenantId: "tenant-a" }));
+      const b = runner.run(request("sleep:1200", { tenantId: "tenant-b" }));
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      // Both runs hold a child at once: before the fix the pool's one-child cap answered the second `busy`.
+      expect(trackedChildCount()).toBeGreaterThanOrEqual(2);
+      expect((await a).ok && (await b).ok).toBe(true);
+    } finally {
+      if (saved.server === undefined) {
+        delete process.env.AGENTFORGE_SERVER;
+      } else {
+        process.env.AGENTFORGE_SERVER = saved.server;
+      }
+      if (saved.maxRuns === undefined) {
+        delete process.env.AGENTFORGE_MAX_CODE_RUNS;
+      } else {
+        process.env.AGENTFORGE_MAX_CODE_RUNS = saved.maxRuns;
+      }
+    }
   });
 });
 

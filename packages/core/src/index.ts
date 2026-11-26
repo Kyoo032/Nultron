@@ -249,6 +249,8 @@ export {
   requireTenant,
   canBuild,
   canAdminister,
+  canAudit,
+  canUseAgents,
   membershipRoleForPortal,
   parsePortalRole,
 } from "./tenancy/types";

@@ -22,7 +22,8 @@ import {
 import { dossierToMarkdown, type Dossier, type ResearchNotes } from "@agentforge/core/artifacts";
 import type { JobEmitter } from "@agentforge/core/jobs";
 import { loadSettings } from "./settings-store";
-import { listSelectableModels, modeDefaultsFor } from "./selectable-models";
+import { modeDefaultsFor } from "./selectable-models";
+import { allowanceFor, catalogFor } from "./model-allowance";
 import { ensureToolsRegistered } from "./register-tools";
 import { artifactStore } from "./artifacts";
 import { upsertWorkSource } from "./knowledge-ingest";
@@ -136,7 +137,7 @@ export async function generateResearchNotes(
   const question = readPrompt(body);
   const settings = loadSettings(tenant);
   requireLiveResearch(settings);
-  const catalog = listSelectableModels(tenant);
+  const catalog = catalogFor(tenant, allowanceFor(tenant));
   const defaults = modeDefaultsFor(tenant);
   const model = resolveChatModel(readOptionalModel(body), settings.researchGenModel || defaults.research, catalog);
   // A model the person picked is never swapped by the fallback; a seeded default can be.

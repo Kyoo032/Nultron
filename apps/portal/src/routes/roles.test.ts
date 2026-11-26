@@ -87,7 +87,7 @@ function refresh(body: TokenBody) {
 }
 
 describe("an invite's role reaches the token", () => {
-  it.each(["owner", "admin", "member"] as const)(
+  it.each(["owner", "admin", "member", "auditor"] as const)(
     "carries %s from the invite to the member, the token response and the access token claim",
     async (role) => {
       const email = nextAddress();

@@ -37,8 +37,8 @@ describe("canBuild", () => {
 });
 
 describe("the portal's role claim", () => {
-  it("is exactly owner, admin or member", () => {
-    expect([...PORTAL_ROLES]).toEqual(["owner", "admin", "member"]);
+  it("is exactly owner, admin, member or auditor", () => {
+    expect([...PORTAL_ROLES]).toEqual(["owner", "admin", "member", "auditor"]);
     for (const role of PORTAL_ROLES) {
       expect(parsePortalRole(role)).toBe(role);
     }
@@ -54,6 +54,9 @@ describe("the portal's role claim", () => {
       "OWNER",
       "owner ",
       "builder",
+      "Auditor",
+      " auditor",
+      "auditor ",
       "superuser",
       "root",
       "admin,owner",

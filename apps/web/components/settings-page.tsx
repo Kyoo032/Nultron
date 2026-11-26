@@ -108,12 +108,14 @@ function hostErrorMessage(body: unknown): string | null {
  */
 export function settingsSaveBody(input: { mayChangeKey: boolean; openaiApiKey: string; editTurnCapUsd: number }): {
   openaiApiKey?: string;
-  editTurnCapUsd: number;
+  editTurnCapUsd?: number;
 } {
   const typed = input.mayChangeKey && input.openaiApiKey.trim().length > 0;
   return {
     ...(typed ? { openaiApiKey: input.openaiApiKey } : {}),
-    editTurnCapUsd: input.editTurnCapUsd,
+    // The cap is a shared company setting: only an owner or admin's body carries it, so a member's
+    // save is not refused for a field it never asked to change (review round 3).
+    ...(input.mayChangeKey ? { editTurnCapUsd: input.editTurnCapUsd } : {}),
   };
 }
 
@@ -508,7 +510,7 @@ export function SettingsPage() {
             </p>
           )}
 
-          {hasOpenai ? (
+          {hasOpenai && mayChangeKey ? (
             <label className="block text-xs font-medium text-[var(--text-2)]">
               {t("settings.editCapLabel")}
               <input
@@ -528,6 +530,11 @@ export function SettingsPage() {
                 data-testid="settings-edit-turn-cap"
               />
             </label>
+          ) : null}
+          {hasOpenai && !mayChangeKey ? (
+            <p className="text-xs text-[var(--text-2)]" data-testid="settings-edit-turn-cap-readonly">
+              {t("settings.editCapLabel")}: ${editTurnCapUsd}
+            </p>
           ) : null}
 
           {hasOpenai && openaiKeyFingerprint ? (

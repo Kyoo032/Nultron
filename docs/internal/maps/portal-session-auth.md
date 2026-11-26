@@ -2,6 +2,8 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
+Re-checked 2026-11-26 on `devin/1795686920-opc-auditor-allowlist` (F8a + F8d): `POST /auth/token` also carries `model_allowlist` (`string[] | null`, from `tenant_config.model_allowlist`, parsed by `PortalTokens`/`portal-client.ts` only when the field is an array — a `null` never clears the list the host recorded at sign-in or refresh in `model-allowance.ts`); `PORTAL_ROLES` gains `auditor`, accepted by the `invite` and `account` operator CLIs and migration `0015_auditor_role.sql` widening `users_role_chk`/`invites_role_chk`. The next paragraph is as verified below.
+
 Re-checked 2026-11-24 on `main`, for per-user operator-assigned API gateway endpoints: `POST /auth/token` now carries `gateway_endpoint` (`string | null`, read from `users.gateway_endpoint` on every mint and refresh), `toTokens` validates it via `normalizeAssignedGatewayEndpoint`, `auth_sessions` persists it in `gateway_endpoint` (updated atomically on every rotation in `recordRotation`), and `dispatch` (`router.ts`) plus voice upgrades (`voice/upgrade.ts`) bind it in AsyncLocalStorage (`gateway-endpoint-scope.ts`) so each user on the same Nultron host routes model calls, Settings, and live gateway key checks to their assigned endpoint. Regular users can never set or override it. Every other line is as verified next.
 
 Re-checked 2026-10-07 at 9aba37e + working tree, for one paragraph only: **`signInMode`** under "Status" (the

@@ -104,6 +104,7 @@ describe("exchangeCode", () => {
       role: "member",
       gatewayEndpoint: null,
       gatewayKey: null,
+      modelAllowlist: null,
     });
   });
 
