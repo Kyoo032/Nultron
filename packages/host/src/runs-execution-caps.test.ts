@@ -54,15 +54,24 @@ async function collectStream(): Promise<string[]> {
   return frames;
 }
 
+async function json<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const result = await dispatch(request(method, path, { body }));
+  if (result.type !== "json") {
+    throw new Error(`expected json, got ${result.type}`);
+  }
+  return (result.body ?? {}) as T;
+}
+
 beforeAll(async () => {
   ({ dispatch } = await import("./router"));
   const { getTenant } = await import("./tenant");
   const tenant: TenantContext = await getTenant();
   void tenant;
-  const chat = await dispatch(request("GET", "/api/v1/chat"));
-  const agentId = (chat.body as { agent: { id: string } }).agent.id;
-  const created = await dispatch(request("POST", "/api/v1/threads", { body: { agentId } }));
-  threadId = (created.body as { thread: { id: string } }).thread.id;
+  const chat = await json<{ agent: { id: string } }>("GET", "/api/v1/chat");
+  const created = await json<{ thread: { id: string } }>("POST", "/api/v1/threads", {
+    agentId: chat.agent.id,
+  });
+  threadId = created.thread.id;
 });
 
 afterEach(() => {
