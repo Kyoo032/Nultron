@@ -189,6 +189,27 @@ describe("host router", () => {
     }
   });
 
+  it("never shadows a literal route behind an earlier parameterized one", async () => {
+    // Regression (F5b): the table is first-match, so `GET /api/v1/channels/:channelId` answered
+    // `/api/v1/channels/email` as the channel id "email" before the list route was ever reached.
+    const { routeRegistrations } = await import("./router");
+    const compile = (path: string) => new RegExp(`^${path.replace(/:([A-Za-z]+)/g, "[^/]+")}$`);
+    const shadowed: string[] = [];
+    const seen = routeRegistrations();
+    for (const [index, route] of seen.entries()) {
+      if (route.keys.length > 0) {
+        continue;
+      }
+      const earlier = seen
+        .slice(0, index)
+        .find((candidate) => candidate.method === route.method && compile(candidate.path).test(route.path));
+      if (earlier) {
+        shadowed.push(`${route.method} ${route.path} shadowed by ${earlier.method} ${earlier.path}`);
+      }
+    }
+    expect(shadowed).toEqual([]);
+  });
+
   it("returns not_found JSON for unknown routes", async () => {
     const result = await dispatch({
       method: "GET",

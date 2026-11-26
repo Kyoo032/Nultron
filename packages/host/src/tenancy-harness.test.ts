@@ -122,6 +122,7 @@ type Seeds = {
   sourceId: string;
   agentId: string;
   channelId: string;
+  emailChannelId: string;
   conversationId: string;
   meetingId: string;
   proposalId: string;
@@ -444,6 +445,23 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     body: { text: "tenant B was here" },
   },
 
+  // --- channels (email, F5b) -------------------------------------------------------------------
+  // `channelId` here is the email channel's id: every lookup is `WHERE id = ? AND workspace_id = ?`,
+  // so tenant B's call takes the same 404 path as an id nobody owns.
+  { method: "DELETE", path: "/api/v1/channels/email/:channelId", params: { channelId: "emailChannelId" } },
+  { method: "GET", path: "/api/v1/channels/email/:channelId/allowlist", params: { channelId: "emailChannelId" } },
+  {
+    method: "POST",
+    path: "/api/v1/channels/email/:channelId/allowlist",
+    params: { channelId: "emailChannelId" },
+    body: { pattern: "@tenant-b.example", userId: null },
+  },
+  {
+    method: "DELETE",
+    path: "/api/v1/channels/email/:channelId/allowlist/:entryId",
+    params: { channelId: "emailChannelId", entryId: "unseeded" },
+  },
+
   // --- customer inbox (WhatsApp, Phase 1) --------------------------------------------------------
   // A conversation hangs off the desk's connected number; every store statement filters on the desk.
   // (The webhook that writes into the inbox is not a by-id route: it names no id, and it takes the
@@ -682,6 +700,7 @@ async function seedTenantA(): Promise<Seeds> {
   const { legalStore } = await import("./legal/store");
   const { addMemory, addPastedSource } = await import("./knowledge");
   const { channelStore } = await import("./channels/store");
+  const { createEmailStore } = await import("./channels/email/store");
   const { inboxStore } = await import("./inbox/db");
   const { meetingStore } = await import("./meeting/store");
   const { saveMedia } = await import("./media");
@@ -849,6 +868,16 @@ async function seedTenantA(): Promise<Seeds> {
       chatType: "channel",
     }),
   );
+  // An email channel of tenant A's first desk (F5b): the routes scope it by `workspace_id`.
+  const { sql: emailDb } = await import("@agentforge/db");
+  const emailChannel = await step("email channel", () =>
+    createEmailStore(emailDb).createChannel({
+      workspaceId: tenantA.workspaceId,
+      agentId: agent.agent.id,
+      address: "tenant-a-harness@example.invalid",
+      unknownSenderPolicy: "ignore",
+    }),
+  );
   const meeting = await step("meeting", () => meetingStore().create(tenantA, { title: LEAK_MARKER, locale: "en" }));
 
   // A customer writing to tenant A's connected number: the endpoint is tenant A's desk's, and the
@@ -918,6 +947,7 @@ async function seedTenantA(): Promise<Seeds> {
     sourceId: source.id,
     agentId: agent.agent.id,
     channelId: channel.id,
+    emailChannelId: emailChannel.id,
     conversationId,
     meetingId: meeting.id,
     proposalId,

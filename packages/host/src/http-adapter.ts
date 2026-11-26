@@ -7,6 +7,7 @@ import {
   WHATSAPP_WEBHOOK_MAX_BODY_BYTES,
   WHATSAPP_WEBHOOK_PATH,
 } from "./inbox/webhook-path";
+import { EMAIL_SIGNATURE_HEADER, EMAIL_WEBHOOK_MAX_BODY_BYTES, EMAIL_WEBHOOK_PATH } from "./channels/email/path";
 import { contentDispositionAttachment } from "./content-disposition";
 import {
   checkCsrfToken,
@@ -245,8 +246,15 @@ async function readBody(
   // The WhatsApp webhook authenticates by a signature over the exact bytes, and it is open to the
   // internet before it has authenticated anyone. So its body is read under a small cap, handed over
   // raw, and not parsed here: the handler parses only what has passed the signature.
-  const isWebhook = path === WHATSAPP_WEBHOOK_PATH;
-  const cap = isWebhook ? WHATSAPP_WEBHOOK_MAX_BODY_BYTES : MAX_BODY_BYTES;
+  // The email webhook is the same shape: signed over the exact bytes, open to the internet first,
+  // so it is also read raw under its own small cap.
+  const isWebhook = path === WHATSAPP_WEBHOOK_PATH || path === EMAIL_WEBHOOK_PATH;
+  const cap =
+    path === WHATSAPP_WEBHOOK_PATH
+      ? WHATSAPP_WEBHOOK_MAX_BODY_BYTES
+      : path === EMAIL_WEBHOOK_PATH
+        ? EMAIL_WEBHOOK_MAX_BODY_BYTES
+        : MAX_BODY_BYTES;
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of req) {
@@ -254,9 +262,7 @@ async function readBody(
     total += piece.byteLength;
     if (total > cap) {
       req.destroy();
-      throw new BodyTooLarge(
-        isWebhook ? "Request body exceeds the 1 MB cap" : "Request body exceeds the 26 MB cap",
-      );
+      throw new BodyTooLarge(isWebhook ? "Request body exceeds the 1 MB cap" : "Request body exceeds the 26 MB cap");
     }
     chunks.push(piece);
   }
@@ -723,6 +729,7 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
       ...(path === WHATSAPP_WEBHOOK_PATH
         ? { [WHATSAPP_SIGNATURE_HEADER]: header(req, WHATSAPP_SIGNATURE_HEADER) }
         : {}),
+      ...(path === EMAIL_WEBHOOK_PATH ? { [EMAIL_SIGNATURE_HEADER]: header(req, EMAIL_SIGNATURE_HEADER) } : {}),
       // Hosted only: the browser's language, for a person who never chose one (`./locale-boot.ts`).
       // Off server mode the request carries exactly the headers it always did, so the desk's boot
       // locale is the only locale there is.
@@ -801,7 +808,11 @@ type Rejection = { readonly code: string; readonly message: string };
  * accepting anything. One literal path, never a prefix: `/api/v1/billing/top-up` is a browser
  * call and keeps every rule.
  */
-const CSRF_EXEMPT_PATHS: ReadonlySet<string> = new Set(["/api/v1/billing/webhook", WHATSAPP_WEBHOOK_PATH]);
+const CSRF_EXEMPT_PATHS: ReadonlySet<string> = new Set([
+  "/api/v1/billing/webhook",
+  WHATSAPP_WEBHOOK_PATH,
+  EMAIL_WEBHOOK_PATH,
+]);
 
 export function hostRejection(host: string | undefined, serverMode: boolean): Rejection | null {
   if (serverMode) {

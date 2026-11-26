@@ -12,6 +12,8 @@ Product: both · Instance: main :3000
 - **channels-receive** — **Check for new messages** pulls `getUpdates` and files inbound text onto the matching channel; messages from a chat the desk has not added are counted as `unmatched`, not stored.
 - **channels-scope** — a second desk sees none of it: its own bot, its own channels, its own conversation.
 - The header art column (`buddy-stage-header`, `buddy-stage-header-tap`) is in the DOM at every width but only visible when the header is 60rem or wider.
+- **channels-email** (F5b, hosted) — an **Email** card under the Telegram card: create an address + agent + unknown-sender policy (`channels-email-add`), list channels, and manage the sender allowlist per channel. Server-mode only for the webhook; the card itself shows on every desk but CRUD needs the hosted host. Unit-level proof lives in `packages/host/src/channels/email/*.test.ts` (signature-before-parse, dedupe, auto-submitted skip, sender cap, allowlist match, RFC 5322 threading) and `packages/db/src/migrate-0030.test.ts`; there is no live drive yet — a real drive needs a signed webhook source and an SMTP sink.
+
 
 ## How to get to it (user POV)
 

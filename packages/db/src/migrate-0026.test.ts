@@ -25,9 +25,9 @@ function insert(sqlite: Database.Database, seq: number, id: string, tenantId = "
 
 describe("0026_audit_events", () => {
   it("follows every existing migration in the forward-only journal", () => {
-    const entry = journal.entries.at(-1)!;
-    expect(entry.tag).toBe("0026_audit_events");
-    for (const previous of journal.entries.slice(0, -1)) expect(entry.when).toBeGreaterThan(previous.when);
+    const idx = journal.entries.findIndex((entry) => entry.tag === "0026_audit_events");
+    const entry = journal.entries[idx];
+    for (const previous of journal.entries.slice(0, idx)) expect(entry.when).toBeGreaterThan(previous.when);
   });
 
   it("applies on a fresh database and enforces append-only plus checkpointed delete", () => {

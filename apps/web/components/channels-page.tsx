@@ -15,7 +15,19 @@ import {
   sendToChannel,
   type ChannelBotStatus,
 } from "@/lib/channels-client";
+import {
+  addEmailAllowlistEntry,
+  createEmailChannel,
+  loadEmailAllowlist,
+  loadEmailChannels,
+  removeEmailAllowlistEntry,
+  removeEmailChannel,
+  type EmailAllowlistEntry,
+  type EmailChannel,
+} from "@/lib/email-channels-client";
+import { fetchVirtualAgents, type VirtualAgentInfo } from "@/lib/virtual-agents";
 import { t } from "@/lib/i18n";
+import { useMayDeleteDesk } from "@/lib/desk-delete-access";
 import { ModeHeader } from "@/components/mode-header";
 
 const NO_BOT: ChannelBotStatus = {
@@ -147,8 +159,279 @@ function Conversation({ messages }: { messages: ChannelMessage[] }) {
   );
 }
 
+/**
+ * The email channel card (F5b): one address per agent, the sender allowlist below it. Inbound mail
+ * reaches the desk through the provider's signed webhook — nothing to connect here.
+ */
+function EmailCard({
+  agents,
+  busy,
+  onError,
+  onChange,
+}: {
+  agents: VirtualAgentInfo[];
+  busy: boolean;
+  onError: (message: string) => void;
+  onChange: () => void;
+}) {
+  const [channels, setChannels] = useState<EmailChannel[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [entries, setEntries] = useState<EmailAllowlistEntry[]>([]);
+  const [address, setAddress] = useState("");
+  const [agentId, setAgentId] = useState("");
+  const [policy, setPolicy] = useState<"ignore" | "refuse">("ignore");
+  const [pattern, setPattern] = useState("");
+  // Mutations are administer-gated host-side; members see the same card with the controls off.
+  const canAdminister = useMayDeleteDesk();
+
+  const refresh = useCallback(async () => {
+    try {
+      const rows = await loadEmailChannels();
+      setChannels(rows);
+      setSelectedId((current) => (current && rows.some((row) => row.id === current) ? current : (rows[0]?.id ?? null)));
+    } catch (caught) {
+      onError(errorText(caught, t("channels.email.errors.load")));
+    }
+  }, [onError]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setEntries([]);
+      return;
+    }
+    let cancelled = false;
+    void loadEmailAllowlist(selectedId)
+      .then((rows) => {
+        if (!cancelled) {
+          setEntries(rows);
+        }
+      })
+      .catch((caught: unknown) => {
+        if (!cancelled) {
+          onError(errorText(caught, t("channels.email.errors.load")));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, onError]);
+
+  const selected = channels.find((row) => row.id === selectedId) ?? null;
+  const hiredAgents = agents.filter((agent) => agent.agentId);
+
+  return (
+    <section
+      className="raise rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4"
+      data-testid="channels-email-card"
+    >
+      <p className="panel-label">{t("channels.email.label")}</p>
+      <p className="mt-1 text-[12px] text-[var(--text-2)]">{t("channels.email.intro")}</p>
+
+      <form
+        className="mt-3 flex flex-col gap-2"
+        data-testid="channels-email-add-form"
+        onSubmit={(event: FormEvent) => {
+          event.preventDefault();
+          const value = address.trim();
+          if (!agentId) {
+            return;
+          }
+          void (async () => {
+            try {
+              const created = await createEmailChannel({ address: value, agentId, unknownSenderPolicy: policy });
+              setAddress("");
+              setSelectedId(created.id);
+              await refresh();
+              onChange();
+            } catch (caught) {
+              onError(errorText(caught, t("channels.email.errors.add")));
+            }
+          })();
+        }}
+      >
+        <input
+          className="input w-full"
+          type="email"
+          placeholder={t("channels.email.addressPlaceholder")}
+          aria-label={t("channels.email.addressAria")}
+          value={address}
+          data-testid="channels-email-address"
+          disabled={!canAdminister}
+          onChange={(event) => setAddress(event.target.value)}
+        />
+        <select
+          className="input w-full"
+          value={agentId}
+          aria-label={t("channels.email.agentAria")}
+          data-testid="channels-email-agent"
+          disabled={!canAdminister}
+          onChange={(event) => setAgentId(event.target.value)}
+        >
+          <option value="">{t("channels.email.agentPlaceholder")}</option>
+          {hiredAgents.map((agent) => (
+            <option key={agent.agentId} value={agent.agentId ?? ""}>
+              {agent.id}
+            </option>
+          ))}
+        </select>
+        <select
+          className="input w-full"
+          value={policy}
+          aria-label={t("channels.email.policyAria")}
+          data-testid="channels-email-policy"
+          disabled={!canAdminister}
+          onChange={(event) => setPolicy(event.target.value === "refuse" ? "refuse" : "ignore")}
+        >
+          <option value="ignore">{t("channels.email.policyIgnore")}</option>
+          <option value="refuse">{t("channels.email.policyRefuse")}</option>
+        </select>
+        <button
+          type="submit"
+          className="btn"
+          disabled={busy || !agentId || !canAdminister}
+          data-testid="channels-email-add"
+        >
+          {t("channels.email.add")}
+        </button>
+      </form>
+
+      {channels.length === 0 ? (
+        <p className="mt-3 text-sm text-[var(--text-2)]" data-testid="channels-email-empty">
+          {t("channels.email.empty")}
+        </p>
+      ) : (
+        <ul className="mt-3 flex flex-col gap-1" data-testid="channels-email-list">
+          {channels.map((channel) => (
+            <li key={channel.id} className="flex items-center gap-2">
+              <button
+                type="button"
+                className="min-w-0 flex-1 rounded-lg px-2 py-1 text-left text-sm hover:bg-[var(--surface-2)]"
+                data-testid="channels-email-item"
+                aria-pressed={channel.id === selectedId}
+                onClick={() => setSelectedId(channel.id)}
+              >
+                <span className="block truncate text-[var(--text)]">{channel.address}</span>
+                <span className="block truncate text-[12px] text-[var(--text-2)]">
+                  {t(`channels.email.policy.${channel.unknownSenderPolicy}`)}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="btn btn-quiet"
+                disabled={busy || !canAdminister}
+                data-testid="channels-email-remove"
+                aria-label={t("channels.email.remove")}
+                onClick={() =>
+                  void (async () => {
+                    try {
+                      await removeEmailChannel(channel.id);
+                      if (channel.id === selectedId) {
+                        setSelectedId(null);
+                      }
+                      await refresh();
+                      onChange();
+                    } catch (caught) {
+                      onError(errorText(caught, t("channels.email.errors.remove")));
+                    }
+                  })()
+                }
+              >
+                {t("channels.email.remove")}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {selected ? (
+        <div className="mt-4 border-t border-[var(--line)] pt-3" data-testid="channels-email-allowlist">
+          <p className="panel-label">{t("channels.email.allowlistLabel")}</p>
+          <form
+            className="mt-2 flex gap-2"
+            data-testid="channels-email-allowlist-form"
+            onSubmit={(event: FormEvent) => {
+              event.preventDefault();
+              const value = pattern.trim();
+              if (!value) {
+                return;
+              }
+              void (async () => {
+                try {
+                  await addEmailAllowlistEntry(selected.id, value);
+                  setPattern("");
+                  setEntries(await loadEmailAllowlist(selected.id));
+                  await refresh();
+                } catch (caught) {
+                  onError(errorText(caught, t("channels.email.errors.allowlist")));
+                }
+              })();
+            }}
+          >
+            <input
+              className="input min-w-0 flex-1"
+              placeholder={t("channels.email.allowlistPlaceholder")}
+              aria-label={t("channels.email.allowlistAria")}
+              value={pattern}
+              data-testid="channels-email-pattern"
+              disabled={!canAdminister}
+              onChange={(event) => setPattern(event.target.value)}
+            />
+            <button
+              type="submit"
+              className="btn"
+              disabled={busy || !canAdminister}
+              data-testid="channels-email-allowlist-add"
+            >
+              {t("channels.email.allowlistAdd")}
+            </button>
+          </form>
+          <p className="mt-2 text-[12px] text-[var(--text-2)]">{t("channels.email.allowlistHint")}</p>
+          {entries.length === 0 ? (
+            <p className="mt-2 text-sm text-[var(--text-2)]" data-testid="channels-email-allowlist-empty">
+              {t("channels.email.allowlistEmpty")}
+            </p>
+          ) : (
+            <ul className="mt-2 flex flex-col gap-1" data-testid="channels-email-allowlist-list">
+              {entries.map((entry) => (
+                <li key={entry.id} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-sm text-[var(--text)]">{entry.pattern}</span>
+                  <button
+                    type="button"
+                    className="btn btn-quiet"
+                    disabled={busy || !canAdminister}
+                    data-testid="channels-email-allowlist-remove"
+                    aria-label={t("channels.email.allowlistRemove")}
+                    onClick={() =>
+                      void (async () => {
+                        try {
+                          await removeEmailAllowlistEntry(selected.id, entry.id);
+                          setEntries(await loadEmailAllowlist(selected.id));
+                          await refresh();
+                        } catch (caught) {
+                          onError(errorText(caught, t("channels.email.errors.allowlist")));
+                        }
+                      })()
+                    }
+                  >
+                    {t("channels.email.allowlistRemove")}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export function ChannelsPage() {
   const [bot, setBot] = useState<ChannelBotStatus>(NO_BOT);
+  const [agents, setAgents] = useState<VirtualAgentInfo[]>([]);
   const [channels, setChannels] = useState<ChannelRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
@@ -165,6 +448,7 @@ export function ChannelsPage() {
       const payload = await loadChannels();
       setBot(payload.bot ?? NO_BOT);
       setChannels(payload.channels ?? []);
+      setAgents(await fetchVirtualAgents().catch(() => []));
       setSelectedId((current) => {
         const rows = payload.channels ?? [];
         if (current && rows.some((row) => row.id === current)) {
@@ -275,6 +559,8 @@ export function ChannelsPage() {
               }, t("channels.errors.disconnect"))
             }
           />
+
+          <EmailCard agents={agents} busy={busy} onError={setError} onChange={() => void refresh()} />
 
           <section className="raise rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
             <p className="panel-label">{t("channels.list.label")}</p>

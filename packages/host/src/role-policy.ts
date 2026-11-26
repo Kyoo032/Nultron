@@ -91,6 +91,11 @@ export const ADMINISTER_ROUTES: ReadonlySet<string> = new Set([
   "POST /api/v1/channels",
   "DELETE /api/v1/channels/:channelId",
   "POST /api/v1/channels/:channelId/send",
+  // The email channel (F5b): an allowlist entry names who mail acts as — members never write it.
+  "POST /api/v1/channels/email",
+  "DELETE /api/v1/channels/email/:channelId",
+  "POST /api/v1/channels/email/:channelId/allowlist",
+  "DELETE /api/v1/channels/email/:channelId/allowlist/:entryId",
   "POST /api/v1/customers/whatsapp",
   "DELETE /api/v1/customers/whatsapp",
   // Datasets (data sources).

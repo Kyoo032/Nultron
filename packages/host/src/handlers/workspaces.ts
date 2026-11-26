@@ -24,6 +24,7 @@ import { dropDelegationsForWorkspace } from "../delegation/session-store";
 import { mcpStore } from "../mcp/store";
 import { purgeDeskFiles } from "../desk-files/store";
 import { inboxStore } from "../inbox/db";
+import { emailStore } from "../channels/email/db";
 import { forgetFolderMount, purgeFolderProposals } from "../folder-root";
 import { getTenant } from "../tenant";
 import { writeSelectedWorkspaceId, workspaceCookie } from "../workspace";
@@ -222,6 +223,8 @@ export async function handleDeleteWorkspace(request: HostRequest, deps: Workspac
     // Customers' numbers and words are stored in the database, not under the channel files: the
     // desk's connected numbers go, and their conversations and messages follow through the keys.
     inboxStore().purgeDesk(workspaceId);
+    // The desk's email channels too — an address a deleted desk held must be free again.
+    emailStore().dropWorkspace(workspaceId);
     forgetFolderMount(workspaceId);
     // Its folder proposals keep a sealed copy of the text the agent wanted to write.
     await purgeFolderProposals(workspaceId);

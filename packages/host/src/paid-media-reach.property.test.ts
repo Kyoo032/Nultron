@@ -38,6 +38,10 @@ const RUN_ENTRIES: Readonly<Record<string, Entry>> = {
     how: "tools stripped",
     why: "The dev-only tier hand-off check (`eval:models:handoff`, never shipped) runs every turn with `bindings: []`, so no tool, paid or not, is bound.",
   },
+  "packages/host/src/channels/email/run.ts": {
+    how: "gated",
+    why: "The inbound-email reply run. Passes `prepared.mediaPermission` from `prepareChatRun` with a body that carries no grants, so the gate always asks — and no sender can answer an ask through the mailbox anyway.",
+  },
   "packages/host/src/edit/agent-run.ts": {
     how: "no gate: the Edit agent's own tools",
     why: "The Edit agent makes media with its own `generate_image` and `generate_video`, not the gated tools. Named residual of SR-167.",
@@ -47,12 +51,23 @@ const RUN_ENTRIES: Readonly<Record<string, Entry>> = {
 const TOOL_OBJECT_USERS: Readonly<Record<string, string>> = {
   "packages/core/src/tools/platform/register.ts":
     "Registers the tools so a run can bind them. A model's call to either goes through invokeToolGuarded, with the run's gate.",
-  "packages/host/src/studio-generate.ts": "The Images and Videos studios call the tool directly: Generate is the person's own click.",
+  "packages/host/src/studio-generate.ts":
+    "The Images and Videos studios call the tool directly: Generate is the person's own click.",
   "packages/host/src/workers/video-generate-tool.ts":
     "Wraps `video_generate` so a chat turn is kept alive while it renders, and `register-tools.ts` registers the wrapper under the same key. It only registers: a model's call reaches it through `getTool(key)` inside `invokeToolGuarded`, which asks the gate by `tool.key` before `execute` runs, so the gate is unchanged.",
 };
 
-const SKIPPED_DIRS = new Set(["node_modules", ".next", "dist", "build", ".turbo", ".ci-local", "coverage", "out", ".git"]);
+const SKIPPED_DIRS = new Set([
+  "node_modules",
+  ".next",
+  "dist",
+  "build",
+  ".turbo",
+  ".ci-local",
+  "coverage",
+  "out",
+  ".git",
+]);
 
 function sourceFiles(dir: string): string[] {
   const found: string[] = [];
@@ -63,7 +78,11 @@ function sourceFiles(dir: string): string[] {
       }
       continue;
     }
-    if (/\.(ts|tsx)$/.test(entry.name) && !/\.(test|spec)\.(ts|tsx)$/.test(entry.name) && !entry.name.endsWith(".d.ts")) {
+    if (
+      /\.(ts|tsx)$/.test(entry.name) &&
+      !/\.(test|spec)\.(ts|tsx)$/.test(entry.name) &&
+      !entry.name.endsWith(".d.ts")
+    ) {
       found.push(join(dir, entry.name));
     }
   }
@@ -96,7 +115,9 @@ function runCallSites(file: string, text: string): CallSite[] {
     ) {
       const names = new Set(
         node.arguments[0].properties.flatMap((property) =>
-          property.name && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) ? [property.name.text] : [],
+          property.name && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
+            ? [property.name.text]
+            : [],
         ),
       );
       if (names.has("bindings")) {
@@ -119,11 +140,21 @@ function gateBuilders(file: string, text: string): GateBuilder[] {
   const tree = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const found: GateBuilder[] = [];
   const visit = (node: ts.Node) => {
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "createMediaPermission") {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === "createMediaPermission"
+    ) {
       let owner = "<module>";
       let inLoop = false;
       for (let up: ts.Node | undefined = node.parent; up; up = up.parent) {
-        if (ts.isForStatement(up) || ts.isWhileStatement(up) || ts.isDoStatement(up) || ts.isForOfStatement(up) || ts.isForInStatement(up)) {
+        if (
+          ts.isForStatement(up) ||
+          ts.isWhileStatement(up) ||
+          ts.isDoStatement(up) ||
+          ts.isForOfStatement(up) ||
+          ts.isForInStatement(up)
+        ) {
           inLoop = true;
         }
         if (ts.isMethodDeclaration(up) || ts.isFunctionDeclaration(up)) {
@@ -135,7 +166,12 @@ function gateBuilders(file: string, text: string): GateBuilder[] {
           break;
         }
       }
-      found.push({ file: rel(file), line: tree.getLineAndCharacterOfPosition(node.getStart()).line + 1, owner, inLoop });
+      found.push({
+        file: rel(file),
+        line: tree.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+        owner,
+        inLoop,
+      });
     }
     ts.forEachChild(node, visit);
   };
@@ -201,7 +237,10 @@ describe("every way into a model-driven run is accounted for", () => {
       const sites = scanned.sites.filter((site) => site.file === file);
       expect(sites.length, `${file} has no run call to check`).toBeGreaterThan(0);
       for (const site of sites) {
-        expect(site.passesPermission, `${site.file}:${site.line} starts a run with tools bound and no mediaPermission`).toBe(true);
+        expect(
+          site.passesPermission,
+          `${site.file}:${site.line} starts a run with tools bound and no mediaPermission`,
+        ).toBe(true);
       }
     }
   });
@@ -316,8 +355,12 @@ describe("the check can fail", () => {
   });
 
   it("sees a direct use of a generator tool and ignores its import and definition", () => {
-    expect(usesGeneratorTool("fake.ts", `import { imageGenerateTool } from "x"; imageGenerateTool.execute(a, b);`)).toBe(true);
-    expect(usesGeneratorTool("fake.ts", `import { imageGenerateTool } from "x"; export { imageGenerateTool };`)).toBe(false);
+    expect(
+      usesGeneratorTool("fake.ts", `import { imageGenerateTool } from "x"; imageGenerateTool.execute(a, b);`),
+    ).toBe(true);
+    expect(usesGeneratorTool("fake.ts", `import { imageGenerateTool } from "x"; export { imageGenerateTool };`)).toBe(
+      false,
+    );
     expect(usesGeneratorTool("fake.ts", `export const videoGenerateTool = defineTool({});`)).toBe(false);
   });
 });
