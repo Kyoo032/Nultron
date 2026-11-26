@@ -30,7 +30,7 @@ function checkReleasedNumber(sqlite: Database.Database) {
 describe("0024_inbox_active_endpoint", () => {
   it("follows every existing migration in the forward-only journal", () => {
     const entry = journal.entries.at(-1)!;
-    expect(entry.tag).toBe("0024_inbox_active_endpoint");
+    expect(entry.tag).toBe("0025_auth_session_endpoint_mac");
     for (const previous of journal.entries.slice(0, -1)) expect(entry.when).toBeGreaterThan(previous.when);
   });
 

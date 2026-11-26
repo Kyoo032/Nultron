@@ -102,6 +102,7 @@ describe("POST /auth/token, grant_type=authorization_code", () => {
       "device_id",
       "expires_in",
       "gateway_endpoint",
+      "gateway_key",
       "org_id",
       "refresh_expires_in",
       "refresh_token",
