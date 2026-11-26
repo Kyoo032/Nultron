@@ -179,6 +179,8 @@
     "calculator": "Calculator",
     "datetime": "Clock",
     "selfChecking": "Checking this desk…",
+    "queryingDataSource": "Querying the data source…",
+    "queryDataSource": "Data source query",
     "selfCheck": "Desk check",
     "imageAsk": "Picture waiting for your OK",
     "videoAsk": "Clip waiting for your OK"
@@ -193,7 +195,8 @@
       "delete_file": "Delete file",
       "knowledge_search": "Knowledge search",
       "run_code": "Run code",
-      "build_deck": "Build deck"
+      "build_deck": "Build deck",
+      "query_data_source": "Query data source"
     },
     "doing": {
       "list_files": "Listing files in {dir}…",
@@ -206,6 +209,7 @@
       "knowledge_search": "Searching your knowledge for “{query}”…",
       "run_code": "Running {language}…",
       "build_deck": "Building “{title}”…",
+      "query_data_source": "Querying {name}…",
       "web_fetch": "Opening {host}…"
     },
     "done": {
@@ -219,6 +223,7 @@
       "knowledge_search": "Searched your knowledge for “{query}”",
       "run_code": "Ran {language}",
       "build_deck": "Built “{title}”",
+      "query_data_source": "Queried {name}",
       "web_fetch": "Opened {host}"
     },
     "failed": {
@@ -231,6 +236,7 @@
       "knowledge_search": "Could not search your knowledge",
       "run_code": "{language} run failed",
       "build_deck": "Could not build the deck",
+      "query_data_source": "Could not query the data source",
       "web_fetch": "Could not open {host}"
     },
     "pending": {

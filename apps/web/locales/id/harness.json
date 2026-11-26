@@ -119,6 +119,7 @@
     "run_code": "Menjalankan kode di sandbox",
     "self_check": "Pemeriksaan mandiri",
     "build_deck": "Membuat slide presentasi",
+    "query_data_source": "Menjalankan kueri di sumber data",
     "research_dossier": "Laporan riset",
     "delegate": "Bertanya ke agen lain",
     "run_sql": "Menjalankan kueri SQL",
