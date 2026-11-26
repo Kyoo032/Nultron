@@ -491,10 +491,6 @@ const routes: Route[] = [
   compile("POST", "/api/v1/channels/telegram/poll", (req) => handlePostTelegramPoll(req)),
   compile("GET", "/api/v1/channels", handleGetChannels),
   compile("POST", "/api/v1/channels", (req) => handlePostChannels(req)),
-  compile("GET", "/api/v1/channels/:channelId", handleGetChannel),
-  compile("DELETE", "/api/v1/channels/:channelId", handleDeleteChannel),
-  compile("GET", "/api/v1/channels/:channelId/messages", handleGetChannelMessages),
-  compile("POST", "/api/v1/channels/:channelId/send", (req) => handlePostChannelSend(req)),
   // The customer inbox (docs/internal/whatsapp-omnichannel-plan.md). The webhook is the one route a
   // stranger can reach: it is exempt from the session gate and the CSRF rule (`UNGATED_GETS`,
   // `UNGATED_POSTS`, `CSRF_EXEMPT_PATHS`) and authenticates by Meta's signature instead. It is a
@@ -512,6 +508,10 @@ const routes: Route[] = [
   compile("GET", "/api/v1/channels/email/:channelId/allowlist", handleListEmailAllowlist),
   compile("POST", "/api/v1/channels/email/:channelId/allowlist", handleAddEmailAllowlist),
   compile("DELETE", "/api/v1/channels/email/:channelId/allowlist/:entryId", handleRemoveEmailAllowlist),
+  compile("GET", "/api/v1/channels/:channelId", handleGetChannel),
+  compile("DELETE", "/api/v1/channels/:channelId", handleDeleteChannel),
+  compile("GET", "/api/v1/channels/:channelId/messages", handleGetChannelMessages),
+  compile("POST", "/api/v1/channels/:channelId/send", (req) => handlePostChannelSend(req)),
   compile("GET", "/api/v1/customers/whatsapp", (req) => handleGetWhatsApp(req)),
   compile("POST", "/api/v1/customers/whatsapp", (req) => handlePostWhatsApp(req)),
   compile("DELETE", "/api/v1/customers/whatsapp", (req) => handleDeleteWhatsApp(req)),
