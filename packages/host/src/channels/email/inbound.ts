@@ -311,10 +311,12 @@ async function handleEmailWebhookInner(request: HostRequest, deps: EmailWebhookD
       const existing = threadHeaders.threadKey ? store.findThread(channel.id, threadHeaders.threadKey, hash) : null;
       let threadId = "";
       if (existing) {
-        const alive = db.prepare(`SELECT id FROM threads WHERE id = ?`).get(existing.threadId) as
-          | { id: string }
+        // Reuse only while the chat thread still belongs to the mapped user: a deleted thread, or
+        // one an allowlist reassignment left under the former actor, is dropped and refiled.
+        const alive = db.prepare(`SELECT id, user_id AS userId FROM threads WHERE id = ?`).get(existing.threadId) as
+          | { id: string; userId: string | null }
           | undefined;
-        if (alive) {
+        if (alive && alive.userId === actor.tenant.userId) {
           threadId = existing.threadId;
         } else {
           store.removeThread(existing.id);
