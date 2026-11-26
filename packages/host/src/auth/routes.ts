@@ -37,6 +37,7 @@ import {
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
 import { log } from "../log";
 import { WHATSAPP_WEBHOOK_PATH } from "../inbox/webhook-path";
+import { EMAIL_WEBHOOK_PATH } from "../channels/email/path";
 import { recordTenantModelAllowlist } from "../model-allowance";
 import {
   createPortalSessionCheck,
@@ -96,7 +97,11 @@ export const UNGATED_GETS: ReadonlySet<string> = new Set(["/api/v1/ping", "/api/
  * stranger on the internet can POST to, which is why the desk it writes to comes from the endpoint
  * row the number id resolves to and never from the payload.
  */
-export const UNGATED_POSTS: ReadonlySet<string> = new Set(["/api/v1/billing/webhook", WHATSAPP_WEBHOOK_PATH]);
+export const UNGATED_POSTS: ReadonlySet<string> = new Set([
+  "/api/v1/billing/webhook",
+  WHATSAPP_WEBHOOK_PATH,
+  EMAIL_WEBHOOK_PATH,
+]);
 
 export type AuthRouteDeps = {
   readonly store: SessionStore;

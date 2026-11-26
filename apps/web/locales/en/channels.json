@@ -52,5 +52,36 @@
     "send": "Telegram did not accept that message.",
     "poll": "Could not check for new messages.",
     "notConnected": "Connect a Telegram bot for this desk first."
+  },
+  "email": {
+    "label": "E-mail",
+    "intro": "Give an agent its own address. Allowlisted senders mail it and get the agent's reply in the same thread.",
+    "addressPlaceholder": "agent@mail.example.com",
+    "addressAria": "E-mail address",
+    "agentPlaceholder": "Pick an agent",
+    "agentAria": "Agent",
+    "policyAria": "Unknown sender policy",
+    "policyIgnore": "Ignore unknown senders",
+    "policyRefuse": "Refuse unknown senders politely",
+    "add": "Add address",
+    "empty": "No e-mail addresses yet.",
+    "remove": "Remove",
+    "allowlistLabel": "Sender allowlist",
+    "allowlistPlaceholder": "person@example.com or @example.com",
+    "allowlistAria": "Sender pattern",
+    "allowlistAdd": "Allow",
+    "allowlistHint": "A full address lets one sender in; @domain lets the whole domain in.",
+    "allowlistEmpty": "Nobody is allowlisted yet.",
+    "allowlistRemove": "Remove",
+    "policy": {
+      "ignore": "unknown senders ignored",
+      "refuse": "unknown senders refused"
+    },
+    "errors": {
+      "load": "Could not load the e-mail channels",
+      "add": "Could not add the address",
+      "remove": "Could not remove the address",
+      "allowlist": "Could not change the allowlist"
+    }
   }
 }

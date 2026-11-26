@@ -67,6 +67,17 @@ import {
 } from "./handlers/customers";
 import { handleWhatsAppWebhookGet, handleWhatsAppWebhookPost } from "./inbox/webhook";
 import { WHATSAPP_WEBHOOK_PATH } from "./inbox/webhook-path";
+import { EMAIL_WEBHOOK_PATH } from "./channels/email/path";
+import { handleEmailWebhook } from "./channels/email/inbound";
+import { emailStore } from "./channels/email/db";
+import {
+  handleAddEmailAllowlist,
+  handleCreateEmailChannel,
+  handleDeleteEmailChannel,
+  handleListEmailAllowlist,
+  handleListEmailChannels,
+  handleRemoveEmailAllowlist,
+} from "./channels/email/routes";
 import {
   handleDeleteChannel,
   handleDeleteTelegramBot,
@@ -490,6 +501,17 @@ const routes: Route[] = [
   // literal path, listed before the `:channelId` routes so `whatsapp` is never read as a channel id.
   compile("GET", WHATSAPP_WEBHOOK_PATH, async (req) => handleWhatsAppWebhookGet(req)),
   compile("POST", WHATSAPP_WEBHOOK_PATH, (req) => handleWhatsAppWebhookPost(req)),
+  // The email channel (F5b): one webhook a stranger can POST to, held to the provider's signature
+  // instead of the session gate — the same contract as WhatsApp's above. Session routes manage the
+  // channel and its allowlist; the literal `email/*` paths sit above `:channelId` so `email` is
+  // never read as a channel id.
+  compile("POST", EMAIL_WEBHOOK_PATH, (req) => handleEmailWebhook(req, { store: emailStore() })),
+  compile("GET", "/api/v1/channels/email", handleListEmailChannels),
+  compile("POST", "/api/v1/channels/email", handleCreateEmailChannel),
+  compile("DELETE", "/api/v1/channels/email/:channelId", handleDeleteEmailChannel),
+  compile("GET", "/api/v1/channels/email/:channelId/allowlist", handleListEmailAllowlist),
+  compile("POST", "/api/v1/channels/email/:channelId/allowlist", handleAddEmailAllowlist),
+  compile("DELETE", "/api/v1/channels/email/:channelId/allowlist/:entryId", handleRemoveEmailAllowlist),
   compile("GET", "/api/v1/customers/whatsapp", (req) => handleGetWhatsApp(req)),
   compile("POST", "/api/v1/customers/whatsapp", (req) => handlePostWhatsApp(req)),
   compile("DELETE", "/api/v1/customers/whatsapp", (req) => handleDeleteWhatsApp(req)),

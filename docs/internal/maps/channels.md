@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-10-01, working tree on top of 0b61a29, for the first line below only (the rail row, the route and the page component: each cite re-read against the file). The rest as of 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1)
+Last verified: 2026-11-26, working tree on top of `devin/1795703647-email-channel` (F5b), for the Email section below and the routes/UI cites in it. The Telegram parts as of 2026-10-01, working tree on top of 0b61a29, for the first line below only (the rail row, the route and the page component: each cite re-read against the file). The rest as of 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1)
 
 ## Overview
 
@@ -51,6 +51,16 @@ Pull only. There is no webhook and no inbound route: the host binds loopback beh
 
 `api.telegram.org` is pinned in `packages/core/src/channels/pinned.ts:14`, resolved through `resolvedTelegramApiOrigin()` which honours `AGENTFORGE_TELEGRAM_API_URL` only when `gatewayUrlOverrideAllowed()` — never packaged, never `NODE_ENV=production`, the same rule the model gateway's endpoint got in 0.14.26. The "never packaged" half held only from 2026-10-01: until then `main.cjs` did not set `AGENTFORGE_PACKAGED`, so a packaged build honoured the hook ([SR-85](../security-register.md#sr-85)); it is set in `apps/desktop/main.cjs` `bootstrapPackaged` now and not yet driven on an installed app. Calls are `redirect: "manual"` (a 3xx is an error), 15 s timeout, 1 MB response cap, JSON only. The token rides in the URL path, so every message that can escape goes through `redactToken` (`telegram.ts:62`) first.
 
+### Email intake and owner notices (F5b, hosted)
+
+`POST /api/v1/channels/email/webhook` (`EMAIL_WEBHOOK_PATH`, `packages/host/src/channels/email/path.ts`) is the second inbound route open to the internet, after the WhatsApp webhook: exempt from the session gate (`UNGATED_POSTS`, `packages/host/src/auth/routes.ts`) and from CSRF (`CSRF_EXEMPT_PATHS`, `packages/host/src/http-adapter.ts`), a literal path, server-mode only (`isServerMode()` -> `channel_unavailable` on a local desk). `handleEmailWebhook` (`packages/host/src/channels/email/inbound.ts`) verifies `x-agentforge-email-signature` - HMAC-SHA256 of the raw body under `AGENTFORGE_EMAIL_WEBHOOK_SECRET`, `sha256=` prefix, constant-time - **before** `JSON.parse`; no secret answers 503, a bad signature 401 (`inbound.test.ts` pins the order).
+
+Per delivery the handler reads only `provider_message_id`, `to`, `headers`, `subject`, `text` - **bodies never touch a table column**: dedupe is a PK insert into `email_inbound_seen(channel_id, provider_message_id)` (`store.markInboundSeen`), the desk is resolved by the `to` address alone (`email_channels.address` unique), and the body itself is written only into the sealed message store via `insertMessage`. Auto-submitted mail (`Auto-Submitted` != `no`, `Precedence: bulk|junk|list|auto_reply`, `x-autoreply*`) is skipped **before** dedupe so a bot's retry of its own auto-reply still lands as seen; a per-sender sliding-window cap (`SenderCap`, `AGENTFORGE_EMAIL_MAX_PER_SENDER_HOUR`, default 20/h) is in-memory - the schema has no sender column by design. Senders are allowlisted per channel: a full address, `@domain`, or `*@domain` maps to a Nultron user (`identity.matchAllowlist`); unknown senders are logged, audited, and either ignored or politely refused per `email_channels.unknown_sender_policy`.
+
+Threading is RFC 5322: `threading.readThreadHeaders` takes `references[0] ?? in-reply-to ?? message-id` as the thread root, `email_threads` maps `(channel_id, root_message_id)` to a sealed `threads` row, and the reply goes out through `outbound.createMailer` - nodemailer over `AGENTFORGE_SMTP_URL` with `Message-ID`/`In-Reply-To`/`References` from `replyHeaders`, `Re:` once. `notices.notifyOwner` reuses that mailer for owner notices (`approval_waiting`, `quota_warning`) addressed to the workspace's `role='owner'` member. Every outcome lands on the audit trail as `channel.trigger` with `channel: "email"`, the sender as a sha256 hash and the rule code - never the text.
+
+Routes are session-gated CRUD on the same literal prefix (`packages/host/src/router.ts`): `GET|POST /api/v1/channels/email`, `DELETE .../:channelId`, `GET|POST|DELETE .../:channelId/allowlist[/...]`; address/agent/policy validation in `routes.ts`, 409 `address_taken`. The renderer gets an **Email** card on `/channels` (`EmailCard`, `apps/web/components/channels-page.tsx`; client `apps/web/lib/email-channels-client.ts`; `channels.email.*` in both locale catalogs). Attachments are not ingested (F7a not merged): inbound takes `text` only.
+
 ## Where things live
 
 | File | Role |
@@ -58,6 +68,7 @@ Pull only. There is no webhook and no inbound route: the host binds loopback beh
 | `packages/core/src/channels/index.ts` | Record shapes, `CHANNEL_CAPS`, `parseChatTarget`, `assertSendableText` |
 | `packages/core/src/channels/pinned.ts` | The pinned API origin and the dev-only override rule |
 | `packages/host/src/channels/telegram.ts` | The Bot API client: `getMe` / `getChat` / `sendMessage` / `getUpdates`, redaction, caps |
+| `packages/host/src/channels/email/` | F5b: `inbound` (webhook), `outbound` (nodemailer), `threading`, `loop-guard`, `identity`, `store`, `routes`, `notices`, `tenant`, `run` |
 | `packages/host/src/channels/store.ts` | Desk store over `localDataDir()/channels/<workspaceId>/` |
 | `packages/host/src/channels/records.ts` | Zod schemas every stored file is read through |
 | `packages/host/src/channels/__fixtures__/bot-api.ts` | In-memory stand-in for the Bot API, shared by the tests and the sandbox script |

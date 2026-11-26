@@ -1128,3 +1128,64 @@ export const customerMessages = sqliteTable(
     ),
   ],
 );
+
+/**
+ * Email channel (F5b, drizzle/0030_email_channel.sql). `workspaceId` is the desk's workspace id.
+ * Bodies live only in the sealed message store — no column here holds one.
+ */
+export const emailChannels = sqliteTable(
+  "email_channels",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id").notNull(),
+    agentId: text("agent_id").notNull(),
+    address: text("address").notNull(),
+    unknownSenderPolicy: text("unknown_sender_policy").notNull().$type<"ignore" | "refuse">(),
+    status: text("status").notNull().$type<"active" | "disabled">(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("email_channels_address_unique").on(table.address),
+    index("email_channels_workspace_idx").on(table.workspaceId),
+    check("email_channels_policy_check", sql`${table.unknownSenderPolicy} IN ('ignore', 'refuse')`),
+    check("email_channels_status_check", sql`${table.status} IN ('active', 'disabled')`),
+  ],
+);
+
+export const emailSenderAllowlist = sqliteTable(
+  "email_sender_allowlist",
+  {
+    id: text("id").primaryKey(),
+    channelId: text("channel_id")
+      .notNull()
+      .references(() => emailChannels.id, { onDelete: "cascade" }),
+    pattern: text("pattern").notNull(),
+    userId: text("user_id"),
+  },
+  (table) => [uniqueIndex("email_sender_allowlist_pattern_unique").on(table.channelId, table.pattern)],
+);
+
+export const emailInboundSeen = sqliteTable(
+  "email_inbound_seen",
+  {
+    providerMessageId: text("provider_message_id").primaryKey(),
+    channelId: text("channel_id")
+      .notNull()
+      .references(() => emailChannels.id, { onDelete: "cascade" }),
+    receivedAt: integer("received_at").notNull(),
+  },
+  (table) => [index("email_inbound_seen_channel_idx").on(table.channelId, table.receivedAt)],
+);
+
+export const emailThreads = sqliteTable(
+  "email_threads",
+  {
+    id: text("id").primaryKey(),
+    channelId: text("channel_id")
+      .notNull()
+      .references(() => emailChannels.id, { onDelete: "cascade" }),
+    threadId: text("thread_id").notNull(),
+    rootMessageId: text("root_message_id").notNull(),
+  },
+  (table) => [uniqueIndex("email_threads_root_unique").on(table.channelId, table.rootMessageId)],
+);

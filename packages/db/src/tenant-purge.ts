@@ -83,6 +83,12 @@ export const CASCADED_TABLES = [
   // the desk's endpoints; each conversation and message follows through its foreign key).
   "customer_conversations",
   "customer_messages",
+  // The email channel's children: reached through `email_channels` (the workspace-scoped pass below
+  // deletes the desk's channels; each allowlist entry, seen-id and thread key follows its foreign
+  // key).
+  "email_sender_allowlist",
+  "email_inbound_seen",
+  "email_threads",
 ] as const;
 
 /**
@@ -116,6 +122,9 @@ export const WORKSPACE_SCOPED_TABLES = [
   // Customer inbox: the connected numbers. Their conversations and messages go with them through
   // the foreign keys, so a purge by desk leaves no customer text behind.
   "channel_endpoints",
+  // Email channels (F5b): keyed by `workspace_id`. Their allowlists, dedupe rows and thread keys go
+  // with them through the foreign keys, so a reset leaves no mail state behind.
+  "email_channels",
 ] as const;
 
 /** Tables keyed directly by `tenant_id` that a reset clears. */

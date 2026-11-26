@@ -252,6 +252,7 @@ export function ensureSchema(sqlite: Database.Database): void {
   ensureCustomerInboxTables(sqlite);
   ensureWorkspaceColumns(sqlite);
   ensureAuditTables(sqlite);
+  ensureEmailChannelTables(sqlite);
   assertKernelTables(sqlite);
 }
 
@@ -1009,9 +1010,9 @@ function ensureKnowledgeTables(sqlite: Database.Database): void {
  */
 function enableFtsSecureDelete(sqlite: Database.Database, table: string): void {
   try {
-    const existing = sqlite
-      .prepare(`SELECT v FROM ${table}_config WHERE k = 'secure-delete'`)
-      .get() as { v: number } | undefined;
+    const existing = sqlite.prepare(`SELECT v FROM ${table}_config WHERE k = 'secure-delete'`).get() as
+      | { v: number }
+      | undefined;
     if (existing?.v === 1) {
       return;
     }
@@ -1038,6 +1039,48 @@ export function listKernelTables(sqlite: Database.Database): string[] {
  * The F2 audit trail. Mirrors drizzle/0026_audit_events.sql exactly; every statement is
  * idempotent so the healer is safe on every boot for a DB baseline-stamped past 0026.
  */
+/**
+ * The email channel (F5b), for a database stamped past 0030 without the tables.
+ * Mirrors drizzle/0030_email_channel.sql.
+ */
+function ensureEmailChannelTables(sqlite: Database.Database): void {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS email_channels (
+      id text PRIMARY KEY NOT NULL,
+      workspace_id text NOT NULL,
+      agent_id text NOT NULL,
+      address text NOT NULL,
+      unknown_sender_policy text NOT NULL,
+      status text NOT NULL,
+      created_at integer NOT NULL,
+      CONSTRAINT email_channels_policy_check CHECK (unknown_sender_policy IN ('ignore', 'refuse')),
+      CONSTRAINT email_channels_status_check CHECK (status IN ('active', 'disabled'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS email_channels_address_unique ON email_channels (address);
+    CREATE INDEX IF NOT EXISTS email_channels_workspace_idx ON email_channels (workspace_id);
+    CREATE TABLE IF NOT EXISTS email_sender_allowlist (
+      id text PRIMARY KEY NOT NULL,
+      channel_id text NOT NULL REFERENCES email_channels(id) ON DELETE cascade,
+      pattern text NOT NULL,
+      user_id text
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS email_sender_allowlist_pattern_unique ON email_sender_allowlist (channel_id, pattern);
+    CREATE TABLE IF NOT EXISTS email_inbound_seen (
+      provider_message_id text PRIMARY KEY NOT NULL,
+      channel_id text NOT NULL REFERENCES email_channels(id) ON DELETE cascade,
+      received_at integer NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS email_inbound_seen_channel_idx ON email_inbound_seen (channel_id, received_at);
+    CREATE TABLE IF NOT EXISTS email_threads (
+      id text PRIMARY KEY NOT NULL,
+      channel_id text NOT NULL REFERENCES email_channels(id) ON DELETE cascade,
+      thread_id text NOT NULL,
+      root_message_id text NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS email_threads_root_unique ON email_threads (channel_id, root_message_id);
+  `);
+}
+
 function ensureAuditTables(sqlite: Database.Database): void {
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS audit_events (
