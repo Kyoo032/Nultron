@@ -44,10 +44,13 @@ export function createMailer(env: NodeJS.ProcessEnv): Mailer | null {
   // `createTransport(url)` takes no options, so the URL is unfolded here: the timeouts and the TLS
   // floor a mail relay should always carry.
   const parsed = new URL(url);
+  const loopback = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(parsed.hostname);
   const transport: Transporter = nodemailer.createTransport({
     host: parsed.hostname,
     port: parsed.port ? Number(parsed.port) : parsed.protocol === "smtps:" ? 465 : 587,
     secure: parsed.protocol === "smtps:",
+    // A remote relay on smtp:// must offer STARTTLS — without it replies would ride in plaintext.
+    requireTLS: parsed.protocol === "smtp:" && !loopback,
     auth: parsed.username
       ? { user: decodeURIComponent(parsed.username), pass: decodeURIComponent(parsed.password) }
       : undefined,
