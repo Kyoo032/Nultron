@@ -7290,11 +7290,13 @@ Gate: none for week one (voice is Rizky's only); before customer voice or any al
 - **Allowlist writes are administer-gated** (`role-policy.ts` `ADMINISTER_ROUTES`): members can no longer grant mail that acts as the owner, and `handleAddEmailAllowlist` refuses a `userId` that is not a member of the desk.
 - **Sender identity prefers the relay's authenticated envelope** (`from`/`sender`/`envelope_sender` at the payload's top level, set by the relay) over the forgeable `From:` header; without one, the header stands and full SPF/DKIM stays the relay's job (acceptance check 4, needs the domain).
 - **Channel addresses are generated or domain-bound**: `handleCreateEmailChannel` mints `agent-<rand>@<AGENTFORGE_EMAIL_FROM_DOMAIN>` and refuses addresses outside the relay's domain, so no desk can claim another organisation's mail.
-- **Mail threads are per user**: `email_threads` keys on `(channel_id, root_message_id, user_id)` so two allowlisted senders in one mail conversation never share a chat thread; stale mappings to deleted chat threads are refiled.
+- **Mail threads are per sender**: `email_threads` keys on `(channel_id, root_message_id, sender_key)` — the sender's sha256 — so two allowlisted senders in one mail conversation never share a chat thread even when they map to the same desk user; stale mappings to deleted chat threads are refiled.
 - **Removed members lose mail access**: `resolveEmailActor` returns null when the allowlist's `userId` no longer sits in `workspace_members`.
 - **No plaintext fallback**: remote `smtp://` transports require STARTTLS (`requireTLS`, loopback exempt).
-- **Transient failures stay retryable**: the dedupe mark is removed on capacity/config/send failures so provider redelivery retries; permanent refusals (injection, empty body, gone member) keep the mark.
+- **Bounce senders are never answered** (MAILER-DAEMON, postmaster, empty paths): denied with audit code `bounce` before the cap and the allowlist.
+- **Post-run failures keep the dedupe mark**: a send failure after turns are saved cannot rerun the agent on redelivery; only pre-run failures (unconfigured mailer, capacity refusals) unmark.
 - **Desk delete frees addresses**: `emailStore().dropWorkspace` runs inside workspace deletion so `email_channels` rows go with the desk.
+- **Relay domains are case-normalised** at channel create, matching the lowercased recipient lookup on intake; the Email card's mutation controls render disabled for hosted members.
 
 ## Must be true before the Tencent Cloud deploy
 
