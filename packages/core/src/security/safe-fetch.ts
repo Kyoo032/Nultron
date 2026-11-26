@@ -203,8 +203,11 @@ export type DestinationRule = {
   /** True when the operator marked this entry reachable over a private address (an internal MinIO). */
   readonly allowPrivate: boolean;
 };
-/** Answers the rule for one `host` (lowercase) + `port`, or `null` when there is none. */
-export type DestinationAllowlist = (host: string, port: number) => DestinationRule | null;
+/**
+ * Answers the rule for one `host` (lowercase) + `port` + `tenantId`, or `null` when there is none.
+ * The allowlist is per tenant: a `null`/`undefined` `tenantId` must fail closed.
+ */
+export type DestinationAllowlist = (host: string, port: number, tenantId?: string | null) => DestinationRule | null;
 
 let destinationAllowlist: DestinationAllowlist = () => null;
 
@@ -227,12 +230,13 @@ export function assertAllowedDestination(
   host: string,
   port: number,
   lookup: DestinationAllowlist = destinationAllowlist,
+  tenantId?: string | null,
 ): DestinationRule {
   const name = host.trim().toLowerCase();
   if (!name || !Number.isInteger(port) || port < 1 || port > 65535) {
     throw new ApiError("invalid_destination", "Destination host or port is not valid", 400);
   }
-  const rule = lookup(name, port);
+  const rule = lookup(name, port, tenantId);
   if (!rule) {
     throw new ApiError("invalid_destination", "This destination is not on the operator's host:port allowlist", 400);
   }

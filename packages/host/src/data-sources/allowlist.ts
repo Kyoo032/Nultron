@@ -48,14 +48,17 @@ export function verifiedDestinationRules(
 
 /** Install the core lookup: per-tenant verified rows, `null` when the destination is not listed. */
 export function installDestinationAllowlistReader(): void {
-  // The lookup core calls has no tenant argument: the rules are global per desk (one org per
-  // deployment today), so the reader unions every tenant's verified rows and keys on host:port.
-  installDestinationAllowlist((host, port): DestinationRule | null => {
+  // The allowlist is per tenant (the spec's "per-org host:port"): a lookup that cannot name its
+  // tenant gets no rule at all — refusing is safer than borrowing another tenant's approval.
+  installDestinationAllowlist((host, port, tenantId): DestinationRule | null => {
+    if (!tenantId) {
+      return null;
+    }
     const rows = sql
       .prepare(
-        "SELECT id, tenant_id, host, port, allow_private, mac FROM destination_allowlist WHERE host = ? AND port = ?",
+        "SELECT id, tenant_id, host, port, allow_private, mac FROM destination_allowlist WHERE tenant_id = ? AND host = ? AND port = ?",
       )
-      .all(host, port) as Row[];
+      .all(tenantId, host, port) as Row[];
     for (const row of rows) {
       const expected = destinationAllowlistMac(row.tenant_id, row.host, row.port, row.allow_private === 1);
       if (expected !== row.mac) {

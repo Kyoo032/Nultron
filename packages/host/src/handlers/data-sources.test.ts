@@ -21,6 +21,7 @@ import { dispatch } from "../router";
 import { createSession } from "../auth/session";
 import { createMemorySessionStore, type SessionStore } from "../auth/session-store";
 import { assertAllowedDestination } from "@agentforge/core";
+import { destinationAllowlistMac } from "../data-sources/allowlist";
 import type { HostJsonResult, HostRequest, HostResult } from "../types";
 
 const T0 = Date.UTC(2026, 10, 26, 9, 0, 0);
@@ -132,7 +133,23 @@ describe("F1 data-sources API", () => {
          VALUES ('tampered', 'ds-tenant-a', 'evil.example.com', 443, 0, 'deadbeef', 1)`,
       )
       .run();
+    expect(() => assertAllowedDestination("evil.example.com", 443, undefined, "ds-tenant-a")).toThrow(/allowlist/);
+    // No tenant context at all also fails closed.
     expect(() => assertAllowedDestination("evil.example.com", 443)).toThrow(/allowlist/);
+  });
+
+  it("keeps destination approvals inside their own tenant", () => {
+    // A valid row for tenant B names a destination tenant A never approved: A gets refused.
+    sql
+      .prepare(
+        `INSERT INTO destination_allowlist (id, tenant_id, host, port, allow_private, mac, created_at)
+         VALUES ('other-tenant', 'ds-tenant-b', 'other-db.example.com', 5432, 0, ?, 1)`,
+      )
+      .run(destinationAllowlistMac("ds-tenant-b", "other-db.example.com", 5432, false));
+    expect(assertAllowedDestination("other-db.example.com", 5432, undefined, "ds-tenant-b")).toEqual({
+      allowPrivate: false,
+    });
+    expect(() => assertAllowedDestination("other-db.example.com", 5432, undefined, "ds-tenant-a")).toThrow(/allowlist/);
   });
 
   it("audits adds, disables and credential deletes with actor and outcome (W1.12)", async () => {

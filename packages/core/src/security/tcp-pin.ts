@@ -38,9 +38,9 @@ export type PinnedDestination = {
 export async function resolvePinnedDestination(
   host: string,
   port: number,
-  options: { allowlist?: DestinationAllowlist; lookupImpl?: HostLookup } = {},
+  options: { allowlist?: DestinationAllowlist; lookupImpl?: HostLookup; tenantId?: string } = {},
 ): Promise<PinnedDestination> {
-  const rule = assertAllowedDestination(host, port, options.allowlist);
+  const rule = assertAllowedDestination(host, port, options.allowlist, options.tenantId);
   const name = host.trim().toLowerCase();
   const literal = parseIpAddress(name);
   let addresses: readonly ResolvedAddress[];

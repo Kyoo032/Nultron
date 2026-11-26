@@ -26,7 +26,7 @@ export function pgConfig(row: DataSourceRow): PgConfig {
 async function connect(row: DataSourceRow): Promise<Client> {
   const config = pgConfig(row);
   const secret = openSourceSecret<PgSecret>(row);
-  const pinned = await resolvePinnedDestination(config.host, config.port);
+  const pinned = await resolvePinnedDestination(config.host, config.port, { tenantId: row.tenant_id });
   const client = new Client({
     host: pinned.address,
     port: config.port,

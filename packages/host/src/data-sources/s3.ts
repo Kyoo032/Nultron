@@ -24,14 +24,17 @@ function s3Secret(row: DataSourceRow): S3Secret {
   return openSourceSecret<S3Secret>(row);
 }
 
-/** The endpoint's host:port, after the allowlist says it may be reached at all. */
-export function s3Destination(config: S3Config): { url: URL; host: string; port: number; rule: DestinationRule } {
+/** The endpoint's host:port, after the allowlist says the tenant may reach it at all. */
+export function s3Destination(
+  config: S3Config,
+  tenantId: string,
+): { url: URL; host: string; port: number; rule: DestinationRule } {
   const url = new URL(config.endpoint);
   if (url.protocol !== "https:") {
     throw new ApiError("invalid_endpoint", "S3 endpoint must use HTTPS", 400);
   }
   const port = url.port ? Number(url.port) : 443;
-  const rule = assertAllowedDestination(url.hostname, port);
+  const rule = assertAllowedDestination(url.hostname, port, undefined, tenantId);
   return { url, host: url.hostname, port, rule };
 }
 
@@ -106,10 +109,10 @@ export function signS3Request(input: {
 async function s3Fetch(
   row: DataSourceRow,
   input: { method: "GET" | "HEAD"; path: string; query?: Record<string, string> },
-): Promise<{ status: number; body: string }> {
+): Promise<{ status: number; body: Buffer }> {
   const config = s3Config(row);
   const secret = s3Secret(row);
-  const { url: base, rule } = s3Destination(config);
+  const { url: base, rule } = s3Destination(config, row.tenant_id);
   const url = new URL(`${base.origin}${input.path}`);
   for (const [k, v] of Object.entries(input.query ?? {})) {
     url.searchParams.set(k, v);
@@ -130,7 +133,8 @@ async function s3Fetch(
     // S3's own XML is the response body; cap it the same way the file cap does.
     maxHops: 0,
   });
-  return { status: result.status, body: result.body.toString("utf8") };
+  // Raw bytes: object bodies are binary documents — decoding them as UTF-8 would corrupt them.
+  return { status: result.status, body: result.body };
 }
 
 function bucketPath(config: S3Config, key = ""): string {
@@ -158,13 +162,14 @@ export async function listS3Objects(row: DataSourceRow, maxKeys = 1000): Promise
     if (status !== 200) {
       throw new ApiError("source_test_failed", `S3 list failed with status ${status}`, 502);
     }
-    const keys = [...body.matchAll(TAG("Key"))].map((m) => m[1]!);
-    const sizes = [...body.matchAll(TAG("Size"))].map((m) => Number(m[1]));
+    const xml = body.toString("utf8");
+    const keys = [...xml.matchAll(TAG("Key"))].map((m) => m[1]!);
+    const sizes = [...xml.matchAll(TAG("Size"))].map((m) => Number(m[1]));
     for (const [i, key] of keys.entries()) {
       out.push({ key, size: sizes[i] ?? 0 });
     }
-    const truncated = /<IsTruncated>true<\/IsTruncated>/.test(body);
-    token = body.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/)?.[1];
+    const truncated = /<IsTruncated>true<\/IsTruncated>/.test(xml);
+    token = xml.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/)?.[1];
     if (!truncated || !token || out.length >= maxKeys) {
       break;
     }
@@ -178,7 +183,7 @@ export async function getS3Object(row: DataSourceRow, key: string): Promise<Buff
   if (status !== 200) {
     throw new ApiError("source_sync_failed", `S3 get failed with status ${status}`, 502);
   }
-  return Buffer.from(body, "utf8");
+  return body;
 }
 
 /**
