@@ -568,6 +568,13 @@ export async function* startModalityRun(options: {
       return true;
     };
     try {
+      // A zero duration cap means no run may start at all. Fail inside `work`'s own frame so the
+      // prompt is never stored and the runtime never called — `finally` still closes the stall
+      // guard and clears the wall-clock timer.
+      if (execCaps.maxSeconds === 0) {
+        failActiveRun("This run reached its time limit and was stopped.");
+        return;
+      }
       // A picture that cannot be sent is refused before the message is stored, so the refusal does not
       // leave a bubble with no answer. This reads each image's row, not its bytes; the run reads those.
       await assertChatImagesSendable(options.tenant, userParts, { locale });
@@ -630,7 +637,9 @@ export async function* startModalityRun(options: {
           // A tier run moves once, to the next live model of the same tier, on the same transport-class
           // failures a stand-in covers (model tiers spec, section 3). Never to another tier: a person who
           // chose Reasoning and got a fast model was told something untrue.
-          if (!maySwapModel({ error: new Error(failure), streamed: false }, { model: from, signal: modelAbort.signal })) {
+          if (
+            !maySwapModel({ error: new Error(failure), streamed: false }, { model: from, signal: modelAbort.signal })
+          ) {
             return undefined;
           }
           return nextTierModel(tierRun.tier, from, catalog, options.modality, options.tenant, tierRun.replaysPicture);
@@ -808,15 +817,22 @@ export async function* startModalityRun(options: {
               // What leaves the runtime (the screen, the thread, the tool rows) is the redacted copy of a
               // tool's input and output. `event` stays the runtime's own: media is read from it below.
               const safe = redactToolEvent(event);
+              // The output cap counts every text the person sees — answer deltas AND reasoning — and
+              // is checked before the chunk is forwarded, so an over-limit chunk is never sent.
+              if (execCaps.maxOutputBytes !== null) {
+                const outBytes =
+                  event.type === "assistant.delta" || event.type === "assistant.thinking"
+                    ? Buffer.byteLength(event.text, "utf8")
+                    : 0;
+                if (outBytes > 0 && assistantBytes + outBytes > execCaps.maxOutputBytes) {
+                  failActiveRun("This run produced more output than allowed and was stopped.");
+                  return;
+                }
+                assistantBytes += outBytes;
+              }
               send(safe);
               if (event.type === "assistant.delta") {
                 assistantText += event.text;
-                if (execCaps.maxOutputBytes !== null) {
-                  assistantBytes += Buffer.byteLength(event.text, "utf8");
-                  if (assistantBytes > execCaps.maxOutputBytes) {
-                    failActiveRun("This run produced more output than allowed and was stopped.");
-                  }
-                }
               }
               if (event.type === "assistant.thinking") {
                 thinkingText = event.replace ? event.text : thinkingText + event.text;

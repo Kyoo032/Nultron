@@ -25,6 +25,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ApiError } from "@agentforge/core";
 import { trackChild } from "../child-processes";
+import { componentsRootDir } from "../components/paths";
 import { FileExtractError, type FileExtractErrorCode } from "./errors";
 import type { ExtractedFile } from "./index";
 
@@ -102,10 +103,16 @@ export function resolveTsxEsmImport(root: string): string {
 }
 
 /** The argv a child parses under: a permission wall plus the loader that runs the repository's TS. */
-export function parseChildExecArgv(root: string, maxOldSpaceMb: number): string[] {
+export function parseChildExecArgv(root: string, maxOldSpaceMb: number, componentsDir?: string): string[] {
+  // The components root is a second read grant: the installed (downloaded) converter lives there,
+  // outside the repository, and without this flag PowerPoint uploads fail after setup reports success.
+  const reads =
+    componentsDir && componentsDir !== root
+      ? [`--allow-fs-read=${root}`, `--allow-fs-read=${componentsDir}`]
+      : [`--allow-fs-read=${root}`];
   return [
     "--permission",
-    `--allow-fs-read=${root}`,
+    ...reads,
     "--allow-addons",
     "--allow-worker",
     `--max-old-space-size=${Math.max(64, Math.floor(maxOldSpaceMb))}`,
@@ -114,12 +121,22 @@ export function parseChildExecArgv(root: string, maxOldSpaceMb: number): string[
   ];
 }
 
-/** Never the parent's env; the one override the loader needs is set explicitly. */
-export function parseChildEnv(): Record<string, string> {
-  return {
+/**
+ * Never the parent's env. The loader override is set explicitly, and only the three variables the
+ * child needs to find the components root — never a secret or a tenant key — pass through.
+ */
+export function parseChildEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const out: Record<string, string> = {
     TSX_DISABLE_CACHE: "1",
     ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
   };
+  for (const key of ["AGENTFORGE_COMPONENTS_DIR", "AGENTFORGE_DATA_DIR", "AGENTFORGE_SERVER"] as const) {
+    const value = env[key];
+    if (value !== undefined) {
+      out[key] = value;
+    }
+  }
+  return out;
 }
 
 export function parseChildMaxMb(env: NodeJS.ProcessEnv = process.env): number {
@@ -137,7 +154,7 @@ export function spawnParseChild(root: string = repoRoot() ?? ""): ChildProcess {
   }
   const options: ForkOptions & { windowsHide: boolean } = {
     execPath: process.execPath,
-    execArgv: parseChildExecArgv(root, parseChildMaxMb()),
+    execArgv: parseChildExecArgv(root, parseChildMaxMb(), componentsRootDir()),
     env: parseChildEnv(),
     serialization: "advanced",
     stdio: ["ignore", "pipe", "pipe", "ipc"],

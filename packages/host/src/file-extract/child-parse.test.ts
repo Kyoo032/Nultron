@@ -36,10 +36,20 @@ describe("parse child flags", () => {
     }
   });
 
-  it("gives the child an empty environment, never the parent's secrets", () => {
-    const env = parseChildEnv();
+  it("gives the child only the variables it needs, never the parent's secrets", () => {
+    const env = parseChildEnv({
+      AGENTFORGE_SECRETS_KEY: "secret",
+      AGENTFORGE_DATA_DIR: "/data",
+      AGENTFORGE_COMPONENTS_DIR: "/opt/components",
+      AGENTFORGE_SERVER: "1",
+      ANYTHING_ELSE: "nope",
+    });
+    // The components-root locators pass through (the installed converter lives there); nothing else does.
+    expect(env.AGENTFORGE_DATA_DIR).toBe("/data");
+    expect(env.AGENTFORGE_COMPONENTS_DIR).toBe("/opt/components");
+    expect(env.AGENTFORGE_SERVER).toBe("1");
     expect(env.AGENTFORGE_SECRETS_KEY).toBeUndefined();
-    expect(Object.keys(env)).not.toContain("AGENTFORGE_DATA_DIR");
+    expect(env.ANYTHING_ELSE).toBeUndefined();
     // The loader's disk cache would demand an fs write grant the child does not have.
     expect(env.TSX_DISABLE_CACHE).toBe("1");
   });

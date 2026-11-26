@@ -217,9 +217,12 @@ export async function extractFile(input: ExtractFileInput, options: ExtractFileO
   }
   const gate = options.nativeGate ?? nativeGate;
   try {
+    // The gate deadline is a backstop only: the child's own timer (`timeoutMs`) kills the process
+    // first, so a timed-out parse frees its slot only after the dead child has settled. Without the
+    // margin the slot would be handed back while a parser is still running.
     return await gate.run(
       () => parseFileInChild({ bytes: input.bytes, filename: input.filename, timeoutMs }),
-      timeoutMs,
+      timeoutMs + 30_000,
     );
   } catch (error) {
     if (error instanceof ParseChildUnavailableError) {
