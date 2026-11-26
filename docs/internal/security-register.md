@@ -7612,3 +7612,77 @@ extract and render; a playlist, a concat script and a metadata file are refused;
   or an address, because the whitelist is `file` only and uploads are stored per tenant. The gate refuses the format
   at the probe, so this stays closed unless detection differs between the probe and the run. Do not remove the gate
   as redundant.
+
+### SR-215 {#sr-215}
+
+**The read-only SQL guard missed relationless server-side reads.** Raised by Devin Review on the F1
+data-sources PR (2026-11-26). High. **Fixed in this change** (commit 7862d5fe).
+
+Evidence before the fix: `packages/host/src/data-sources/sql-guard.ts` enforced single-statement SELECT +
+read-only transaction + a FROM/JOIN table allowlist, but functions like `pg_read_file(...)`,
+`pg_ls_dir(...)`, `dblink(...)`, `pg_logical_slot_get_changes(...)` and `http_get(...)` return rows without
+naming a relation, so a query like `SELECT pg_read_file('/etc/passwd')` passed every check and read outside
+the table allowlist.
+
+Fix: the guard's FORBIDDEN set now names the server-side read functions (`pg_read_file`,
+`pg_read_binary_file`, `pg_ls_dir`, `pg_stat_file`, `pg_ls_*` catalog variants, `pg_export_snapshot`, the
+`dblink_*` family, replication-slot functions, `pg_logical_slot_*_changes`, and the `http*` extension
+functions). `sql-guard.test.ts` adds a refusal case for each class. Catalog views were already covered by the
+FROM/JOIN allowlist.
+
+Gate: closed — the function names are refused before the query reaches Postgres.
+
+### SR-216 {#sr-216}
+
+**Destination allowlist lookups ignored the tenant.** Raised by Devin Review on the F1 data-sources PR
+(2026-11-26). High. **Fixed in this change** (commit c4a00e13).
+
+Evidence before the fix: `installDestinationAllowlist` in `packages/host/src/data-sources/allowlist.ts`
+matched `host`+`port` without `tenant_id`, so one tenant's approved destination allowed every tenant's
+connector to reach it.
+
+Fix: `DestinationAllowlist` (`packages/core/src/security/safe-fetch.ts`) and `assertAllowedDestination`
+take the caller's `tenantId` and fail closed without one; the host reader scopes the row lookup by
+`tenant_id`; S3 and Postgres connectors pass their row's tenant. `handlers/data-sources.test.ts` adds a
+cross-tenant refusal case.
+
+Gate: closed — a tenant cannot reach another tenant's approved destination.
+
+### SR-217 {#sr-217}
+
+**`secretLast4` returned short secrets whole.** Raised by Devin Review on the F1 data-sources PR
+(2026-11-26). Medium. **Fixed in this change** (commit 7862d5fe).
+
+Evidence before the fix: `packages/host/src/data-sources/store.ts` returned `raw.slice(-4)`, which is the
+entire secret when it is four characters or shorter — the list endpoint then exposed it.
+
+Fix: secrets of ≤4 characters return a fixed `••••` mask; longer ones still show their last four.
+
+Gate: closed — no response body can carry a whole stored credential.
+
+### SR-218 {#sr-218}
+
+**Data-source sync skipped the injection scan and PII masking.** Raised by Devin Review on the F1
+data-sources PR (2026-11-26). Medium. **Fixed in this change** (commit 7862d5fe).
+
+Evidence before the fix: `syncDataSource` (`packages/host/src/data-sources/sync.ts`) indexed parsed text
+straight into the knowledge base, while manual uploads through `knowledge.ts` run `injectionRule` (prompt
+injection / secret-shaped content) and `maskPii` first — so a hostile or sensitive file pulled from a
+connected source bypassed both gates.
+
+Fix: sync runs `injectionRule(tenant, key, text)` per object (a hit counts the file failed with
+`injection_blocked`) and indexes `maskPii(text)`, matching the manual-upload path.
+
+Gate: closed — synced content gets the same gates as an upload.
+
+### SR-219 {#sr-219}
+
+**Synced objects shared one knowledge origin, so only the last file survived.** Raised by Devin Review on
+the F1 data-sources PR (2026-11-26). Low (correctness; listed here because it was raised as a finding on a
+security-adjacent change). **Fixed in this change** (commit 7862d5fe).
+
+Evidence: `syncDataSource` used `origin: { kind: "data_source", id: row.id }` for every object; the
+unique-origin index in `knowledge.ts` folds rows sharing `origin_kind`/`origin_id`, deleting the previous
+row each write.
+
+Fix: each object gets `id: "<row.id>/<object.key>"`, so files coexist in the knowledge base.
