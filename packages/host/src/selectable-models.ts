@@ -434,13 +434,19 @@ export async function refreshModelCache(
   const now = new Date().toISOString();
   const registryPromise = refreshModelsDevRegistry(fetch, { force: options.forceRegistry === true });
 
+  // The bearer and the base URL resolve as a pair: inside an assigned-endpoint scope the key is
+  // the portal-issued one (never the company key, and no probe at all when none was issued);
+  // elsewhere it is the stored or env key (DFIND-155).
+  const resolved = resolveProviderKeys(settings);
+  const openaiUrl = resolved.openaiBaseUrl || DEFAULT_OPENAI_BASE_URL;
+
   // Stub desks (no key, default gateway) never call out: there is nothing to list.
-  if (settings.openaiApiKey || hasCustomGateway(settings)) {
+  if (resolved.openai || hasCustomGateway(settings)) {
     const catalogPromise = fetchPricingWithMedia();
     try {
       const detected = await detectCompatibleApi({
-        url: resolveProviderKeys(settings).openaiBaseUrl || DEFAULT_OPENAI_BASE_URL,
-        apiKey: settings.openaiApiKey,
+        url: openaiUrl,
+        apiKey: resolved.openai,
       });
       putModels(next, detected.dialect, detected.models, now);
       next.detectedDialect = detected.dialect;
