@@ -43,10 +43,10 @@ export const LOGOUT_PATH = "/api/v1/auth/logout";
 
 export type SessionStatus = "unknown" | "signed-out" | "signed-in" | "unavailable";
 
-/** The role the host holds for the person (`GET /api/v1/auth/session`), the portal's three words. */
-export type SessionRole = "owner" | "admin" | "member";
+/** The role the host holds for the person (`GET /api/v1/auth/session`), the portal's four words. */
+export type SessionRole = "owner" | "admin" | "member" | "auditor";
 
-const SESSION_ROLES: readonly SessionRole[] = ["owner", "admin", "member"];
+const SESSION_ROLES: readonly SessionRole[] = ["owner", "admin", "member", "auditor"];
 
 /** Exactly what `sessionSummary` returns (`packages/host/src/auth/session.ts`). No token, ever. */
 export type SessionIdentity = {

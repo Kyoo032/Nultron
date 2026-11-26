@@ -29,7 +29,8 @@ import { requireLegalLive } from "./legal/legal-model";
 import type { LegalMatterRecord, LegalRunArtifact, LegalRunRecord } from "./legal/records";
 import { runLegalMatter } from "./legal/run";
 import { legalStore, requireLegalMatter } from "./legal/store";
-import { listSelectableModels, modeDefaultsFor } from "./selectable-models";
+import { modeDefaultsFor } from "./selectable-models";
+import { allowanceFor, catalogFor } from "./model-allowance";
 import { localeForRun } from "./run-context";
 import { artifactWorkCard } from "./work-cards";
 import { log } from "./log";
@@ -125,7 +126,7 @@ export function answeredLegalModels(models: LegalModels, answeredFor: Readonly<R
 }
 
 function resolveModels(body: LegalRunBody, tenant: TenantContext): LegalModels {
-  const catalog = listSelectableModels(tenant);
+  const catalog = catalogFor(tenant, allowanceFor(tenant));
   const defaults = modeDefaultsFor(tenant);
   return {
     drafting: resolveChatModel(body.model, defaults.legal, catalog),

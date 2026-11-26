@@ -61,7 +61,8 @@ import { ensureToolsRegistered } from "./register-tools";
 import { formatTeamSessionsPrompt } from "./delegation/session-store";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
-import { defaultSelectableModel, listSelectableModels, toolMediaModels } from "./selectable-models";
+import { defaultSelectableModel, toolMediaModels } from "./selectable-models";
+import { allowanceFor, catalogFor } from "./model-allowance";
 import { nextTierModel, resolveTierRun } from "./tier-resolve";
 import { markJobModelDown, maySwapModel, pickNext, startModel } from "./job-model-fallback";
 import { readModelPinned } from "./job-regen";
@@ -217,7 +218,9 @@ export async function prepareChatRun(options: {
     throw new ApiError("not_found", "Thread not found", 404);
   }
   const published = await agentService.getPublishedForRun(options.tenant, thread.agentId);
-  const catalog = listSelectableModels(options.tenant);
+  // F8d: the tenant's model allowlist bounds both the host's pick and a `model` the body names —
+  // a pick outside it answers `unknown_model`, the same refusal as any model not on the catalog.
+  const catalog = catalogFor(options.tenant, allowanceFor(options.tenant));
   const defaultChat = isDefaultChatAgent(published.agent);
   // Tester code: a mode agent's conversation. Its prompt, tools and budget come from the registry in
   // code, never from the agent row (`./virtual-agents.ts`). Null for Chat and for an agent a person built.

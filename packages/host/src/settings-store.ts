@@ -133,6 +133,11 @@ function normalizeSecrets(parsed: StoredSecrets): StoredSecrets {
     researchGenModel: readString(parsed.researchGenModel),
     presentationGenModel: readString(parsed.presentationGenModel),
     disabledTools,
+    modelAllowlist: Array.isArray(parsed.modelAllowlist)
+      ? parsed.modelAllowlist
+          .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+          .map((item) => item.trim())
+      : undefined,
     editTurnCapUsd:
       typeof parsed.editTurnCapUsd === "number" && Number.isFinite(parsed.editTurnCapUsd)
         ? Math.min(50, Math.max(0.5, parsed.editTurnCapUsd))

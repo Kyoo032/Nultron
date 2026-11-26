@@ -22,6 +22,7 @@ import { AgentsShell } from "@/components/agents-shell";
 import { DashboardPage, DashboardStudioKeepAlive, isDashboardStudioId } from "@/components/dashboard-page";
 import { SettingsPage } from "@/components/settings-page";
 import { SettingsShell } from "@/components/settings-shell";
+import { UsersRolesPage } from "@/components/settings-users-roles";
 import { UsagePage } from "@/components/usage-page";
 import { VirtualAgentsPage } from "@/components/virtual-agents-page";
 import { TeamPage } from "@/components/team-page";
@@ -466,6 +467,16 @@ export function AppRoutes() {
               element={
                 <DeskPane>
                   <KnowledgePage />
+                </DeskPane>
+              }
+            />
+            <Route
+              path="/users"
+              element={
+                <DeskPane>
+                  <SettingsShell>
+                    <UsersRolesPage />
+                  </SettingsShell>
                 </DeskPane>
               }
             />

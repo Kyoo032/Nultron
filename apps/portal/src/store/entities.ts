@@ -22,7 +22,7 @@ export type TenantStatus = "active" | "suspended";
 export type OrgStatus = "active" | "past_due" | "suspended";
 export type OrgPlan = "free" | "business" | "enterprise";
 export type UserStatus = "invited" | "active" | "disabled";
-export type UserRole = "owner" | "admin" | "member";
+export type UserRole = "owner" | "admin" | "member" | "auditor";
 export type DeviceStatus = "active" | "revoked";
 export type DevicePlatform = "windows" | "macos" | "linux" | "android" | "ios" | "web";
 /** `redeemed` is terminal. `device-code-login.md` is explicit that there is no `consumed`. */

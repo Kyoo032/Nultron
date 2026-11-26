@@ -37,6 +37,7 @@ import {
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
 import { log } from "../log";
 import { WHATSAPP_WEBHOOK_PATH } from "../inbox/webhook-path";
+import { recordTenantModelAllowlist } from "../model-allowance";
 import {
   createPortalSessionCheck,
   faultOf,
@@ -548,6 +549,9 @@ export function createAuthRoutes(deps: AuthRouteDeps): AuthRoutes {
       gatewayEndpoint: tokens.gatewayEndpoint,
       now,
     });
+    // The tenant's model allowlist arrives beside the token; a portal that sends none (`null`)
+    // leaves the desk's own setting governing instead.
+    recordTenantModelAllowlist(tokens.tenantId, tokens.modelAllowlist);
     // The row and its sealed refresh token in one insert; the access token only in process memory.
     await deps.store.create(session, sealForSignIn(session, tokens));
     await deps.vault.put(session.id, {

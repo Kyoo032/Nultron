@@ -247,7 +247,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-211](#sr-211) | High | A live voice session could leak the desk's gateway key to the browser | `fixed-unverified`, not hosted (2026-11-10, `tester`; rewritten from the code 2026-11-11): `createVoiceModels` reads the key on the host and puts it only in the `Authorization` header of the two gateway calls; H1 answers `{ sessionId, threadId, model, streamPath, endsAt }`; the test "keeps the gateway key out of every log line, frame, response, saved row and ledger row" (`packages/host/src/voice/relay.test.ts:1466-1595`) fails if it shows up anywhere else; built on `tester`, not merged to `main`, never run on the hosted server | Merge of voice from `tester` to `main` |
 | [SR-212](#sr-212) | Medium | A spoken, or misheard, request could make the voice thinker write a file, send something, spend money or start long work | `fixed-unverified`, not hosted (2026-11-10, `tester`; rewritten from the code 2026-11-11): the thinker is offered only the tools on `VOICE_READ_TOOLS` and `VOICE_DELEGATE_TOOLS` plus `request_tap`; a `request_tap` call stops the run and returns a card, and the tap ends voice and sends a normal Chat turn. `web_search` and `web_fetch` are on the list, behind the same outbound guard as Chat; whether voice may reach the web is Rizky's open decision V12. Since 2026-11-20 `delegate` itself runs from voice because the run it starts is already fenced — no picture or clip tools, the desk's files only and never the owner's folder, a tainted egress guard, its own budget and the worker ceiling — while every generalist worker stays tap-only. Built on `tester`, not merged to `main`, never run on the hosted server | Merge of voice from `tester` to `main`; V12 |
 | [SR-213](#sr-213) | Low | An aborted talker stream reports no usage, so the host writes no row for it, and audio has no list price, so its seconds rows are unpriced | Open, accepted for week one (2026-11-10, `tester`; rewritten from the code 2026-11-11): voice writes token rows and seconds rows under mode `voice` and the thinker's tokens under mode `chat`; a cut or abandoned talker reply, the short-speech check and the acknowledgement call write nothing; seconds rows carry `no_list_price` | An audio list price in `media-pricing.ts` and a rule for aborted calls, before any allowance or bill counts voice |
-| [SR-214](#sr-214) | Medium | A bucket writer could re-offer one desk's valid archive under another desk's name and `restore.sh` would overwrite the named desk with it | Fixed in PR #285 (2026-11-26): `backup.sh` embeds `backup-meta.json` (`{"desk","createdAt"}`) in every archive before tarring, and `restore.sh` reads the desk id from that member and refuses a mismatch with `--desk` or the filename; a run pinned by `COMPOSE_PROJECT_NAME`/`-p` refuses any desk outside the pin. Unit-tested (`webapp-deploy/scripts/backup-restore.test.mjs`), not driven on a real server | — |
+| [SR-215](#sr-215) | Medium | A bucket writer could re-offer one desk's valid archive under another desk's name and `restore.sh` would overwrite the named desk with it | Fixed in PR #285 (2026-11-26): `backup.sh` embeds `backup-meta.json` (`{"desk","createdAt"}`) in every archive before tarring, and `restore.sh` reads the desk id from that member and refuses a mismatch with `--desk` or the filename; a run pinned by `COMPOSE_PROJECT_NAME`/`-p` refuses any desk outside the pin. Unit-tested (`webapp-deploy/scripts/backup-restore.test.mjs`), not driven on a real server | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -4670,8 +4670,8 @@ a wrapper, not an engine limit.** Both products. Raised by the sandbox lane (202
 Evidence: the Python child replaces `process.binding` with a function that answers `constants` from
 `fs.constants` and `os.constants` (`packages/host/src/code-runner/child/py-child.mjs:31-33`), because
 the NODEFS start-up calls it and `--permission` denies it. It also wraps
-`WebAssembly.Memory.prototype.grow` to throw past the cap (`:37-42`; `PY_WASM_MAX_MB` is 512,
-`packages/host/src/code-runner/limits.ts:21`), because Pyodide defines its own memory and Node's
+`WebAssembly.Memory.prototype.grow` to throw past the cap (`:37-42`; `PY_WASM_MAX_MB` is 256,
+`packages/host/src/code-runner/limits.ts:27`), because Pyodide defines its own memory and Node's
 `resourceLimits` do not cover wasm. Both rest on how Emscripten and Pyodide 314.0.7 behave today
 (`vendor/sandbox-runtime/MANIFEST.json`, key `pyodide`). A `memory.grow` instruction executed inside
 wasm never passes through the JavaScript wrapper. I did not look for a route by which a guest can supply
@@ -4719,15 +4719,20 @@ Gate: none.
 **Two busy Python children can take a large share of the hosted app's memory limit, and an out-of-memory
 kill may take the host with them.** Enterprise. Raised by the sandbox lane (2026-10-03). Open.
 
-Evidence: the wasm cap is 512 MB and the child's V8 old space is capped at 256 MB
-(`packages/host/src/code-runner/limits.ts:21`, `:27`); the prototype measured 300 to 700 MB resident for a
-Python child. Hosted allows 2 warm children in all and 2 runs at once, 1 per tenant
-(`HOSTED_WARM_TOTAL`, `HOSTED_MAX_RUNS`, `HOSTED_MAX_RUNS_PER_TENANT`, `limits.ts:50`, `:54-55`;
+Evidence: the wasm cap was 512 MB and the child's V8 old space was capped at 256 MB
+(`packages/host/src/code-runner/limits.ts`); the prototype measured 300 to 700 MB resident for a
+Python child. Hosted allowed 2 warm children in all and 2 runs at once, 1 per tenant
+(`HOSTED_WARM_TOTAL`, `HOSTED_MAX_RUNS`, `HOSTED_MAX_RUNS_PER_TENANT`;
 `createCodeLimiter`, `packages/host/src/code-runner/code-limiter.ts:60-63`), and an operator can raise
-the global caps with `AGENTFORGE_MAX_CODE_RUNS` (`limits.ts:57`). The children share the app container's
+the global caps with `AGENTFORGE_MAX_CODE_RUNS`. The children share the app container's
 memory limit with the host: 6 GB in compose (`webapp-deploy/compose.yml:122`) and 3 GiB in the Kubernetes
 pod (`webapp-deploy/k8s/base/app.yaml:72`). Two children at the top of the measurement take about 1.4 GB
 before the host's own use.
+
+Update 2026-11-26 (DFIND-166): the caps were shrunk so one sandboxed run fits inside a 768 MiB desk —
+Python wasm 256 MB, JavaScript wasm 128 MB and heap 64 MB, child old space 128 MB, hosted keeps 1 warm
+child and 1 run (`limits.ts:27-33`, `:59`, `:63-64`). One Python child is about 430 MB worst case, which
+leaves the host 300+ MB. Raising `AGENTFORGE_MAX_CODE_RUNS` on a 768 MiB desk re-opens this finding.
 
 What goes wrong if ignored: at the limit the kernel's out-of-memory killer picks a process in the
 container. If it picks the host, every tenant's request fails until the container restarts. The default
@@ -7259,6 +7264,15 @@ Residual: any allowance or bill that counts `voice` rows undercounts, and no sec
 Gate: none for week one (voice is Rizky's only); before customer voice or any allowance counts voice, give audio a list price in `media-pricing.ts` and decide a rule for aborted calls.
 
 ### SR-214 {#sr-214}
+
+**The OPC `auditor` role and the tenant model allowlist (F8a/F8d) — built 2026-11-26, branch `devin/1795686920-opc-auditor-allowlist`; in the tree, not deployed.** Informational control entry, not a finding.
+
+- **Role gate in one place.** `routeGate` + `roleDenied` (`packages/host/src/role-policy.ts`), evaluated in `dispatch` (`packages/host/src/router.ts`) before the handler on every non-session-exempt `/api/v1/*` route, server mode only. Classes: `administer` (mutations to agents, data sources, keys, channels, settings — owner/admin), `audit` (owner/auditor), `auditor-read` (the auditor's explicit allowlist), `read`, `agents` (auditor refused). Denials are one `403 forbidden` shape. Pinned by `packages/host/src/role-matrix.test.ts`, which dispatches every registered route as each of the four roles.
+- **Auditor reach.** Auditor reads only ping, auth session/logout/refresh, usage, storage/usage, workspaces, organizations, settings GET, billing plan/plans and health; a thread's messages, any run and any mutation are refused. Provisioned through `ensurePortalOwner`; the portal widens `users_role_chk` and `invites_role_chk` in `migrations/0015_auditor_role.sql` and accepts `auditor` in the `invite`/`account` CLIs.
+- **Model allowlist.** `model_allowlist` travels in the `POST /auth/token` body (`apps/portal/src/flows/token.ts`, from `tenant_config.model_allowlist`); the host holds it per tenant in memory (`packages/host/src/model-allowance.ts`) — no host migration. A `null` body field never clears a list an older token carried. Off-portal, the desk's `modelAllowlist` setting is the fallback (`mergeSecrets`). Empty or absent keeps allow-everything.
+- **Residual.** The gate resolves the tenant through `getTenant` per request; a session whose membership cannot resolve skips the check and the handler answers with its own tenancy error (the pre-gate behaviour, kept so unprovisioned test identities behave as before).
+
+### SR-215 {#sr-215}
 
 **A bucket writer could re-offer one desk's valid archive under another desk's name, and restore.sh would overwrite the named desk with it.**
 Raised 2026-11-26 by an independent review of PR #285 (the per-desk F12 backup change). Medium. Status: fixed in the same PR.

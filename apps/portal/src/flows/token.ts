@@ -37,7 +37,7 @@ export interface TokenResponseBody {
   readonly org_id: string;
   readonly tenant_id: string;
   /**
-   * The member's role in their org: `owner | admin | member`. The host provisions a first-time
+   * The member's role in their org: `owner | admin | member | auditor`. The host provisions a first-time
    * sign-in's membership from it and must not default to `owner` when it is absent. Read from the
    * member's row at every mint and every refresh, so a role the operator changed arrives with the
    * next token.
@@ -49,6 +49,12 @@ export interface TokenResponseBody {
    * endpoint updates reach the host automatically and cannot be overridden by regular users.
    */
   readonly gateway_endpoint: string | null;
+  /**
+   * The tenant's model allowlist (`tenant_config.model_allowlist`), read on every mint and
+   * refresh so a change reaches the host with the next token. An empty array keeps the host's
+   * default of allowing every model; the field is always present so an emptied list propagates.
+   */
+  readonly model_allowlist: readonly string[];
 }
 
 export type TokenResult =
@@ -179,6 +185,7 @@ export async function mintSession(
   const config = await ops.tenantConfig.get(input.tenantId);
   const scope = scopeFor(config?.featureFlags);
   const { role, gatewayEndpoint } = await userClaimsOf(ops, input.userId);
+  const modelAllowlist = config?.modelAllowlist ?? [];
 
   const session = await ops.sessions.create({
     tenantId: input.tenantId,
@@ -233,6 +240,7 @@ export async function mintSession(
       tenant_id: input.tenantId,
       role,
       gateway_endpoint: gatewayEndpoint,
+      model_allowlist: modelAllowlist,
     }),
   };
 }
@@ -338,6 +346,7 @@ export async function exchangeRefreshToken(
     const config = await ops.tenantConfig.get(rotated.tenantId);
     const scope = scopeFor(config?.featureFlags);
     const { role, gatewayEndpoint } = await userClaimsOf(ops, rotated.userId);
+    const modelAllowlist = config?.modelAllowlist ?? [];
 
     await ops.audit.append({
       tenantId: rotated.tenantId,
@@ -378,6 +387,7 @@ export async function exchangeRefreshToken(
         tenant_id: rotated.tenantId,
         role,
         gateway_endpoint: gatewayEndpoint,
+        model_allowlist: modelAllowlist,
       }),
     };
   });

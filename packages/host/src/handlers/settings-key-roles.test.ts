@@ -261,10 +261,15 @@ describe("what a member can still change", () => {
     expect(response.body.savedLocale).toBe("id");
   });
 
-  it("saves a setting that is not a key", async () => {
-    const response = await save("member", { editTurnCapUsd: 4 });
+  it("is refused a setting that is shared, not personal", async () => {
+    // `editTurnCapUsd` is the company's cap: on the hosted server only an owner or admin writes it,
+    // and the refusal is whole — a `locale` riding along in the same request is not saved either.
+    const response = await save("member", { editTurnCapUsd: 4, locale: "id" });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(403);
+    expect(errorOf(response).code).toBe(FORBIDDEN_CODE);
+    expect(store.loadUserLocale(people.get("member") as TenantContext)).not.toBe("id");
+    expect(store.loadSettings(people.get("owner") as TenantContext).editTurnCapUsd).not.toBe(4);
   });
 
   it("is not refused for the blank key the Settings page echoes on every save", async () => {
@@ -272,7 +277,7 @@ describe("what a member can still change", () => {
     // (`keyFieldValue`), so it writes nothing and a member's ordinary save must not turn into a 403.
     await ownerHasSaved();
     for (const blank of ["", "   "]) {
-      const response = await save("member", { openaiApiKey: blank, locale: "id", editTurnCapUsd: 3 });
+      const response = await save("member", { openaiApiKey: blank, locale: "id" });
       expect(response.status, JSON.stringify(blank)).toBe(200);
     }
     expect(companyKey()).toBe(KEY);

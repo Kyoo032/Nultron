@@ -7,7 +7,7 @@
  * claim nobody reads and a byte of token nobody asked for.
  *
  * One claim has been added since, on the owner's instruction (2026-10-01): `role`, the member's role
- * in their org (`owner | admin | member`). The host provisions the person's own role from it instead
+ * in their org (`owner | admin | member | auditor`). The host provisions the person's own role from it instead
  * of guessing one -- it used to give `owner` to every first-time sign-in, so any colleague could
  * erase the company. The gateway ignores claims it does not know; the host reads it from the token
  * response body, which carries the same value.
