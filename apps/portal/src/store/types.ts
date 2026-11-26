@@ -150,7 +150,7 @@ export interface PortalOps {
     /** The one place a role changes after the member exists. Only the operator's tool calls it. */
     setRole(id: string, role: UserRole): Promise<User | null>;
     /** Operator-only per-user API gateway endpoint assignment (`null` reverts to default pinned gateway). */
-    setGatewayEndpoint(id: string, gatewayEndpoint: string | null): Promise<User | null>;
+    setGatewayEndpoint(id: string, gatewayEndpoint: string | null, gatewayKeySealed?: string | null): Promise<User | null>;
     /**
      * Members who hold `owner` and are not disabled, invited ones included: a tenant needs one.
      * **Locks those rows** (`FOR UPDATE`) until the transaction ends, so two operators cannot each

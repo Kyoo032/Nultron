@@ -34,7 +34,11 @@ import { log } from "../log";
 import { chatHistoryFromRows, prepareChatRun } from "../runs";
 import { activeRuns, admitRun, runCapsFromEnv } from "../run-limits";
 import { withRunContext } from "../run-context";
-import { currentAssignedGatewayEndpoint, withAssignedGatewayEndpoint } from "../gateway-endpoint-scope";
+import {
+  currentAssignedGatewayEndpoint,
+  currentAssignedGatewayKey,
+  withAssignedGatewayEndpoint,
+} from "../gateway-endpoint-scope";
 import { toolMediaModels } from "../selectable-models";
 import { listMessages } from "../threads";
 import { withToolRun } from "../tool-run-context";
@@ -353,13 +357,15 @@ export async function askNultron(input: AskInput, options: AskOptions = {}): Pro
       // reaches it, and a `delegating` phase goes to the relay's caption. Everything else is ignored.
       // Each agent once: a delegation re-sends its phase on every heartbeat, and parallel ones interleave.
       const announced = new Set<string>();
-      await withAssignedGatewayEndpoint(tenant.gatewayEndpoint ?? currentAssignedGatewayEndpoint(), () =>
-        withToolRun({ runId, mode: prepared.agentPolicy ? prepared.agentPolicy.agent.id : "chat" }, () =>
-          withRunContext({ threadId: prepared.thread.id, agentId: prepared.thread.agentId, locale, voice: true }, () =>
-            runOutboundGuarded(outbound, () =>
-              withWorkerChannel(
-                {
-                  emit: (_toolKey, job) => {
+      await withAssignedGatewayEndpoint(
+        tenant.gatewayEndpoint ?? currentAssignedGatewayEndpoint(),
+        () =>
+          withToolRun({ runId, mode: prepared.agentPolicy ? prepared.agentPolicy.agent.id : "chat" }, () =>
+            withRunContext({ threadId: prepared.thread.id, agentId: prepared.thread.agentId, locale, voice: true }, () =>
+              runOutboundGuarded(outbound, () =>
+                withWorkerChannel(
+                  {
+                    emit: (_toolKey, job) => {
                     if (job.type === "job.phase" && job.phase === "delegating" && !announced.has(job.label)) {
                       announced.add(job.label);
                       input.onProgress?.(job.label, "delegate");
@@ -388,7 +394,9 @@ export async function askNultron(input: AskInput, options: AskOptions = {}): Pro
               ),
             ),
           ),
-        ),
+          ),
+        // The key pairs with whichever endpoint won: the tenant's own or the request scope's (DFIND-155).
+        tenant.gatewayEndpoint != null ? (tenant.gatewayEndpointKey ?? null) : currentAssignedGatewayKey(),
       );
     })().catch((error: unknown) => {
       state.failed = true;

@@ -1,5 +1,5 @@
 import { guessDialectFromKey } from "./models/probe";
-import { resolvedGatewayBaseUrl } from "./gateway";
+import { assignedGatewayEndpoint, assignedGatewayKey, resolvedGatewayBaseUrl } from "./gateway";
 import { keyFingerprintOrNull } from "./security/fingerprint";
 import { maskToolKeys } from "./tools/credentials";
 import { providerBaseUrl } from "./providers/registry";
@@ -337,6 +337,9 @@ export function hasLiveProvider(settings: StoredSecrets, env: EnvLike = process.
       settings.googleApiKey ||
       settings.anthropicApiKey ||
       settings.volcengineApiKey ||
+      // An operator-assigned endpoint with a sealed key the portal issued is a live provider even
+      // when the desk stores no BYO key of its own (DFIND-155).
+      (assignedGatewayEndpoint() && assignedGatewayKey()) ||
       (honoursBaseUrls && (settings.anthropicBaseUrl || settings.volcengineBaseUrl)),
   );
 }
@@ -370,12 +373,19 @@ export function resolveProviderKeys(
 } {
   // In server mode nothing here may come from the process environment; see the note above.
   const fallback = providerEnv(env);
-  const openai = settings.openaiApiKey || fallback.OPENAI_API_KEY || undefined;
+  // DFIND-155: inside a scope bound to an operator-assigned endpoint, the bearer is the sealed
+  // per-endpoint key the portal issued — never the company key. No key issued means `undefined`,
+  // which the gate reports as needs_key instead of falling back to settings.
+  const openai = assignedGatewayEndpoint()
+    ? assignedGatewayKey() || undefined
+    : settings.openaiApiKey || fallback.OPENAI_API_KEY || undefined;
   // Pinned endpoint: neither the stored value nor OPENAI_BASE_URL can re-point the gateway.
   const openaiBaseUrl = resolvedGatewayBaseUrl();
   const openaiKeyDialect = openai ? guessDialectFromKey(openai) : undefined;
+  // An issued endpoint key is sealed for its assigned gateway and is never borrowed for a
+  // different provider's host, however its string happens to be shaped (DFIND-155).
   const reuseOpenAI = (dialect: "anthropic" | "google" | "volcengine") =>
-    openaiKeyDialect === dialect ? openai : undefined;
+    !assignedGatewayEndpoint() && openaiKeyDialect === dialect ? openai : undefined;
 
   const google = settings.googleApiKey || fallback.GOOGLE_GENERATIVE_AI_API_KEY || reuseOpenAI("google");
   const anthropic = settings.anthropicApiKey || fallback.ANTHROPIC_API_KEY || reuseOpenAI("anthropic");

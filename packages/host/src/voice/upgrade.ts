@@ -184,12 +184,18 @@ async function accept(
           // The cookie name follows the mode the rules above ran in, not a second read of the environment.
           serverMode,
         });
+        // The issued key is opened per request like the router's gate does, bound to the
+        // endpoint this session uses (DFIND-155); without it a voice upgrade 403s on its own key.
+        const gatewayEndpointKey = record.gatewayEndpoint
+          ? await (options.sessionStore ?? hostSessionStore()).readEndpointKey(record.id, record.gatewayEndpoint)
+          : null;
         request.session = {
           id: record.id,
           tenantId: record.tenantId,
           orgId: record.orgId,
           userId: record.userId,
           ...(record.gatewayEndpoint ? { gatewayEndpoint: record.gatewayEndpoint } : {}),
+          gatewayEndpointKey,
         };
       } catch (error) {
         refuse(socket, { status: 401, code: error instanceof ApiError ? error.code : "session_invalid" }, context);
@@ -215,16 +221,24 @@ async function accept(
       return;
     }
     try {
-      withAssignedGatewayEndpoint(tenant.gatewayEndpoint ?? null, () => requireGatewayAllowedFor(tenant));
+      withAssignedGatewayEndpoint(
+        tenant.gatewayEndpoint ?? null,
+        () => requireGatewayAllowedFor(tenant),
+        tenant.gatewayEndpointKey ?? null,
+      );
     } catch {
       refuse(socket, { status: 403, code: "gateway_blocked" }, context);
       return;
     }
     sockets.handleUpgrade(req, socket, head, (ws) => {
-      withAssignedGatewayEndpoint(tenant.gatewayEndpoint ?? null, () => {
-        const relay = new VoiceRelay(ws, voice);
-        void relay.start();
-      });
+      withAssignedGatewayEndpoint(
+        tenant.gatewayEndpoint ?? null,
+        () => {
+          const relay = new VoiceRelay(ws, voice);
+          void relay.start();
+        },
+        tenant.gatewayEndpointKey ?? null,
+      );
     });
   } catch {
     refuse(socket, { status: 401, code: "session_invalid" }, context);

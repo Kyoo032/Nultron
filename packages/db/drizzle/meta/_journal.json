@@ -176,6 +176,13 @@
       "when": 1788820000017,
       "tag": "0024_inbox_active_endpoint",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1788820000018,
+      "tag": "0025_auth_session_endpoint_mac",
+      "breakpoints": true
     }
   ]
 }

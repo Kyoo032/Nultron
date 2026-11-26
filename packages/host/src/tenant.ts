@@ -112,7 +112,7 @@ async function resolveFromSession(session: HostSession, preferredWorkspaceId?: s
     throw new ApiError(resolution.code, FAILURE_MESSAGE[resolution.code], FAILURE_STATUS[resolution.code]);
   }
   return session.gatewayEndpoint
-    ? { ...resolution.tenant, gatewayEndpoint: session.gatewayEndpoint }
+    ? { ...resolution.tenant, gatewayEndpoint: session.gatewayEndpoint, gatewayEndpointKey: session.gatewayEndpointKey ?? null }
     : resolution.tenant;
 }
 

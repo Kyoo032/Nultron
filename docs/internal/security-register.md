@@ -7287,6 +7287,86 @@ Residual: a bucket writer can still swap an archive for an older valid archive o
 
 Gate: none; the fix ships with the per-desk backup change it protects.
 
+### SR-216 {#sr-216}
+
+**A per-user assigned gateway endpoint was sent the company key.** DFIND-155 (Ethan). High.
+Status: `fixed-unverified`, not hosted.
+
+Evidence as it stood: `resolveProviderKeys` (`packages/core/src/secrets.ts`) resolved the tenant's
+saved `openaiApiKey` for every call, including calls bound to a different user's assigned endpoint,
+so a member's endpoint received the organisation's bearer key, and a second member of the same org
+assigned a different endpoint still spent it.
+
+Fix:
+- The portal issues a write-only key per assigned endpoint, sealed in `users.gateway_key_sealed`
+  (`apps/portal/migrations/0018_gateway_endpoint_key.sql`), AES-256-GCM under HKDF over the signing
+  key's DER (`apps/portal/src/gateway-key.ts`), written only by
+  `portal.sh account set-endpoint --key-stdin` — the key arrives on stdin, never as an argument or a
+  URL (`apps/portal/scripts/account.ts`, `apps/portal/src/accounts/args.ts`, 
+  `apps/portal/src/accounts/operations.ts:540-550`). It is emitted to the host only inside that
+  user's `/auth/token` body as `gateway_key`, opened with the portal signing key
+  (`apps/portal/src/flows/token.ts:238`, `:395`, `userClaimsOf` `:249-269`), and only ever beside the
+  endpoint it belongs to.
+- The host seals it per session in `auth_sessions.endpoint_key_sealed` (host migration 0025), opened
+  only as that row's key for that row's MAC-verified endpoint
+  (`packages/host/src/auth/session-secrets.ts`, `session-store.ts:361-382`), read per request at the
+  router gate (`packages/host/src/router.ts:617`) and bound in the same AsyncLocalStorage slot as the
+  endpoint (`packages/host/src/gateway-endpoint-scope.ts`), so a rebound endpoint without its key
+  yields `null` rather than another scope's key.
+- `resolveProviderKeys` (`packages/core/src/secrets.ts`) and the gate's `keyFor`
+  (`packages/host/src/gateway-gate.ts:538-555`) hand an assigned endpoint its issued key only when
+  the live scope binds that same endpoint; no issued key reads `needs_key`, never the company key.
+- A member `POST /api/v1/settings` still cannot set the base URL (`ignoredFields`).
+
+Proof: `packages/host/src/per-user-gateway-endpoint.test.ts` — two users on one host route to their
+own endpoints with issued keys; Org A's company key reaches no endpoint; a member with an assigned
+endpoint and no issued key reports `needs_key` and the endpoint sees nothing; reassignment on refresh
+carries the new endpoint's issued key; the settings override is refused. `apps/portal/src/gateway-key.test.ts`
+seals, opens, and refuses foreign and tampered blobs.
+
+Residual: the key reaches the endpoint it was issued for, which is what it is for; whether the
+gateway operator logs bearer keys is not known from this repo. `migrate-0018` is written for the
+backend team's own migration runner to pick up; the local store honours the column only after the
+file is applied. Voice (`packages/host/src/voice/ask.ts`, `upgrade.ts`) and detached runs
+(`packages/host/src/runs.ts`) bind the same pair.
+
+Gate: Marcus review before merge (secrets and migration paths touched).
+
+### SR-217 {#sr-217}
+
+**`auth_sessions.gateway_endpoint` was unauthenticated plaintext, and a future `portal_checked_at`
+could freeze the portal re-check.** DFIND-160 (Marcus). High. Status: `fixed-unverified`, not hosted.
+
+Evidence as it stood: `auth_sessions.gateway_endpoint` was a raw column. A writer who can reach the
+SQLite file without the vault key — a backup volume, a copied data directory — could repoint a
+tenant's bearer key at an address of their choosing, and `portal_checked_at` written in the future
+would keep the forgery out of the portal's reach forever, because the re-check compares
+`now - checkedAt` against an interval that never closes.
+
+Fix (host migration 0025):
+- `auth_sessions.gateway_endpoint_mac` holds `hmac1:<hex>` = HMAC-SHA256 over `sha256(session id)`
+  + NUL + endpoint under HKDF(`AGENTFORGE_SECRETS_KEY`, `auth-session-endpoint-mac-v1`)
+  (`packages/host/src/auth/session-secrets.ts:114-150`), written beside the endpoint in the same row
+  at sign-in and at every rotation (`packages/host/src/auth/session-store.ts:266`, `:344`).
+- `find` verifies the MAC before trusting the column: a missing or wrong tag drops the endpoint from
+  the record — refused, not trusted — and the session falls back to the pinned gateway
+  (`session-store.ts:294-304`). `readEndpointKey` applies the same check before opening
+  (`session-store.ts:361-380`), so a forged row gets neither the endpoint nor a key.
+- `portalCheckedAt` in the future is treated as due (`packages/host/src/auth/session.ts`,
+  `portalCheckDue`), and the rotation writer resets a stored stamp `> at` to `at`
+  (`session-store.ts:336-337`), so tampering cannot freeze a forged row past the next check.
+- A valid portal-issued endpoint is still used unchanged.
+
+Proof: `packages/host/src/per-user-gateway-endpoint.test.ts` — a `gateway_endpoint` rewritten in
+SQLite without the vault key never becomes the endpoint `checkGatewayLive` calls (the record drops
+it), the sealed key does not open for it, and a `portal_checked_at` set into the future is due.
+`packages/db/src/migrate-0025.test.ts` covers the migration.
+
+Residual: a writer who has both the SQLite file and the vault key can re-MAC a forgery — but the
+vault key is the boundary every sealed value in the product already stands on.
+
+Gate: Marcus review before merge (secrets and migration paths touched).
+
 ## Must be true before the Tencent Cloud deploy
 
 Each line names the row that owns it. A line that cannot be ticked is a reason not to hand out the

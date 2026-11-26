@@ -26,6 +26,8 @@ export {
   normalizeAssignedGatewayEndpoint,
   registerAssignedGatewayEndpointReader,
   assignedGatewayEndpoint,
+  registerAssignedGatewayKeyReader,
+  assignedGatewayKey,
 } from "./gateway/pinned";
 export type { GatewayGateStatus, GatewayGatePayload } from "./gateway/gate-types";
 export { RESET_CONFIRM_WORD, TENANT_ERASE_CONFIRM_WORD } from "./gateway/reset-types";

@@ -226,10 +226,10 @@ export function usersOps(client: PoolClient): PortalOps["users"] {
       const row = first(rows);
       return row ? toUser(row) : null;
     },
-    async setGatewayEndpoint(id, gatewayEndpoint) {
+    async setGatewayEndpoint(id, gatewayEndpoint, gatewayKeySealed = null) {
       const { rows } = await client.query<Row>(
-        `UPDATE users SET gateway_endpoint = $2::text WHERE id = $1 RETURNING *`,
-        [id, gatewayEndpoint],
+        `UPDATE users SET gateway_endpoint = $2::text, gateway_key_sealed = $3::text WHERE id = $1 RETURNING *`,
+        [id, gatewayEndpoint, gatewayKeySealed],
       );
       const row = first(rows);
       return row ? toUser(row) : null;

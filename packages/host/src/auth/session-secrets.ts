@@ -24,12 +24,18 @@
  * wrap key that cannot be read at all is different — a deployment fault, not a verdict on the
  * session — so `createSessionSecrets` lets that throw.
  */
-import { hkdfSync } from "node:crypto";
+import { createHmac, hkdfSync, timingSafeEqual } from "node:crypto";
 import { decryptJson, encryptJson, isEnvelope } from "@agentforge/core";
 import { hashSessionId } from "./session";
 
 /** The HKDF info label. Changing it orphans every stored token: bump the suffix, never edit it. */
 export const REFRESH_SEALING_INFO = "auth-session-refresh-v1";
+/** HKDF info for the key that MACs `auth_sessions.gateway_endpoint` (migration 0025, DFIND-160). */
+export const ENDPOINT_MAC_INFO = "auth-session-endpoint-mac-v1";
+/** HKDF info for the key that seals a session's per-endpoint bearer key (DFIND-155). */
+export const ENDPOINT_KEY_SEALING_INFO = "auth-session-endpoint-key-v1";
+/** Stored MAC format: `hmac1:<lowercase hex>`. */
+const ENDPOINT_MAC_PREFIX = "hmac1:";
 const SEALING_KEY_BYTES = 32;
 const NO_SALT = Buffer.alloc(0);
 const PAYLOAD_VERSION = 1;
@@ -99,6 +105,125 @@ export function openRefresh(sessionIdHash: string, sealed: string, wrapKey: Buff
     return null;
   }
   return { refreshToken: payload.refreshToken, deviceId: payload.deviceId };
+}
+
+/**
+ * HKDF-SHA256(wrapKey, salt = "", info = `auth-session-endpoint-mac-v1`), 32 bytes. A sqlite
+ * writer can rewrite `gateway_endpoint` but cannot forge this tag without the wrap key.
+ */
+export function endpointMacKey(wrapKey: Buffer): Buffer {
+  return Buffer.from(hkdfSync("sha256", wrapKey, NO_SALT, ENDPOINT_MAC_INFO, SEALING_KEY_BYTES));
+}
+
+/** `hmac1:<hex>` — HMAC-SHA256 over `sessionIdHash` + NUL + `endpoint`, or null when no endpoint. */
+export function endpointMac(sessionIdHash: string, endpoint: string | null | undefined, wrapKey: Buffer): string | null {
+  if (!endpoint) {
+    return null;
+  }
+  const tag = createHmac("sha256", endpointMacKey(wrapKey))
+    .update(sessionIdHash, "utf8")
+    .update("\0", "utf8")
+    .update(endpoint, "utf8")
+    .digest("hex");
+  return `${ENDPOINT_MAC_PREFIX}${tag}`;
+}
+
+/** Constant-time check of a stored MAC against the endpoint it claims to cover. Never throws. */
+export function endpointMacVerify(
+  sessionIdHash: string,
+  endpoint: string | null | undefined,
+  stored: string | null | undefined,
+  wrapKey: Buffer,
+): boolean {
+  if (!endpoint) {
+    return true;
+  }
+  const expected = endpointMac(sessionIdHash, endpoint, wrapKey);
+  if (!expected || typeof stored !== "string") {
+    return false;
+  }
+  // Compare on bytes: a stored tag with non-ASCII bytes can share the string length while its
+  // UTF-8 length differs, and timingSafeEqual throws on mismatched lengths — breaking the session
+  // load instead of refusing the tag.
+  const storedBytes = Buffer.from(stored, "utf8");
+  const expectedBytes = Buffer.from(expected, "utf8");
+  if (storedBytes.length !== expectedBytes.length) {
+    return false;
+  }
+  return timingSafeEqual(storedBytes, expectedBytes);
+}
+
+/**
+ * HKDF-SHA256(wrapKey, salt = "", info = `auth-session-endpoint-key-v1`), 32 bytes — seals the
+ * per-endpoint bearer key the portal issued for this session's assigned gateway (DFIND-155).
+ */
+export function endpointKeySealingKey(wrapKey: Buffer): Buffer {
+  return Buffer.from(hkdfSync("sha256", wrapKey, NO_SALT, ENDPOINT_KEY_SEALING_INFO, SEALING_KEY_BYTES));
+}
+
+type SealedEndpointKeyPayload = {
+  readonly v: typeof PAYLOAD_VERSION;
+  readonly sid: string;
+  readonly endpoint: string;
+  readonly key: string;
+};
+
+/** The string stored in `auth_sessions.endpoint_key_sealed`, or null when there is no key. */
+export function sealEndpointKey(
+  sessionIdHash: string,
+  endpoint: string,
+  key: string,
+  wrapKey: Buffer,
+): string {
+  const payload: SealedEndpointKeyPayload = { v: PAYLOAD_VERSION, sid: sessionIdHash, endpoint, key };
+  return JSON.stringify(encryptJson(payload, endpointKeySealingKey(wrapKey)));
+}
+
+function isSealedEndpointKeyPayload(value: unknown): value is SealedEndpointKeyPayload {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    record.v === PAYLOAD_VERSION &&
+    typeof record.sid === "string" &&
+    typeof record.endpoint === "string" &&
+    record.endpoint.length > 0 &&
+    typeof record.key === "string" &&
+    record.key.length > 0
+  );
+}
+
+/**
+ * The bearer key sealed for this row and endpoint, or null for anything else: a corrupt blob, a
+ * foreign row's, a key sealed under a different wrap key, or one sealed for another endpoint —
+ * a blob moved with the endpoint it covers does not open elsewhere. Never throws.
+ */
+export function openEndpointKey(
+  sessionIdHash: string,
+  sealed: string,
+  endpoint: string,
+  wrapKey: Buffer,
+): string | null {
+  let envelope: unknown;
+  try {
+    envelope = JSON.parse(sealed);
+  } catch {
+    return null;
+  }
+  if (!isEnvelope(envelope)) {
+    return null;
+  }
+  let payload: unknown;
+  try {
+    payload = decryptJson<unknown>(envelope, endpointKeySealingKey(wrapKey));
+  } catch {
+    return null;
+  }
+  if (!isSealedEndpointKeyPayload(payload) || payload.sid !== sessionIdHash || payload.endpoint !== endpoint) {
+    return null;
+  }
+  return payload.key;
 }
 
 /** What the auth routes and the portal check hold: seal and open by the cookie's id. */

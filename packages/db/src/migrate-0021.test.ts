@@ -98,6 +98,8 @@ describe("0021 on a fresh database", () => {
       "revoked_at",
       "portal_checked_at",
       "refresh_sealed",
+      "gateway_endpoint_mac",
+      "endpoint_key_sealed",
       "gateway_endpoint",
     ]);
     insertSession(sqlite, "a".repeat(64));

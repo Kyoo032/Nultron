@@ -49,7 +49,10 @@ export async function handleGetContext(request: HostRequest): Promise<HostResult
       .where(eq(organizations.id, tenant.organizationId))
       .limit(1);
     const [workspace] = await db.select().from(workspaces).where(eq(workspaces.id, tenant.workspaceId)).limit(1);
-    return jsonOk({ tenant, organization, workspace });
+    // The issued endpoint key is a server-side secret (DFIND-155): the renderer hears the
+    // endpoint it belongs to, never the key.
+    const { gatewayEndpointKey: _key, ...tenantForBrowser } = tenant;
+    return jsonOk({ tenant: tenantForBrowser, organization, workspace });
   } catch (error) {
     return jsonError(error);
   }

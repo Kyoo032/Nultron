@@ -77,7 +77,11 @@ import { readRetryTurn, turnIsStored } from "./chat-retry";
 import { readMediaPermission } from "./paid-media-body";
 import { saveGeneratedImage, saveGeneratedVideo } from "./media";
 import { getRunContext, hostedRequestLocale, localeForRun, withRunContext } from "./run-context";
-import { currentAssignedGatewayEndpoint, withAssignedGatewayEndpoint } from "./gateway-endpoint-scope";
+import {
+  currentAssignedGatewayEndpoint,
+  currentAssignedGatewayKey,
+  withAssignedGatewayEndpoint,
+} from "./gateway-endpoint-scope";
 import { withToolRun } from "./tool-run-context";
 import type { JobEvent } from "@agentforge/core/jobs";
 import {
@@ -701,13 +705,20 @@ export async function* startModalityRun(options: {
         tainted: hasNonTextUserPart(history) || teamSessionsPrompt.length > 0,
         locale,
       });
+      // The key pairs with whichever endpoint wins: the tenant's own when it names one, else the
+      // request scope's (DFIND-155). Never a mix of one scope's endpoint and another's key.
       const inChatRun = <T>(fn: () => Promise<T>): Promise<T> =>
-        withAssignedGatewayEndpoint(options.tenant.gatewayEndpoint ?? currentAssignedGatewayEndpoint(), () =>
+        withAssignedGatewayEndpoint(
+          options.tenant.gatewayEndpoint ?? currentAssignedGatewayEndpoint(),
+          () =>
           withToolRun({ runId: run.id, mode: agentPolicy ? agentPolicy.agent.id : "chat" }, () =>
             withRunContext({ threadId: thread.id, agentId: thread.agentId, locale }, () =>
               runOutboundGuarded(outbound, () => withWorkerChannel(workerChannel, fn)),
             ),
           ),
+          options.tenant.gatewayEndpoint != null
+            ? (options.tenant.gatewayEndpointKey ?? null)
+            : currentAssignedGatewayKey(),
         );
       const attempt = () =>
         inChatRun(async () => {

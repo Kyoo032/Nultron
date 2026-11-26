@@ -152,9 +152,18 @@ export function createSession(input: {
   };
 }
 
-/** True when the gate should ask the portal again before trusting this session (`./portal-check.ts`). */
+/**
+ * True when the gate should ask the portal again before trusting this session (`./portal-check.ts`).
+ * A stamp in the FUTURE counts as due (DFIND-160): it cannot be a real answer, and letting it stand
+ * would keep an unauthenticated row — e.g. a forged `gateway_endpoint` — out of the portal's reach
+ * forever.
+ */
 export function portalCheckDue(session: SessionRecord, now: number): boolean {
-  return session.portalCheckedAt === null || now - session.portalCheckedAt >= PORTAL_CHECK_INTERVAL_MS;
+  return (
+    session.portalCheckedAt === null ||
+    session.portalCheckedAt > now ||
+    now - session.portalCheckedAt >= PORTAL_CHECK_INTERVAL_MS
+  );
 }
 
 /**

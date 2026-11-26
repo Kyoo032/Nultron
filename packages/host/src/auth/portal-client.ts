@@ -97,6 +97,12 @@ export type PortalTokens = {
    */
   readonly gatewayEndpoint: string | null;
   /**
+   * The write-only bearer key the operator set for `gatewayEndpoint`, delivered sealed-at-rest by
+   * the portal (DFIND-155). `null`/absent when the endpoint has none: callers fail closed to
+   * needs_key, never to the company key. Never logged or echoed.
+   */
+  readonly gatewayKey?: string | null;
+  /**
    * The tenant's model allowlist from the body's `model_allowlist` (`tenant_config`), sent on
    * every mint and refresh. `null` only when the portal does not send the field at all — an
    * absent or malformed value must not empty a list an older token carried.
@@ -223,6 +229,12 @@ function asString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+/** An issued endpoint key: any non-empty string within a sane cap, otherwise absent. */
+const MAX_GATEWAY_KEY_LENGTH = 8192;
+function asEndpointKey(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 && value.length <= MAX_GATEWAY_KEY_LENGTH ? value : null;
+}
+
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -298,6 +310,8 @@ function toTokens(body: unknown): PortalTokens {
     role: parsePortalRole(record.role),
     // Operator-assigned per-user gateway endpoint; invalid or absent values fall back to default (`null`).
     gatewayEndpoint: normalizeAssignedGatewayEndpoint(record.gateway_endpoint),
+    // The bearer key the portal issued for that endpoint (DFIND-155). Opaque; only length-checked.
+    gatewayKey: asEndpointKey(record.gateway_key),
     // An array of strings is a real answer (an empty one allows every model); anything else is
     // the portal not sending the field, which must not clear a list a previous token carried.
     modelAllowlist: Array.isArray(record.model_allowlist)
@@ -415,6 +429,7 @@ const FAKE_TOKENS: PortalTokens = {
   // an admin says so (`createFakePortalClient({ tokens: { role: "owner" } })`).
   role: "member",
   gatewayEndpoint: null,
+  gatewayKey: null,
   modelAllowlist: null,
 };
 

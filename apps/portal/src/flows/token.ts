@@ -20,6 +20,8 @@
  */
 import { randomToken } from "../crypto";
 import { ACCESS_TOKEN_TTL_SECONDS, signAccessToken } from "../jwt/sign";
+import type { PortalKey } from "../jwt/keys";
+import { openGatewayKey } from "../gateway-key";
 import type { Clock, PortalOps, TenantFeatureFlags, UserRole } from "../store/types";
 import type { PortalRuntime } from "./context";
 import { runBrowserLoginGate, webInstallId, auditLoginDenied } from "./login";
@@ -184,7 +186,7 @@ export async function mintSession(
 ): Promise<TokenResult> {
   const config = await ops.tenantConfig.get(input.tenantId);
   const scope = scopeFor(config?.featureFlags);
-  const { role, gatewayEndpoint } = await userClaimsOf(ops, input.userId);
+  const { role, gatewayEndpoint, gatewayKey } = await userClaimsOf(ops, input.userId, runtime.keys.current);
   const modelAllowlist = config?.modelAllowlist ?? [];
 
   const session = await ops.sessions.create({
@@ -240,6 +242,7 @@ export async function mintSession(
       tenant_id: input.tenantId,
       role,
       gateway_endpoint: gatewayEndpoint,
+      gateway_key: gatewayKey,
       model_allowlist: modelAllowlist,
     }),
   };
@@ -253,11 +256,22 @@ export async function mintSession(
 async function userClaimsOf(
   ops: PortalOps,
   userId: string,
-): Promise<{ readonly role: UserRole; readonly gatewayEndpoint: string | null }> {
+  key: PortalKey,
+): Promise<{
+  readonly role: UserRole;
+  readonly gatewayEndpoint: string | null;
+  readonly gatewayKey: string | null;
+}> {
   const user = await ops.users.findById(userId);
+  // The issued key travels only with the endpoint it belongs to, and only as far as this user's
+  // token body: a member with no endpoint, or a blob that does not open, emits `null` and the host
+  // fails closed to needs_key (DFIND-155).
+  const gatewayKey =
+    user?.gatewayEndpoint && user.gatewayKeySealed ? openGatewayKey(user.gatewayKeySealed, key) : null;
   return {
     role: user?.role ?? "member",
     gatewayEndpoint: user?.gatewayEndpoint ?? null,
+    gatewayKey,
   };
 }
 
@@ -345,7 +359,7 @@ export async function exchangeRefreshToken(
   return runtime.store.tx(rotated.tenantId, async (ops) => {
     const config = await ops.tenantConfig.get(rotated.tenantId);
     const scope = scopeFor(config?.featureFlags);
-    const { role, gatewayEndpoint } = await userClaimsOf(ops, rotated.userId);
+    const { role, gatewayEndpoint, gatewayKey } = await userClaimsOf(ops, rotated.userId, runtime.keys.current);
     const modelAllowlist = config?.modelAllowlist ?? [];
 
     await ops.audit.append({
@@ -387,6 +401,7 @@ export async function exchangeRefreshToken(
         tenant_id: rotated.tenantId,
         role,
         gateway_endpoint: gatewayEndpoint,
+        gateway_key: gatewayKey,
         model_allowlist: modelAllowlist,
       }),
     };

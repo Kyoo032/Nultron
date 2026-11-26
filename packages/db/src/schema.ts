@@ -935,6 +935,10 @@ export const authSessions = sqliteTable(
     portalCheckedAt: integer("portal_checked_at"),
     refreshSealed: text("refresh_sealed"),
     gatewayEndpoint: text("gateway_endpoint"),
+    /** HMAC-SHA256(session id, endpoint) under HKDF(wrapKey, "auth-session-endpoint-mac-v1"); `hmac1:<hex>`. */
+    gatewayEndpointMac: text("gateway_endpoint_mac"),
+    /** Sealed per-endpoint bearer key under HKDF(wrapKey, "auth-session-endpoint-key-v1"); bound to row id and endpoint. */
+    endpointKeySealed: text("endpoint_key_sealed"),
   },
   (table) => [
     // The Phase 5 seat counter reads "members with a live session in the last 30 days" off this.

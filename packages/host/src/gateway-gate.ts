@@ -25,7 +25,7 @@ import {
   type StoredSecrets,
   type TenantContext,
 } from "@agentforge/core";
-import { assignedEndpointSlotTag, currentAssignedGatewayEndpoint } from "./gateway-endpoint-scope";
+import { assignedEndpointSlotTag, currentAssignedGatewayEndpoint, currentAssignedGatewayKey } from "./gateway-endpoint-scope";
 import {
   companyStateKey,
   TENANT_STATE_FILENAMES,
@@ -124,6 +124,7 @@ export type GateScope =
   | (Pick<TenantContext, "tenantId" | "workspaceId"> & {
       organizationId?: string;
       gatewayEndpoint?: string | null;
+      gatewayEndpointKey?: string | null;
     });
 
 export type GatewayGateOptions = {
@@ -159,7 +160,13 @@ export type MaybeRefreshGatewayOptions = GatewayGateOptions & {
  * Whose verdict a call reads and writes: the tenant, and on the hosted server the company inside it.
  * `companyId` is null on a desk, which is how every desk path stays exactly what it was.
  */
-export type GateOwner = { tenantId: string; companyId: string | null; assignedEndpoint?: string | null };
+export type GateOwner = {
+  tenantId: string;
+  companyId: string | null;
+  assignedEndpoint?: string | null;
+  /** Non-secret hash handle of the issued key the verdict under this owner was judged on. */
+  keyFingerprint?: string | null;
+};
 
 /** What a hosted gate call that names no company is refused with (a bug in the caller, never a user's doing). */
 export const COMPANY_REQUIRED_CODE = "company_required";
@@ -205,20 +212,36 @@ function ownerOf(opts: GatewayGateOptions): GateOwner {
       500,
     );
   }
-  return { tenantId, companyId: organizationId, assignedEndpoint };
+  // The key this owner's verdict is about: the session's issued key when the scope carries it,
+  // else the one the live request scope binds. Without it "forget my key" could not reach the
+  // fingerprinted slot the verdict was saved under.
+  const scopeKey =
+    scope !== null && typeof scope === "object" && "gatewayEndpointKey" in scope
+      ? (scope.gatewayEndpointKey ?? null)
+      : null;
+  const keyFingerprint = assignedEndpoint ? (keyFingerprintOrNull(scopeKey ?? undefined) ?? keyFingerprintOrNull(currentAssignedGatewayKey() ?? undefined)) : null;
+  return { tenantId, companyId: organizationId, assignedEndpoint, keyFingerprint };
 }
 
 /**
  * Which stored slot holds this owner's verdict: the tenant's one payload on a desk, the company's
- * own on the server (further isolated per operator-assigned endpoint when a custom endpoint is set).
+ * own on the server (further isolated per operator-assigned endpoint when a custom endpoint is set,
+ * and per issued key under it — two people of one company may share an endpoint while the portal
+ * issued them different keys, and one's verdict must never be adopted as the other's).
  */
-function gateSlot(companyId: string | null | undefined, assignedEndpoint?: string | null): TenantStateSlot {
+function gateSlot(
+  companyId: string | null | undefined,
+  assignedEndpoint?: string | null,
+  keyFingerprint?: string | null,
+): TenantStateSlot {
   if (!companyId) {
     return GATE_KEY;
   }
-  return assignedEndpoint
-    ? companyStateKey(GATE_KEY, `${companyId}:ep:${assignedEndpointSlotTag(assignedEndpoint)}`)
-    : companyStateKey(GATE_KEY, companyId);
+  if (!assignedEndpoint) {
+    return companyStateKey(GATE_KEY, companyId);
+  }
+  const fingerprintTag = keyFingerprint ? `:${keyFingerprint.replace("sha256:", "")}` : "";
+  return companyStateKey(GATE_KEY, `${companyId}:ep:${assignedEndpointSlotTag(assignedEndpoint)}${fingerprintTag}`);
 }
 
 function isGatewayGateStatus(value: unknown): value is GatewayGateStatus {
@@ -252,10 +275,11 @@ export function loadGateState(
   tenantId: string,
   companyId?: string | null,
   assignedEndpoint?: string | null,
+  keyFingerprint?: string | null,
 ): GateState | null {
   let parsed: unknown;
   try {
-    const stored = tenantStateBackend().read(tenantId, gateSlot(companyId, assignedEndpoint));
+    const stored = tenantStateBackend().read(tenantId, gateSlot(companyId, assignedEndpoint, keyFingerprint));
     if (!stored) {
       return null;
     }
@@ -299,7 +323,7 @@ export function loadGateState(
  * adopted: it has no history to stand on. The partner's row is left where it is, for the other companies.
  */
 function loadVerdictFor(owner: GateOwner, fingerprint: string | null): GateState | null {
-  const own = loadGateState(owner.tenantId, owner.companyId, owner.assignedEndpoint);
+  const own = loadGateState(owner.tenantId, owner.companyId, owner.assignedEndpoint, fingerprint);
   if (own || owner.companyId === null || fingerprint === null || owner.assignedEndpoint) {
     return own;
   }
@@ -330,7 +354,7 @@ export function saveGateState(
   // sealed settings. The atomic temp-file-and-rename this used to do itself now belongs to the file
   // backend, and the row backend writes one statement, so neither can leave half a verdict.
   try {
-    tenantStateBackend().write(tenantId, gateSlot(companyId, assignedEndpoint), `${JSON.stringify(state, null, 2)}\n`);
+    tenantStateBackend().write(tenantId, gateSlot(companyId, assignedEndpoint, state.fingerprint), `${JSON.stringify(state, null, 2)}\n`);
     return { state, persisted: true };
   } catch (error) {
     // Swallow-and-warn, exactly like `clearGateState`. A read-only data dir, a full disk or a
@@ -345,7 +369,12 @@ export function saveGateState(
 export function clearGateState(scope?: GateScope): void {
   try {
     const owner = ownerOf({ tenant: scope });
-    tenantStateBackend().remove(owner.tenantId, gateSlot(owner.companyId, owner.assignedEndpoint));
+    // Drop both spellings: the per-key slot today's writes land on and the shared endpoint slot
+    // older writes (and a no-key verdict) may still sit under.
+    tenantStateBackend().remove(owner.tenantId, gateSlot(owner.companyId, owner.assignedEndpoint, owner.keyFingerprint));
+    if (owner.keyFingerprint) {
+      tenantStateBackend().remove(owner.tenantId, gateSlot(owner.companyId, owner.assignedEndpoint));
+    }
   } catch (error) {
     // A hosted scope with no company is a bug in the caller, so it is not swallowed as "nothing to clear".
     if (error instanceof ApiError && error.code === COMPANY_REQUIRED_CODE) {
@@ -535,7 +564,20 @@ export async function checkGatewayLive(input: {
  * rule `resolveProviderKeys` now enforces on the call path, applied here so the gate's verdict and
  * the call agree about whether this tenant has a key at all.
  */
-function keyFor(settings: StoredSecrets, envRuntime: string | undefined, env: EnvLike = process.env): string | undefined {
+function keyFor(
+  settings: StoredSecrets,
+  envRuntime: string | undefined,
+  env: EnvLike = process.env,
+  assignedEndpoint: string | null = null,
+): string | undefined {
+  // DFIND-155: an assigned endpoint gets the bearer key issued for it — never the company key. The
+  // key is trusted only when the live request scope binds the same endpoint, so a stored endpoint
+  // cannot borrow another scope's key. No issued key means no key: the verdict reads needs_key.
+  if (assignedEndpoint) {
+    return assignedEndpoint === currentAssignedGatewayEndpoint()
+      ? currentAssignedGatewayKey() ?? undefined
+      : undefined;
+  }
   const saved = settings.openaiApiKey?.trim();
   if (saved) {
     return saved;
@@ -550,8 +592,8 @@ function keyFor(settings: StoredSecrets, envRuntime: string | undefined, env: En
 /** The current gate for this desk, derived from the saved verdict. No network, no throw. */
 export function reportGatewayGate(settings: StoredSecrets, opts: GatewayGateOptions = {}): GatewayGatePayload {
   const envRuntime = opts.envRuntime ?? process.env.AGENTFORGE_RUNTIME;
-  const key = keyFor(settings, envRuntime, opts.env);
   const owner = ownerOf(opts);
+  const key = keyFor(settings, envRuntime, opts.env, owner.assignedEndpoint ?? null);
   const fingerprint = keyFingerprintOrNull(key);
   return deriveGatewayGate({
     envRuntime,
@@ -651,13 +693,14 @@ export async function runGatewayCheck(
   opts: GatewayGateOptions = {},
 ): Promise<GatewayGatePayload> {
   const envRuntime = opts.envRuntime ?? process.env.AGENTFORGE_RUNTIME;
-  const key = keyFor(settings, envRuntime, opts.env);
+  const owner = ownerOf(opts);
+  const key = keyFor(settings, envRuntime, opts.env, owner.assignedEndpoint ?? null);
   // Stub runtime and "no key saved" are decided without asking anyone.
   if (envRuntime === "stub" || !key) {
     return reportGatewayGate(settings, opts);
   }
 
-  const owner = ownerOf(opts);
+
   const { tenantId, companyId, assignedEndpoint } = owner;
   const fingerprint = keyFingerprintOrNull(key);
   const endpoint = gatewayEndpointFor(settings, opts.tenant);
@@ -748,7 +791,7 @@ export function maybeRefreshGateway(settings: StoredSecrets, opts: MaybeRefreshG
   if (envRuntime === "stub") {
     return false;
   }
-  const key = keyFor(settings, envRuntime, opts.env);
+  const key = keyFor(settings, envRuntime, opts.env, assignedEndpointOf(opts.tenant));
   if (!key) {
     return false;
   }

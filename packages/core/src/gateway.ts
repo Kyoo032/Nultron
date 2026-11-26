@@ -1,4 +1,5 @@
-import { assignedGatewayEndpoint, gatewayUrlOverride, PINNED_GATEWAY_BASE_URL } from "./gateway/pinned";
+import { assignedGatewayEndpoint, assignedGatewayKey, gatewayUrlOverride, PINNED_GATEWAY_BASE_URL } from "./gateway/pinned";
+export { assignedGatewayEndpoint, assignedGatewayKey };
 import { assertAllowedEndpointUrl } from "./security/tls";
 
 /** Toko Token OpenAI-compatible gateway. Public Nultron’s home inference path. */
