@@ -89,6 +89,8 @@ describe("runMigrations", () => {
       "auth_codes",
       "invites",
       "user_credentials",
+      "user_oidc_identities",
+      "oidc_login_states",
     ]) {
       expect(await tableExists(table), table).toBe(true);
     }

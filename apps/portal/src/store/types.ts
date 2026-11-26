@@ -124,6 +124,8 @@ export interface PortalOps {
     listForTenant(tenantId: string): Promise<readonly Org[]>;
     setStatus(id: string, status: OrgStatus): Promise<Org | null>;
     setSeatCap(id: string, seatCap: number): Promise<Org | null>;
+    /** `orgs.sso_required` (0017): on, non-owners sign in through the org's OIDC provider only. */
+    setSsoRequired(id: string, required: boolean): Promise<Org | null>;
     /** `count_active_users(uuid)` from 0005, called, not re-implemented. */
     countActiveUsers(orgId: string): Promise<number>;
     /**
@@ -298,6 +300,40 @@ export interface PortalOps {
     revoke(input: { readonly userId: string; readonly tenantId: string }): Promise<number>;
   };
 
+  /**
+   * OIDC sign-in (0017): the (issuer, subject) bindings a finished SSO sign-in leaves behind, and
+   * the single-use login states a PKCE round trip keeps server-side.
+   */
+  readonly oidc: {
+    /** The user a binding points at, inside the door's tenant scope; NULL when unbound. */
+    findUserByIdentity(issuer: string, subject: string): Promise<string | null>;
+    /**
+     * First sign-in through this provider: bind (issuer, subject) to the seat the verified
+     * e-mail matched. `ON CONFLICT DO NOTHING` -- a raced first sign-in keeps the first binding.
+     */
+    bindIdentity(input: {
+      readonly tenantId: string;
+      readonly userId: string;
+      readonly issuer: string;
+      readonly subject: string;
+    }): Promise<void>;
+    createState(input: {
+      readonly tenantId: string;
+      readonly stateHash: Buffer;
+      readonly nonceHash: Buffer;
+      readonly sealed: string;
+      readonly provider: string;
+      readonly expiresAt: Date;
+    }): Promise<void>;
+    /**
+     * `DELETE ... RETURNING` in one statement: single-use. NULL for an unknown or expired state.
+     */
+    consumeState(
+      tenantId: string,
+      stateHash: Buffer,
+    ): Promise<{ readonly nonceHash: Buffer; readonly sealed: string; readonly provider: string } | null>;
+  };
+
   readonly audit: {
     append(input: AppendAuditInput): Promise<AuditEntry>;
     list(filter?: {
@@ -333,6 +369,8 @@ export interface TenantResolvers {
   byUserCode(userCode: string): Promise<string | null>;
   byAuthCode(rawCode: string): Promise<string | null>;
   byClientId(clientId: string): Promise<string | null>;
+  /** The callback's only way to a tenant: NULL for an unknown, expired or consumed state. */
+  byOidcState(stateHash: Buffer): Promise<string | null>;
 }
 
 export interface MigrationResult {

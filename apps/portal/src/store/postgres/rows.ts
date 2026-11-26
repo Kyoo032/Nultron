@@ -116,6 +116,7 @@ export function toOrg(row: Row): Org {
     plan: str(row.plan) as Org["plan"],
     seatCap: int(row.seat_cap),
     seatBand: int(row.seat_band),
+    ssoRequired: row.sso_required === true,
     currency: str(row.currency) as Org["currency"],
     billingEmail: strOrNull(row.billing_email),
     pastDueSince: isoOrNull(row.past_due_since),

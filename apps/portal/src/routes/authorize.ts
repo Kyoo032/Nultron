@@ -32,6 +32,7 @@ import { normaliseEmail } from "../crypto";
 import { mustChangePasswordFirst, versionIsLive, webSessionCookieFor } from "../flows/web-session";
 import { boundedField, stringField } from "../security/body";
 import { redirectResponse } from "../security/headers";
+import { oidcSsoLinks } from "./oidc";
 import type { WebSession } from "../security/web-session";
 import type { PortalRequest, PortalResponse, PortalRoute } from "../server";
 import {
@@ -50,15 +51,7 @@ import {
   handleInviteStep,
   type SignInSpec,
 } from "./sign-in-flow";
-import {
-  codeErrorMessage,
-  csrfOk,
-  htmlError,
-  limit,
-  readForm,
-  requestContext,
-  type RequestContext,
-} from "./support";
+import { codeErrorMessage, csrfOk, htmlError, limit, readForm, requestContext, type RequestContext } from "./support";
 
 const EMAIL_PATH = "/authorize/email";
 const INVITE_PATH = "/authorize/invite";
@@ -102,23 +95,25 @@ function clientFormAction(params: AuthorizeParams): readonly string[] {
 }
 
 /** Built only after `checkClient` has returned ok, for the reason `clientFormAction` gives. */
-function specFor(params: AuthorizeParams, tenantId: string): SignInSpec {
+function specFor(runtime: PortalRuntime, params: AuthorizeParams, tenantId: string): SignInSpec {
   return {
     purpose: "portal_login",
     requiredTenantId: tenantId,
     paths: { email: EMAIL_PATH, invite: INVITE_PATH, inviteResend: INVITE_RESEND_PATH, verify: VERIFY_PATH },
     hidden: hiddenFor(params),
     formActionOrigins: clientFormAction(params),
+    sso: oidcSsoLinks(runtime, { kind: "authorize", params }),
   };
 }
 
 /** The same, for the password sign-in's two posts. Built only after `checkClient` has returned ok. */
-function passwordSpecFor(params: AuthorizeParams, tenantId: string): PasswordSpec {
+function passwordSpecFor(runtime: PortalRuntime, params: AuthorizeParams, tenantId: string): PasswordSpec {
   return {
     requiredTenantId: tenantId,
     paths: { password: PASSWORD_PATH, change: PASSWORD_CHANGE_PATH },
     hidden: hiddenFor(params),
     formActionOrigins: clientFormAction(params),
+    sso: oidcSsoLinks(runtime, { kind: "authorize", params }),
   };
 }
 
@@ -154,19 +149,26 @@ export function authorizeRoutes(runtime: PortalRuntime): readonly PortalRoute[] 
     {
       method: "POST",
       path: EMAIL_PATH,
-      handle: (request) => authorizePost(runtime, request, (flow) => handleEmailStep(runtime, flow.context, flow.spec, flow.fields)),
+      handle: (request) =>
+        authorizePost(runtime, request, (flow) => handleEmailStep(runtime, flow.context, flow.spec, flow.fields)),
     },
     {
       method: "POST",
       path: INVITE_PATH,
-      handle: (request) => authorizePost(runtime, request, (flow) => handleInviteStep(runtime, flow.context, flow.spec, flow.fields)),
+      handle: (request) =>
+        authorizePost(runtime, request, (flow) => handleInviteStep(runtime, flow.context, flow.spec, flow.fields)),
     },
     {
       method: "POST",
       path: INVITE_RESEND_PATH,
-      handle: (request) => authorizePost(runtime, request, (flow) => handleInviteResend(runtime, flow.context, flow.spec, flow.fields)),
+      handle: (request) =>
+        authorizePost(runtime, request, (flow) => handleInviteResend(runtime, flow.context, flow.spec, flow.fields)),
     },
-    { method: "POST", path: VERIFY_PATH, handle: (request) => authorizePost(runtime, request, (flow) => postVerify(runtime, flow)) },
+    {
+      method: "POST",
+      path: VERIFY_PATH,
+      handle: (request) => authorizePost(runtime, request, (flow) => postVerify(runtime, flow)),
+    },
   ];
 }
 
@@ -201,9 +203,9 @@ async function getAuthorize(runtime: PortalRuntime, request: PortalRequest): Pro
   }
 
   if (runtime.config.signInMode === "password") {
-    return passwordEntryResponse(runtime, context, passwordSpecFor(params, client.tenantId));
+    return passwordEntryResponse(runtime, context, passwordSpecFor(runtime, params, client.tenantId));
   }
-  return emailEntryResponse(runtime, context, specFor(params, client.tenantId));
+  return emailEntryResponse(runtime, context, specFor(runtime, params, client.tenantId));
 }
 
 interface AuthorizeFlow {
@@ -245,8 +247,8 @@ async function authorizePost(
     context,
     fields: body.fields,
     params,
-    spec: specFor(params, client.tenantId),
-    password: passwordSpecFor(params, client.tenantId),
+    spec: specFor(runtime, params, client.tenantId),
+    password: passwordSpecFor(runtime, params, client.tenantId),
   });
 }
 
@@ -350,7 +352,7 @@ function retryCode(
  * sessions that existed, so the one this would issue would outlive it. A resumed cookie then falls
  * through to the form (`null`); a fresh sign-in is answered with `ifChangeRequired`, the change screen.
  */
-async function completeSignIn(
+export async function completeSignIn(
   runtime: PortalRuntime,
   context: RequestContext,
   params: AuthorizeParams,

@@ -16,7 +16,8 @@
     "missing": "Enter your username and your password.",
     "invalid": "That username or password is not right. If you keep seeing this, ask your admin.",
     "rateLimited": "Too many attempts. Try again in a few minutes.",
-    "busy": "Sign-in is busy right now. Wait a moment, then try again."
+    "busy": "Sign-in is busy right now. Wait a moment, then try again.",
+    "ssoRequired": "Your organization requires single sign-on. Use the sign-in button above."
   },
   "change": {
     "title": "Choose a new password",
@@ -83,6 +84,10 @@
     "seatCap": {
       "title": "No seats left",
       "next": "Ask your admin to free a seat or add one."
+    },
+    "ssoRequired": {
+      "title": "Single sign-on required",
+      "body": "Your organization requires single sign-on. Use the sign-in button on the sign-in page, or contact your owner if you cannot reach your provider."
     }
   },
   "account": {
@@ -168,5 +173,15 @@
   "footer": {
     "note": "Never share a sign-in code with anyone.",
     "notePassword": "Never share your password with anyone."
+  },
+  "sso": {
+    "divider": "Or continue with",
+    "google": "Sign in with Google",
+    "microsoft": "Sign in with Microsoft"
+  },
+  "oidc": {
+    "error": "We could not start that sign-in. Try again.",
+    "unavailable": "The sign-in provider did not answer. Try again in a moment.",
+    "denied": "That sign-in could not be completed. If you should have access, contact your owner."
   }
 }

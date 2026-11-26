@@ -60,11 +60,7 @@ import {
   type PasswordRefusal,
 } from "../password/policy";
 import type { PasswordAttempts } from "../security/password-attempts";
-import {
-  PASSWORD_GRACE_ATTEMPTS,
-  PASSWORD_LOCK_MS,
-  PASSWORD_MAX_FAILED_ATTEMPTS,
-} from "../store/postgres/credentials";
+import { PASSWORD_GRACE_ATTEMPTS, PASSWORD_LOCK_MS, PASSWORD_MAX_FAILED_ATTEMPTS } from "../store/postgres/credentials";
 import type { Account, Clock, Credential, PortalOps, PortalStore, User } from "../store/types";
 import { revokeWebSessions } from "./web-session";
 
@@ -139,7 +135,13 @@ export type VerifyOutcome =
       /** The stored hash as it stands now (after any re-hash): what the change step guards on. */
       readonly currentHash: Buffer;
     }
-  | { readonly kind: "refused" };
+  | { readonly kind: "refused" }
+  /**
+   * `orgs.sso_required` (0017) and not an owner: the password is off for them whatever it is. Said
+   * after the account was identified but before any password work: nothing was counted, and the
+   * answer names the org's own rule rather than spending a derivation to say nothing.
+   */
+  | { readonly kind: "sso_required" };
 
 const REFUSED: VerifyOutcome = Object.freeze({ kind: "refused" });
 
@@ -243,6 +245,22 @@ export async function verifyPasswordStep(
     return refuseInactive(deps, tenantId, user, password, ip);
   }
 
+  // The org's Owner may require SSO for non-owners (0017). Before the lock and before the
+  // derivation: a refused-elsewhere policy costs nobody an attempt, and the row it writes is the
+  // one place the refusal is on record.
+  const ssoGate = await deps.store.tx(tenantId, async (ops) => {
+    const org = await ops.orgs.findById(user.orgId);
+    if (org?.ssoRequired && user.role !== "owner") {
+      await outsiderRow(ops, user, "password.withheld", "sso_required", ip);
+      return true;
+    }
+    return false;
+  });
+  if (ssoGate) {
+    await deps.passwords.verifyDummy(password);
+    return { kind: "sso_required" };
+  }
+
   // One synchronous step, and nothing awaited between its two halves: this source is recorded as having
   // attempted this person (and told whether it already had), and the charge is queued behind every
   // earlier one for the same person. The order of those two is the order the database sees them in.
@@ -321,7 +339,13 @@ export async function verifyPasswordStep(
       await personRow(ops, user, "password.verified", reserved.graceUsed > 0 ? "while_locked" : null, ip);
       return true;
     }
-    await personRow(ops, user, "password.verified", reserved.graceUsed > 0 ? "while_locked" : rehash ? "rehashed" : null, ip);
+    await personRow(
+      ops,
+      user,
+      "password.verified",
+      reserved.graceUsed > 0 ? "while_locked" : rehash ? "rehashed" : null,
+      ip,
+    );
     return true;
   });
   if (!recorded) {
@@ -362,6 +386,8 @@ export type PasswordSignInState =
   | { readonly kind: "change_required" }
   /** Wrong, unknown, locked or disabled. The route cannot tell which, and neither can the person. */
   | { readonly kind: "refused" }
+  /** `orgs.sso_required` and not an owner: the button on the sign-in page is the way in. */
+  | { readonly kind: "sso_required" }
   /**
    * Too many sign-ins are deriving already (`503`). Said before anything was looked up or counted, so
    * it is the same for everyone and costs nobody an attempt.
@@ -378,6 +404,9 @@ export async function signInWithPassword(deps: PasswordDeps, input: PasswordSign
     const verified = await verifyPasswordStep(deps, found, input.password, input.ip, input.source);
     if (verified.kind === "refused") {
       return { kind: "refused" };
+    }
+    if (verified.kind === "sso_required") {
+      return { kind: "sso_required" };
     }
     // A second factor, when one exists, is checked here (see the header).
     if (verified.credential.mustChange) {
@@ -444,7 +473,7 @@ export async function changePasswordAndSignIn(
   try {
     const found = await identifyAccount(deps, input);
     const verified = await verifyPasswordStep(deps, found, input.currentPassword, input.ip, input.source);
-    if (verified.kind === "refused") {
+    if (verified.kind === "refused" || verified.kind === "sso_required") {
       return { kind: "invalid" };
     }
     // A second factor, when one exists, is checked here too (see the header).

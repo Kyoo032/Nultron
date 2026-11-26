@@ -76,6 +76,8 @@ export interface SignInScreen extends ScreenBase {
   readonly hidden: Readonly<Record<string, string>>;
   readonly error?: string;
   readonly email?: string;
+  /** The "Sign in with …" links (F8b): provider id + start URL, one per configured provider. */
+  readonly sso?: readonly { readonly provider: string; readonly href: string }[];
 }
 
 /**
@@ -99,8 +101,27 @@ ${hiddenFields({ ...screen.hidden, csrf_token: screen.csrfToken })}
 <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required
  autofocus maxlength="254" value="${screen.email ?? ""}">
 <button type="submit">${t("signIn.submit")}</button>
-</form>`,
+</form>${ssoSection(screen)}`,
   });
+}
+
+/**
+ * The SSO block the sign-in screens share (F8b): a separator line and one plain GET link per
+ * configured provider, labelled by that provider's own locale key. Returns markup -- the pages
+ * interpolate it inside `html`, so `SafeHtml` keeps it out of the `raw(...)` audit line.
+ */
+function ssoSection(screen: {
+  readonly t: ScreenBase["t"];
+  readonly sso?: readonly { readonly provider: string; readonly href: string }[];
+}): SafeHtml | "" {
+  const sso = screen.sso;
+  if (!sso || sso.length === 0) {
+    return "";
+  }
+  const { t } = screen;
+  return html`
+<div class="sso-divider"><span>${t("sso.divider")}</span></div>
+${sso.map((link) => html`<a class="sso" href="${link.href}">${t(`sso.${link.provider}`)}</a>`)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -118,6 +139,8 @@ export interface PasswordSignInScreen extends ScreenBase {
   /** Re-shown after a refusal so a typo costs one field, not two. The password never is. */
   readonly identifier?: string;
   readonly error?: string;
+  /** The "Sign in with …" links (F8b): provider id + start URL, one per configured provider. */
+  readonly sso?: readonly { readonly provider: string; readonly href: string }[];
 }
 
 /**
@@ -145,7 +168,7 @@ ${hiddenFields({ ...screen.hidden, csrf_token: screen.csrfToken })}
 <input id="password" name="password" type="password" autocomplete="current-password" required
  maxlength="200">
 <button type="submit">${t("password.submit")}</button>
-</form>`,
+</form>${ssoSection(screen)}`,
   });
 }
 

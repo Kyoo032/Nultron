@@ -27,6 +27,7 @@ import type { PortalResponse } from "../server";
 import { type Vars, waitText } from "../views/i18n";
 import { enterCodePage, inviteCodePage, signInPage, statePage } from "../views/pages";
 import { MAX_EMAIL_LENGTH } from "../flows/authorize";
+import type { OidcSsoLink } from "./oidc";
 import { ensureCsrf, htmlError, limit, type RequestContext } from "./support";
 
 export interface SignInSpec {
@@ -43,6 +44,8 @@ export interface SignInSpec {
   readonly hidden: Readonly<Record<string, string>>;
   /** Extra `form-action` origins -- the client's, on `/authorize` only (SR-20). */
   readonly formActionOrigins: readonly string[];
+  /** The "Sign in with …" buttons (F8b), one per configured OIDC provider; absent when none are. */
+  readonly sso?: readonly OidcSsoLink[];
 }
 
 /** An invite code is 20 characters in groups of five; anything past this is junk and is cut. */
@@ -90,6 +93,7 @@ export function emailEntryResponse(
       hidden: spec.hidden,
       email: options.email,
       error: options.error,
+      sso: spec.sso,
     }),
     { status: options.status },
   );
@@ -176,7 +180,7 @@ function deadEndResponse(
   runtime: PortalRuntime,
   context: RequestContext,
   spec: SignInSpec,
-  key: "expired" | "noAccess" | "inviteLocked" | "otpLocked" | "seatCap",
+  key: "expired" | "noAccess" | "inviteLocked" | "otpLocked" | "seatCap" | "ssoRequired",
   status: number,
   vars?: Vars,
 ): PortalResponse {
@@ -261,6 +265,9 @@ function respondTo(
       });
     case "no_access":
       return deadEndResponse(runtime, context, spec, "noAccess", 200);
+    case "sso_required":
+      // The org's Owner turned the e-mailed code off for non-owners (`orgs.sso_required`).
+      return deadEndResponse(runtime, context, spec, "ssoRequired", 403);
     case "seat_cap_reached":
       // 403, not 200: unlike "ask your admin to invite you", this is a refusal with a known
       // cause that only an admin can lift, and nothing was spent finding out.
@@ -282,12 +289,7 @@ function respondTo(
  * answer depends on who the address is. All of them count the request whatever the outcome, and
  * none depends on the address existing.
  */
-function emailStepAllowed(
-  runtime: PortalRuntime,
-  context: RequestContext,
-  spec: SignInSpec,
-  email: string,
-): boolean {
+function emailStepAllowed(runtime: PortalRuntime, context: RequestContext, spec: SignInSpec, email: string): boolean {
   const { limiters } = runtime;
   const address = `${spec.requiredTenantId ?? "-"}|${email}`;
   return limit(

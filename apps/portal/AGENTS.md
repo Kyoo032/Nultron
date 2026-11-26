@@ -26,8 +26,12 @@ before working here. It is the plan of record and it names the lanes.
    on `oauth_clients`, which nothing needed), `0009_web_session_revocation.sql` (the portal's own
    browser session counter), `0010_app_login_role.sql` (the server's login role, which 0001
    describes and nobody had created), `0011_invites.sql` (the invite that gates a first sign-in),
-   `0012_password_signin.sql` (the credentials of the password sign-in) and `0013_password_grace.sql` (the
-   attempts a source with no earlier failure may take under that sign-in's lock).
+   `0012_password_signin.sql` (the credentials of the password sign-in), `0013_password_grace.sql` (the
+   attempts a source with no earlier failure may take under that sign-in's lock),
+   `0014_user_gateway_endpoint.sql` (an operator-assigned gateway endpoint per member),
+   `0015_auditor_role.sql` (widening the role checks for `auditor`) and
+   `0017_oidc_identities.sql` (OIDC identity bindings, the single-use login states and
+   `orgs.sso_required`).
    Same style: one transaction per file,
    `IF NOT EXISTS`, `DROP POLICY` before `CREATE POLICY`, and every new table placed explicitly
    into one of the three RLS shapes `0004_rls.sql` defines.

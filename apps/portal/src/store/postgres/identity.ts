@@ -158,6 +158,14 @@ export function orgsOps(client: PoolClient): PortalOps["orgs"] {
       const row = first(rows);
       return row ? toOrg(row) : null;
     },
+    async setSsoRequired(id, required) {
+      const { rows } = await client.query<Row>(
+        `UPDATE orgs SET sso_required = $2 WHERE id = $1 RETURNING *`,
+        [id, required],
+      );
+      const row = first(rows);
+      return row ? toOrg(row) : null;
+    },
     async countActiveUsers(orgId) {
       const { rows } = await client.query<{ n: number }>(`SELECT count_active_users($1) AS n`, [orgId]);
       return Number(rows[0]?.n ?? 0);

@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-11-26 on `devin/1795686920-opc-auditor-allowlist`, for the `auditor` role value (`migrations/0015_auditor_role.sql` widening `users_role_chk` and `invites_role_chk`; `auditor` in `invite --role` and `account` role lists) and `model_allowlist` in the `POST /auth/token` body (`src/flows/token.ts`, from `tenant_config.model_allowlist`, on mint and refresh). Before that: 2026-11-24 on `main`, for per-user operator-assigned API gateway endpoints (`migrations/0014_user_gateway_endpoint.sql`, `src/gateway-endpoint.ts`, `account create --gateway-endpoint`, `account set-endpoint`, `invite --gateway-endpoint`, and `gateway_endpoint` in `POST /auth/token` responses), plus portal PII log scrubbing (`apps/portal/src/log.ts`), production Postgres TLS `sslmode` enforcement (`config.ts`, `store/postgres/index.ts`), SMTP `minVersion: "TLSv1.2"` (`mail/smtp.ts`), and production `X-Forwarded-Proto: https` enforcement (`server.ts`). Before that: 2026-11-23 on `feat/security-phase1-hardening`, for portal `esbuild` runtime bundling (`apps/portal/src/paths.ts`, `apps/portal/scripts/build-server.mjs`, `dist/main.mjs`, `dist/scripts/*.mjs`, `apps/portal/package.json` `build`/`start`) only; the rest keeps its prior readings below. Before that: 2026-11-09 on `claude/fix-portal-test-teardown` (from `39cd5f0`), for the idle-connection row of section 6 and the `testing/pg.ts` anchors of section 7 only (SR-200). Before that: 2026-11-03 at b79a5275 for the `GET /activate` row, the typed-code row of the Verify table and the `api.test.ts` count only (the form on the code screen is a GET to `?code=`). Before that: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-07 at 9aba37e + working tree for section 8 (password sign-in), Where things live, the
+Last verified: 2026-11-26 on `devin/1795703668-oidc-signin`, for OIDC sign-in (F8b: `migrations/0017_oidc_identities.sql`, `src/oidc/**`, `src/routes/oidc.ts`, the `sso_required` gates in `src/flows/sign-in.ts` and `src/flows/password-sign-in.ts`, and the `sso` block on the sign-in screens). Before that: 2026-11-26 on `devin/1795686920-opc-auditor-allowlist`, for the `auditor` role value (`migrations/0015_auditor_role.sql` widening `users_role_chk` and `invites_role_chk`; `auditor` in `invite --role` and `account` role lists) and `model_allowlist` in the `POST /auth/token` body (`src/flows/token.ts`, from `tenant_config.model_allowlist`, on mint and refresh). Before that: 2026-11-24 on `main`, for per-user operator-assigned API gateway endpoints (`migrations/0014_user_gateway_endpoint.sql`, `src/gateway-endpoint.ts`, `account create --gateway-endpoint`, `account set-endpoint`, `invite --gateway-endpoint`, and `gateway_endpoint` in `POST /auth/token` responses), plus portal PII log scrubbing (`apps/portal/src/log.ts`), production Postgres TLS `sslmode` enforcement (`config.ts`, `store/postgres/index.ts`), SMTP `minVersion: "TLSv1.2"` (`mail/smtp.ts`), and production `X-Forwarded-Proto: https` enforcement (`server.ts`). Before that: 2026-11-23 on `feat/security-phase1-hardening`, for portal `esbuild` runtime bundling (`apps/portal/src/paths.ts`, `apps/portal/scripts/build-server.mjs`, `dist/main.mjs`, `dist/scripts/*.mjs`, `apps/portal/package.json` `build`/`start`) only; the rest keeps its prior readings below. Before that: 2026-11-09 on `claude/fix-portal-test-teardown` (from `39cd5f0`), for the idle-connection row of section 6 and the `testing/pg.ts` anchors of section 7 only (SR-200). Before that: 2026-11-03 at b79a5275 for the `GET /activate` row, the typed-code row of the Verify table and the `api.test.ts` count only (the form on the code screen is a GET to `?code=`). Before that: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-07 at 9aba37e + working tree for section 8 (password sign-in), Where things live, the
 Verify table's last four rows and one Why bullet, written the day the mode was built; the rest of the page keeps
 its reading below. Earlier: 2026-10-01 at 0b61a29 + working tree, by the sign-in-codes pass (four fixes found by driving
 the pilot: a replaced code no longer signs in, one request is one code, the fifth wrong invite code is the
@@ -423,6 +423,44 @@ page adds is where it plugs in and what to be careful of.
   and nothing otherwise; `apps/web/components/sign-in-screen.tsx` reads it. See
   [`portal-session-auth.md`](portal-session-auth.md), "Status".
 
+### 9. OIDC sign-in (F8b, 2026-11-26)
+
+A third way in beside the e-mailed code and the password: "Sign in with Google" / "Sign in with
+Microsoft" links on the sign-in screens (`ssoSection`, `src/views/pages.ts`), one literal
+`GET /oidc/<provider>/start` + `GET /oidc/<provider>/callback` pair per configured provider
+(`src/routes/oidc.ts`) registered on both doors when `PORTAL_OIDC_*` env vars name the provider
+(`readOidc`, `src/config.ts`). No library: discovery and JWKS over the built-in `fetch`
+(`src/oidc/{discovery,jwks}.ts`), PKCE S256 + state + nonce (`src/oidc/pkce.ts`), and ID-token
+verification through `node:crypto` `createPublicKey({ format: "jwk" })`
+(`src/oidc/verify-id-token.ts`): RS256 only, `alg` refused before the key lookup, then signature,
+`iss`, `aud`, `exp`, `iat`, `nonce` and `sub`; the JWKS is cached with exactly one refetch on an
+unknown `kid`.
+
+- **The login state** lives in `oidc_login_states` (`0017_oidc_identities.sql`): `state_hash`
+  and `nonce_hash` (sha256 bytea, like every credential), the code verifier and door context sealed
+  with AES-256-GCM under a derived signing key (`src/oidc/seal.ts`), ten-minute expiry, single use —
+  `consumeState` deletes it in the callback transaction. The callback has no tenant, so
+  `resolve_tenant_for_oidc_state` is the resolver.
+- **The match is by verified e-mail, never a creation.** `findUserByIdentity`
+  (`user_oidc_identities`, issuer+subject) first, then `findByEmail` on the verified address; an
+  unknown one is `login.denied` `oidc_no_member` and the dead-end page. A first OIDC sign-in binds
+  the identity so the second skips the e-mail lookup. Success audits `oidc.sign_in`; every denial
+  audits `login.denied` (`oidc_token_exchange`, `oidc_token_<verify reason>`, `oidc_no_member`,
+  `user_not_active`, `seat_cap_reached`).
+- **The tail is the code sign-in's own.** Door "a" ends on `completeSignIn`, door "c" on the
+  web-session cookie and `/activate?code=` — same authorization code, cookie, `role` claim.
+- **`sso_required`** (`orgs.sso_required` + `tenant_config.feature_flags.sso_provider`) turns the
+  code and password off for non-owners, in `beginSignIn`/`submitInvite` (`flows/sign-in.ts`) and in
+  `verifyPasswordStep` (`flows/password-sign-in.ts`, after the active check, with the dummy
+  derivation so the refusal costs the same); the answer is the `ssoRequired` state page at 403.
+  The owner keeps password/OTP as recovery. `orgs.setSsoRequired` is the only writer.
+- **Rate limits:** `oidcStartIp` (30/15 min), `oidcCallbackIp` (60/15 min)
+  (`src/security/rate-limit.ts`), on top of CSRF-free GET starts (the state itself is the
+  correlation value).
+- **Tests seam:** `OidcSeams { fetchImpl?, verifyIdTokenImpl? }` reaches the routes through
+  `PortalRouteOptions.oidcSeams` (`src/testing/server.ts` `routeOptions`), so `routes/oidc.test.ts`
+  signs with a stub IdP and never calls out.
+
 ## Where things live
 
 | File | Role |
@@ -476,6 +514,10 @@ page adds is where it plugs in and what to be careful of.
 | `apps/portal/src/accounts/`, `apps/portal/scripts/account.ts` | `portal:account`: create, reset-password, disable, enable, set-role, list |
 | `apps/portal/src/mail/disabled.ts` | the mailer of password mode: refuses to send, builds no transport |
 | `apps/portal/src/testing/{password-kit,code-pages}.ts` | a password-mode pilot and its posts; the code-mode screens rendered for the byte pin |
+| `apps/portal/src/oidc/{pkce,seal,providers,discovery,jwks,verify-id-token}.ts` | F8b: PKCE material, the sealed login state, the two provider presets, OIDC discovery, the JWKS cache and the RS256-only ID-token verifier |
+| `apps/portal/src/routes/oidc.ts` | the start and callback routes, the `sso` links on the sign-in screens, the activate-door start; audits `oidc.sign_in` and `login.denied` |
+| `apps/portal/src/store/postgres/oidc.ts` | `findUserByIdentity`, `bindIdentity`, `createState`, `consumeState` |
+| `apps/portal/migrations/0017_oidc_identities.sql` | `user_oidc_identities`, `oidc_login_states`, `orgs.sso_required`, `resolve_tenant_for_oidc_state` |
 
 ## Touches / Do not touch
 

@@ -99,6 +99,20 @@ export interface PortalConfig {
   /** `X-Forwarded-For` is believed only when this is on. Every rate-limit bucket keys on it. */
   readonly trustProxy: boolean;
   readonly smtp: SmtpConfig;
+  /** OIDC sign-in (F8b): one entry per configured provider; `null` when that provider is off. */
+  readonly oidc?: OidcConfig;
+}
+
+export interface OidcProviderConfig {
+  readonly clientId: string;
+  /** Never logged, never sent anywhere but the provider's own token endpoint. */
+  readonly clientSecret: string;
+}
+
+export interface OidcConfig {
+  readonly google: OidcProviderConfig | null;
+  /** `tenant` is the directory tenant the multi-tenant Entra endpoints are built from. */
+  readonly microsoft: (OidcProviderConfig & { readonly tenant: string }) | null;
 }
 
 const DEFAULT_PORT = 4000;
@@ -428,6 +442,7 @@ export function loadConfig(env: Env = process.env): PortalConfig {
     publicUrl: readPublicUrl(env, production, problems),
     trustProxy: readFlag(env, "PORTAL_TRUST_PROXY", problems),
     smtp: readSmtp(env, production, signInMode, problems),
+    oidc: readOidc(env, problems),
   };
 
   if (production && config.devOutbox) {
@@ -444,4 +459,31 @@ export function loadConfig(env: Env = process.env): PortalConfig {
     throw new PortalConfigError(problems);
   }
   return Object.freeze({ ...config, smtp: config.smtp });
+}
+
+function readOidc(env: Env, problems: string[]): OidcConfig {
+  const pair = (name: "GOOGLE" | "MICROSOFT"): OidcProviderConfig | null => {
+    const id = env[`PORTAL_OIDC_${name}_CLIENT_ID`]?.trim();
+    const secret = env[`PORTAL_OIDC_${name}_CLIENT_SECRET`];
+    if (!id && !secret) {
+      return null;
+    }
+    if (!id || !secret) {
+      problems.push(`PORTAL_OIDC_${name}_CLIENT_ID and PORTAL_OIDC_${name}_CLIENT_SECRET are set or unset together`);
+      return null;
+    }
+    return { clientId: id, clientSecret: secret };
+  };
+  const google = pair("GOOGLE");
+  const microsoft = pair("MICROSOFT");
+  if (microsoft) {
+    const tenant = env.PORTAL_OIDC_MICROSOFT_TENANT?.trim() || "common";
+    if (!/^[A-Za-z0-9.-]{1,253}$/.test(tenant)) {
+      problems.push(
+        `PORTAL_OIDC_MICROSOFT_TENANT must be a tenant id, domain or "common" (got ${JSON.stringify(tenant)})`,
+      );
+    }
+    return { google, microsoft: { ...microsoft, tenant } };
+  }
+  return { google, microsoft: null };
 }

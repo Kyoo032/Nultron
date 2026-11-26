@@ -23,14 +23,13 @@ export function createResolvers(pool: Pool): TenantResolvers {
     bySlug: (slug) => one(`SELECT resolve_tenant_by_slug($1) AS tenant_id`, slug),
     byEmail: (email) => one(`SELECT resolve_tenant_for_email($1) AS tenant_id`, normaliseEmail(email)),
     byUsername: (username) => one(`SELECT resolve_tenant_for_username($1) AS tenant_id`, username.trim().toLowerCase()),
-    byRefreshToken: (rawToken) =>
-      one(`SELECT resolve_tenant_for_refresh($1) AS tenant_id`, sha256(rawToken)),
+    byRefreshToken: (rawToken) => one(`SELECT resolve_tenant_for_refresh($1) AS tenant_id`, sha256(rawToken)),
     byDeviceCode: (rawDeviceCode) =>
       one(`SELECT resolve_tenant_for_device_code($1) AS tenant_id`, sha256(rawDeviceCode)),
-    byUserCode: (userCode) =>
-      one(`SELECT resolve_tenant_for_user_code($1) AS tenant_id`, normaliseUserCode(userCode)),
+    byUserCode: (userCode) => one(`SELECT resolve_tenant_for_user_code($1) AS tenant_id`, normaliseUserCode(userCode)),
     byAuthCode: (rawCode) => one(`SELECT resolve_tenant_for_auth_code($1) AS tenant_id`, sha256(rawCode)),
     byClientId: (clientId) => one(`SELECT resolve_tenant_for_client($1) AS tenant_id`, clientId),
+    byOidcState: (stateHash) => one(`SELECT resolve_tenant_for_oidc_state($1) AS tenant_id`, stateHash),
   };
   return Object.freeze(resolvers);
 }

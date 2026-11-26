@@ -13,7 +13,7 @@ import { createRuntime, type PortalRuntime } from "../flows/context";
 import { resolveKeyring } from "../jwt/keys";
 import type { MailMessage, Mailer, SentMail } from "../mail/types";
 import type { PasswordHasher } from "../password/hash";
-import { registerPortalRoutes } from "../routes";
+import { registerPortalRoutes, type PortalRouteOptions } from "../routes";
 import { createPortalLimiters, createRateLimiter, type PortalLimiters } from "../security/rate-limit";
 import { createPortalServer, type PortalServer } from "../server";
 import { createTestStore, type TestStore } from "./pg";
@@ -124,6 +124,8 @@ export interface StartPortalOptions {
   readonly trustProxy?: boolean;
   /** A hasher the suite wraps to count or time the derivation. Absent, the shipped one. */
   readonly passwords?: PasswordHasher;
+  /** Passed to `registerPortalRoutes`: the OIDC suite's stub IdP lives here. */
+  readonly routeOptions?: PortalRouteOptions;
 }
 
 export async function startTestPortal(options: StartPortalOptions = {}): Promise<PortalHarness> {
@@ -178,7 +180,7 @@ export async function startTestPortal(options: StartPortalOptions = {}): Promise
     limiters,
     passwords: options.passwords,
   });
-  registerPortalRoutes(server, runtime);
+  registerPortalRoutes(server, runtime, options.routeOptions);
 
   return {
     runtime,

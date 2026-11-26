@@ -8,6 +8,7 @@ import { deviceCodesOps } from "./device-codes";
 import { devicesOps, sessionsOps } from "./devices";
 import { orgsOps, tenantConfigOps, tenantsOps, usersOps } from "./identity";
 import { invitesOps } from "./invites";
+import { oidcOps } from "./oidc";
 import { loginOtpsOps } from "./otps";
 import { loginPrecheck, refreshTokensOps } from "./tokens";
 import { webSessionsOps } from "./web-sessions";
@@ -28,6 +29,7 @@ export function createOps(client: PoolClient, clock: Clock): PortalOps {
     authCodes: authCodesOps(client, clock),
     oauthClients: oauthClientsOps(client),
     webSessions: webSessionsOps(client),
+    oidc: oidcOps(client),
     audit: auditOps(client),
     loginPrecheck: loginPrecheck(client),
   });

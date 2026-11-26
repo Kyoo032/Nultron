@@ -19,6 +19,7 @@
  * password in a URL, a log line, an audit row or a page. The only value a page gets back is the
  * identifier, and only to save a retype.
  */
+import type { OidcSsoLink } from "./oidc";
 import { changePasswordAndSignIn, normaliseIdentifier, signInWithPassword } from "../flows/password-sign-in";
 import type { PortalRuntime } from "../flows/context";
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, type PasswordRefusal } from "../password/policy";
@@ -39,6 +40,8 @@ export interface PasswordSpec {
   readonly hidden: Readonly<Record<string, string>>;
   /** Extra `form-action` origins -- the client's, on `/authorize` only (SR-20). */
   readonly formActionOrigins: readonly string[];
+  /** The "Sign in with …" buttons (F8b), one per configured OIDC provider; absent when none are. */
+  readonly sso?: readonly OidcSsoLink[];
 }
 
 type Fields = Readonly<Record<string, unknown>>;
@@ -89,6 +92,7 @@ export function passwordEntryResponse(
       hidden: spec.hidden,
       identifier: options.identifier,
       error: options.error,
+      sso: spec.sso,
     }),
     { status: options.status, retryAfter: options.retryAfter },
   );
@@ -251,6 +255,17 @@ export async function handlePasswordStep(
           error: context.t("password.busy"),
           status: 503,
           retryAfter: BUSY_RETRY_AFTER_SECONDS,
+        }),
+      };
+    case "sso_required":
+      // `orgs.sso_required`: password is off for non-owners. Named, not the one refusal -- the
+      // org's policy is the answer, and saying so sends them to the button on this page.
+      return {
+        kind: "response",
+        response: passwordEntryResponse(runtime, context, spec, {
+          identifier,
+          error: context.t("password.ssoRequired"),
+          status: 403,
         }),
       };
     case "refused":
