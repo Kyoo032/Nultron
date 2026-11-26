@@ -210,15 +210,23 @@ function ownerOf(opts: GatewayGateOptions): GateOwner {
 
 /**
  * Which stored slot holds this owner's verdict: the tenant's one payload on a desk, the company's
- * own on the server (further isolated per operator-assigned endpoint when a custom endpoint is set).
+ * own on the server (further isolated per operator-assigned endpoint when a custom endpoint is set,
+ * and per issued key under it — two people of one company may share an endpoint while the portal
+ * issued them different keys, and one's verdict must never be adopted as the other's).
  */
-function gateSlot(companyId: string | null | undefined, assignedEndpoint?: string | null): TenantStateSlot {
+function gateSlot(
+  companyId: string | null | undefined,
+  assignedEndpoint?: string | null,
+  keyFingerprint?: string | null,
+): TenantStateSlot {
   if (!companyId) {
     return GATE_KEY;
   }
-  return assignedEndpoint
-    ? companyStateKey(GATE_KEY, `${companyId}:ep:${assignedEndpointSlotTag(assignedEndpoint)}`)
-    : companyStateKey(GATE_KEY, companyId);
+  if (!assignedEndpoint) {
+    return companyStateKey(GATE_KEY, companyId);
+  }
+  const fingerprintTag = keyFingerprint ? `:${keyFingerprint.replace("sha256:", "")}` : "";
+  return companyStateKey(GATE_KEY, `${companyId}:ep:${assignedEndpointSlotTag(assignedEndpoint)}${fingerprintTag}`);
 }
 
 function isGatewayGateStatus(value: unknown): value is GatewayGateStatus {
@@ -252,10 +260,11 @@ export function loadGateState(
   tenantId: string,
   companyId?: string | null,
   assignedEndpoint?: string | null,
+  keyFingerprint?: string | null,
 ): GateState | null {
   let parsed: unknown;
   try {
-    const stored = tenantStateBackend().read(tenantId, gateSlot(companyId, assignedEndpoint));
+    const stored = tenantStateBackend().read(tenantId, gateSlot(companyId, assignedEndpoint, keyFingerprint));
     if (!stored) {
       return null;
     }
@@ -299,7 +308,7 @@ export function loadGateState(
  * adopted: it has no history to stand on. The partner's row is left where it is, for the other companies.
  */
 function loadVerdictFor(owner: GateOwner, fingerprint: string | null): GateState | null {
-  const own = loadGateState(owner.tenantId, owner.companyId, owner.assignedEndpoint);
+  const own = loadGateState(owner.tenantId, owner.companyId, owner.assignedEndpoint, fingerprint);
   if (own || owner.companyId === null || fingerprint === null || owner.assignedEndpoint) {
     return own;
   }
@@ -330,7 +339,7 @@ export function saveGateState(
   // sealed settings. The atomic temp-file-and-rename this used to do itself now belongs to the file
   // backend, and the row backend writes one statement, so neither can leave half a verdict.
   try {
-    tenantStateBackend().write(tenantId, gateSlot(companyId, assignedEndpoint), `${JSON.stringify(state, null, 2)}\n`);
+    tenantStateBackend().write(tenantId, gateSlot(companyId, assignedEndpoint, state.fingerprint), `${JSON.stringify(state, null, 2)}\n`);
     return { state, persisted: true };
   } catch (error) {
     // Swallow-and-warn, exactly like `clearGateState`. A read-only data dir, a full disk or a

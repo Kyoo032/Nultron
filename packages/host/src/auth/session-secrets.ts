@@ -139,10 +139,18 @@ export function endpointMacVerify(
     return true;
   }
   const expected = endpointMac(sessionIdHash, endpoint, wrapKey);
-  if (!expected || typeof stored !== "string" || stored.length !== expected.length) {
+  if (!expected || typeof stored !== "string") {
     return false;
   }
-  return timingSafeEqual(Buffer.from(stored, "utf8"), Buffer.from(expected, "utf8"));
+  // Compare on bytes: a stored tag with non-ASCII bytes can share the string length while its
+  // UTF-8 length differs, and timingSafeEqual throws on mismatched lengths — breaking the session
+  // load instead of refusing the tag.
+  const storedBytes = Buffer.from(stored, "utf8");
+  const expectedBytes = Buffer.from(expected, "utf8");
+  if (storedBytes.length !== expectedBytes.length) {
+    return false;
+  }
+  return timingSafeEqual(storedBytes, expectedBytes);
 }
 
 /**

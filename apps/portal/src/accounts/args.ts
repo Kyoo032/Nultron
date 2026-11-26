@@ -53,7 +53,7 @@ Usernames are 3 to 32 characters of a-z 0-9 . _ - and start with a letter or dig
 and never contain @, so the sign-in form can take a username or an address in one field.`;
 
 /** Flags that take no value. Everything else wants one. */
-const BARE_FLAGS: ReadonlySet<string> = new Set(["clear"]);
+const BARE_FLAGS: ReadonlySet<string> = new Set(["clear", "key-stdin"]);
 
 interface Common {
   readonly tenantSlug: string;
@@ -110,6 +110,9 @@ function collect(
       }
       const [name, inline] = token.slice(2).split("=", 2);
       if (BARE_FLAGS.has(name)) {
+        if (inline !== undefined) {
+          throw new AccountArgsError(`--${name} takes no value.\n\n${ACCOUNT_USAGE}`);
+        }
         flags.add(name);
         continue;
       }
@@ -246,13 +249,17 @@ export function parseAccountArgs(argv: readonly string[]): AccountCommand {
           `Pass exactly one of --gateway-endpoint <url> or --clear.\n\n${ACCOUNT_USAGE}`,
         );
       }
+      if (hasClear && flags.has("key-stdin")) {
+        throw new AccountArgsError(`--key-stdin has no meaning next to --clear.\n\n${ACCOUNT_USAGE}`);
+      }
       return Object.freeze({
         ...common,
         command,
         person: readPerson(values),
         gatewayEndpoint: hasClear ? null : readGatewayEndpoint(values.get("gateway-endpoint")),
         // The key comes over stdin, never as an argument (`--key-stdin`): an argv string would sit
-        // in the process list and the shell history (F11's same rule).
+        // in the process list and the shell history (F11's same rule). A `--clear` writes NULL for
+        // the key as it does the endpoint, so a key flag beside it has nothing to write.
         keyFromStdin: flags.has("key-stdin") || undefined,
       });
     }

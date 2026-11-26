@@ -530,10 +530,15 @@ export async function setAccountEndpoint(
   }
   return inTenant<EndpointChanged, SetEndpointRefusal>(deps.store, tenantId, async (ops) => {
     const account = await findPerson(ops, tenantId, input.person);
-    if (!account) {
+    // A code-mode member holds no password credential, so `findPerson` misses them; the person
+    // still exists on `users`, found by address (a code-mode invite names no username).
+    const codeModeUser =
+      !account && input.person.by === "email" ? await ops.users.findByEmail(tenantId, input.person.email) : null;
+    const user = account?.user ?? codeModeUser;
+    if (!user) {
       throw new RollBack("not_found");
     }
-    const { user, credential } = account;
+    const username = account?.credential.username ?? user.email;
     if (user.status === "disabled") {
       throw new RollBack("user_disabled");
     }
@@ -552,12 +557,12 @@ export async function setAccountEndpoint(
       ops,
       user,
       "account.gateway_endpoint_updated",
-      { user_id: user.id, username: credential.username, gateway_endpoint: target },
+      { user_id: user.id, username, gateway_endpoint: target },
       { gateway_endpoint: user.gatewayEndpoint },
     );
     return {
       ok: true as const,
-      username: credential.username,
+      username,
       email: user.email,
       userId: user.id,
       from: user.gatewayEndpoint,

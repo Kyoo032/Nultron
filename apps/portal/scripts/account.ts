@@ -210,6 +210,10 @@ async function run(command: AccountCommand, deps: AccountDeps): Promise<void> {
     case "set-endpoint": {
       // The key comes over stdin only: never an argv string, never a URL (F11's rule, applied here).
       const gatewayKey = command.keyFromStdin ? await readStdinKey() : undefined;
+      // An invalid stdin read already refused; nothing reaches the write.
+      if (command.keyFromStdin && gatewayKey === null) {
+        return;
+      }
       const result = await setAccountEndpoint(deps, { ...command, gatewayKey });
       if (result.ok) {
         say(
@@ -245,11 +249,14 @@ async function main(): Promise<void> {
   }
   const command = parseAccountArgs(argv);
   const config = loadConfig();
-  if (config.signInMode !== "password") {
+  // `set-endpoint` works in either sign-in mode: assigning a gateway endpoint (and issuing its key)
+  // touches the member's own row, nothing the password stack owns.
+  if (config.signInMode !== "password" && command.command !== "set-endpoint") {
     console.error(
       "Refused: this portal is not in password mode (PORTAL_SIGNIN_MODE is not set to password where this runs).\n" +
         "The accounts this command makes are read only by a portal that signs people in with a username and a\n" +
-        "password. For the e-mailed-code sign-in, use the invite command instead.",
+        "password. For the e-mailed-code sign-in, use the invite command instead. `set-endpoint` works in\n" +
+        "either mode.",
     );
     process.exit(3);
   }
@@ -288,7 +295,7 @@ main().catch((error: unknown) => {
  * `--key-stdin`: the key arrives on stdin and nowhere else — never an argument, a URL or a log line.
  * Trimmed once; anything empty or multi-line is refused, because a pasted block is not a key.
  */
-async function readStdinKey(): Promise<string> {
+async function readStdinKey(): Promise<string | null> {
   const rl = createInterface({ input: process.stdin, terminal: false });
   let text = "";
   for await (const line of rl) {
@@ -297,6 +304,8 @@ async function readStdinKey(): Promise<string> {
   const key = text.trim();
   if (!key || key.includes("\n") || key.includes("\r")) {
     refuse({ code: 3, message: "Pass exactly one line on stdin: the endpoint's bearer key." });
+    // `refuse` only sets the exit code, so the caller must bail on null: nothing reaches the write.
+    return null;
   }
   return key;
 }
