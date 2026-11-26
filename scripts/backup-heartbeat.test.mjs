@@ -101,18 +101,35 @@ function fakeDocker(dir, appRunning) {
   const data = join(dir, "data");
   mkdirSync(data, { recursive: true });
   writeFileSync(join(data, "file.txt"), "payload");
+  // backup.sh's verify step requires the embedded desk meta in every archive.
+  writeFileSync(join(data, "backup-meta.json"), '{"desk":"nultron-web","createdAt":"stub"}\n');
   const bin = join(dir, "bin");
   mkdirSync(bin, { recursive: true });
   const docker = join(bin, "docker");
   writeFileSync(
     docker,
     `#!/bin/sh
+# Stub of the per-desk interface backup.sh drives: desks are compose projects with an
+# \`app\` service, found by label filters; snapshots and tars run through docker exec.
 case "$*" in
   *"compose version"*) exit 0 ;;
-  *"ps -q app"*) ${appRunning ? "echo fake-app-id" : "true"} ;;
-  *"ps -q portal-db"*) true ;;
-  *"exec -T app tar"*) tar -czf - -C "${toPosix(data)}" . ;;
-  *exec*) cat >/dev/null 2>&1 || true ;;
+  *"compose ps -q portal-db"*) true ;;
+  *"ps --filter"*) ${appRunning ? "echo nultron-web" : "true"} ;;
+  *"ps -q --filter"*) ${appRunning ? "echo fake-app-id" : "true"} ;;
+  *"exec -i "*" sh -s"*)
+    # Emulate the snapshot step: stage a fake agentforge.sqlite under the per-run dir
+    # named in -e SNAP_DIR=, so the tar below carries a .backup-staging* member and
+    # backup.sh's test -f probe and snapshot-required verify run for real.
+    _snap="$(printf '%s\\n' "$*" | sed -n 's/.*SNAP_DIR=\\([^ ]*\\).*/\\1/p')"
+    mkdir -p "${toPosix(data)}/$_snap" && : > "${toPosix(data)}/$_snap/agentforge.sqlite"
+    cat >/dev/null 2>&1 || true ;;
+  *"tar -czf"*) tar -czf - -C "${toPosix(data)}" . ; echo "tar_exit=0" >&2 ;;
+  *exec*)
+    eval "_last=\${$#}"
+    case "$_last" in
+      "test -f"*) AGENTFORGE_DATA_DIR="${toPosix(data)}" eval "$_last" ;;
+      *) cat >/dev/null 2>&1 || true ;;
+    esac ;;
 esac
 exit 0
 `,
@@ -134,6 +151,9 @@ function runBackup(name, { appRunning, heartbeat, scripts = scriptsPosix }) {
       BACKUP_KEY: "test-passphrase",
       BACKUP_HEARTBEAT_URL: heartbeat,
       COS_BACKUP_BUCKET: "",
+      // These tests exercise the heartbeat, not the offsite gate: a skipped upload would
+      // otherwise fail every desk (BACKUP_REQUIRE_OFFSITE=1 is covered in backup-restore.test.mjs).
+      BACKUP_REQUIRE_OFFSITE: "0",
     },
     90_000,
   );

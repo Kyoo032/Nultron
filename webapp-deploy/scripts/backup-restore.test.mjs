@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -83,11 +83,15 @@ function runCapture(command, args, options = {}) {
 }
 
 /** A tiny gzipped tar with real content, built with the system tar, plus its listing for assertions. */
-function makeTarFixture(dir) {
+function makeTarFixture(dir, { meta } = {}) {
   const data = join(dir, "data");
   mkdirSync(join(data, "sub"), { recursive: true });
   writeFileSync(join(data, "hello.txt"), "hello nultron backup\n");
   writeFileSync(join(data, "sub", "second.txt"), "second file\n");
+  // backup.sh's verify step requires the embedded desk meta in every archive it produces.
+  if (meta) {
+    writeFileSync(join(data, "backup-meta.json"), `${JSON.stringify({ desk: meta.desk ?? "stub", createdAt: "stub" })}\n`);
+  }
   const tarPath = join(dir, "fixture.tar.gz");
   const tar = runCapture("tar", ["-czf", posixPath(tarPath), "-C", posixPath(data), "."]);
   assert.equal(tar.status, 0, tar.output);
@@ -136,7 +140,13 @@ function installDockerStub(dir) {
       "#!/bin/sh",
       'if [ "$1" = "compose" ] && [ "$2" = "version" ]; then echo "Docker Compose version v2.99.0-stub"; exit 0; fi',
       'printf "%s\\n" "$*" >> "$DOCKER_STUB_LOG"',
-      'for a in "$@"; do [ "$a" = "ps" ] && echo 0123456789ab; done',
+      'case "$*" in *"ps -q portal-db"*) echo 0123456789ab ;; esac',
+      'if [ "$1" = "ps" ]; then',
+      '  # -aq (all containers) answers the app container id; a bare -q (running only)',
+      '  # the way restore.sh checks the desk is stopped, answers nothing.',
+      '  case "$*" in *-a*|*service*) echo 0123456789ab ;; esac',
+      '  exit 0',
+      'fi',
       "cat >/dev/null 2>&1 || true",
       "exit 0",
       "",
@@ -144,6 +154,84 @@ function installDockerStub(dir) {
   );
   chmodSync(join(bin, "docker"), 0o755);
   return { bin, log };
+}
+
+/**
+ * A fake `docker` for backup.sh's per-desk path: `ps --format ...` answers the desk project
+ * names from $STUB_DESKS_FILE, `ps -q` answers a container id, `exec <cid> tar -czf ...`
+ * streams the fixture tar at $STUB_TAR, `exec` of anything else consumes stdin and exits 0
+ * (the sqlite snapshot, the staging cleanup and the backup-status.json writes), `compose ...`
+ * answers nothing (so the portal-dump branch stays off), and `inspect`/`stop`/`start`/`run`
+ * are recorded and succeed. Every invocation lands in $DOCKER_STUB_LOG.
+ */
+function installBackupDockerStub(dir, { desks = [], tarPath }) {
+  const bin = join(dir, "bin");
+  mkdirSync(bin, { recursive: true });
+  const log = join(dir, "docker-stub.log");
+  const desksFile = join(dir, "desks.txt");
+  writeFileSync(desksFile, desks.join("\n"));
+
+  writeFileSync(
+    join(bin, "docker"),
+    [
+      "#!/bin/sh",
+      'if [ "$1" = "compose" ] && [ "$2" = "version" ]; then echo "Docker Compose version v2.99.0-stub"; exit 0; fi',
+      'printf "%s\\n" "$*" >> "$DOCKER_STUB_LOG"',
+      'if [ "$1" = "ps" ]; then',
+      '  case "$*" in',
+      '    *--format*) cat "$STUB_DESKS_FILE" ;;',
+      "    # -aq (all containers) and -q filtered for the app service answer the id;",
+      "    # a bare -q for the project alone, restore.sh's post-stop check, answers nothing.",
+      '    *-a*|*service*) echo 0123456789ab ;;',
+      "  esac",
+      "  exit 0",
+      "fi",
+      'if [ "$1" = "inspect" ]; then echo "nultron-web:stub"; exit 0; fi',
+      'if [ "$1" = "exec" ]; then',
+      '  case "$*" in',
+      '    *"tar -czf"*) cat "$STUB_TAR"; echo "tar_exit=$?" >&2 ;;',
+      "    # The stub stages no snapshot, so backup.sh's test -f probe answers false and",
+      "    # verify requires only the embedded meta in the static fixture.",
+      '    *"test -f"*) exit 1 ;;',
+      "    *) cat >/dev/null 2>&1 || true ;;",
+      "  esac",
+      "  exit 0",
+      "fi",
+      'if [ "$1" = "compose" ]; then exit 0; fi',
+      "cat >/dev/null 2>&1 || true",
+      "exit 0",
+      "",
+    ].join("\n"),
+  );
+  chmodSync(join(bin, "docker"), 0o755);
+  return { bin, log, desksFile };
+}
+
+/** Run backup.sh or restore.sh with the per-desk stub on PATH and capture everything. */
+function runBackupScript(script, args, { desks = [], tarPath, dir, env = {} }) {
+  const stub = installBackupDockerStub(dir, { desks, tarPath });
+  const tmp = join(dir, "tmp");
+  mkdirSync(tmp, { recursive: true });
+  const fullEnv = {
+    ...process.env,
+    PATH: `${posixPath(stub.bin)}:${process.env.PATH}`,
+    DOCKER_STUB_LOG: posixPath(stub.log),
+    STUB_DESKS_FILE: posixPath(stub.desksFile),
+    STUB_TAR: posixPath(tarPath ?? ""),
+    TMPDIR: posixPath(tmp),
+    BACKUP_KEY: KEY,
+    // A local-test run: no bucket anywhere, cos_upload can only fail.
+    COS_BACKUP_BUCKET: "",
+    ...env,
+  };
+  delete fullEnv.COS_BACKUP_BUCKET;
+  delete fullEnv.BACKUP_HEARTBEAT_URL;
+  const run = runCapture("sh", [script, ...args.map(posixPath)], { env: fullEnv });
+  let logText = "";
+  try {
+    logText = readFileSync(stub.log, "utf8");
+  } catch {}
+  return { ...run, log: stub.log, logText };
 }
 
 const DESTRUCTIVE = ["stop", "run", "up", "exec"];
@@ -304,6 +392,153 @@ describe("backup/restore shell wiring", () => {
     const run = runRestoreScript("webapp-deploy/scripts/restore-portal.sh", [plain, "--yes"], { dir });
     assert.notEqual(run.status, 0);
     assert.match(run.output, /no encryption header/);
+  });
+
+  it("backup.sh exits non-zero and writes a failed heartbeat when the offsite upload is skipped (DFIND-168)", { skip: SHELL_OPTS.shellSkip }, () => {
+    const dir = tempDir("backup-nobucket-");
+    const tarPath = makeTarFixture(dir, { meta: { desk: "nultron-web" } });
+    const outDir = join(dir, "backups");
+    const run = runBackupScript("webapp-deploy/scripts/backup.sh", [outDir], {
+      desks: ["nultron-web"],
+      tarPath,
+      dir,
+    });
+    assert.notEqual(run.status, 0, "a skipped upload is a failed backup, not a green run");
+    assert.match(run.output, /stays on this server|COS_BACKUP_BUCKET/);
+    assert.match(run.output, /backup FAILED for:.*nultron-web/);
+    // The desk's backup-status.json write is a `docker exec ... printf` call in the stub log.
+    assert.match(run.logText, /backup-status\.json/, "the run must leave a heartbeat file behind");
+    assert.match(run.logText, /failed/, "the heartbeat records the failure, not 'ok'");
+  });
+
+  it("backup.sh honours BACKUP_REQUIRE_OFFSITE=0 for local tests", { skip: SHELL_OPTS.shellSkip }, () => {
+    const dir = tempDir("backup-offsite-off-");
+    const tarPath = makeTarFixture(dir, { meta: { desk: "nultron-web" } });
+    const outDir = join(dir, "backups");
+    const run = runBackupScript("webapp-deploy/scripts/backup.sh", [outDir], {
+      desks: ["nultron-web"],
+      tarPath,
+      dir,
+      env: { BACKUP_REQUIRE_OFFSITE: "0" },
+    });
+    assert.equal(run.status, 0, run.output);
+  });
+
+  it("backup.sh archives every desk it discovers, one encrypted archive per desk id (DFIND-169)", { skip: SHELL_OPTS.shellSkip }, () => {
+    const dir = tempDir("backup-perdesk-");
+    const tarPath = makeTarFixture(dir, { meta: {} });
+    const outDir = join(dir, "backups");
+    const desks = ["nultron-web", "pusat01", "tester-a"];
+    const run = runBackupScript("webapp-deploy/scripts/backup.sh", [outDir], {
+      desks,
+      tarPath,
+      dir,
+      env: { BACKUP_REQUIRE_OFFSITE: "0" },
+    });
+    assert.equal(run.status, 0, run.output);
+    for (const desk of desks) {
+      const archives = readdirSync(outDir).filter(
+        (name) => name.startsWith(`nultron-data-${desk}-`) && name.endsWith(".tar.gz.enc"),
+      );
+      assert.equal(archives.length, 1, `expected exactly one archive for desk ${desk}, saw ${readdirSync(outDir)}`);
+      // Each archive opens only with the key: right key lists the fixture, wrong key refuses.
+      const archivePath = join(outDir, archives[0]);
+      const good = runCapture(
+        "sh",
+        ["-c", `node webapp-deploy/scripts/aead-crypt.mjs decrypt --in "$1" | tar -tzf - | grep hello`, "driver", archivePath],
+        { env: { ...process.env, BACKUP_KEY: KEY } },
+      );
+      assert.equal(good.status, 0, `archive for ${desk} should decrypt with BACKUP_KEY: ${good.output}`);
+      const bad = runCapture(process.execPath, [
+        join(SCRIPTS_DIR, "aead-crypt.mjs"),
+        "decrypt",
+        "--in",
+        archivePath,
+      ], { env: { ...process.env, BACKUP_KEY: WRONG_KEY } });
+      assert.notEqual(bad.status, 0, `archive for ${desk} must refuse the wrong key`);
+    }
+    // No key material ever lands in the archives or their names.
+    for (const name of readdirSync(outDir)) {
+      assert.doesNotMatch(name, /key|secret|master/i, name);
+    }
+  });
+
+  it("backup.sh drops the staged snapshot copy when archiving fails (r4707956068)", { skip: SHELL_OPTS.shellSkip }, () => {
+    const dir = tempDir("backup-leak-");
+    const outDir = join(dir, "backups");
+    // A tarPath that does not exist: the stub's cat fails, tar_exit=1 reaches backup.sh's
+    // strict gate, and the run must still rm -rf its own .backup-staging-<stamp>-<pid> dir.
+    const run = runBackupScript("webapp-deploy/scripts/backup.sh", [outDir], {
+      desks: ["nultron-web"],
+      tarPath: join(dir, "missing.tar.gz"),
+      dir,
+      env: { BACKUP_REQUIRE_OFFSITE: "0" },
+    });
+    assert.notEqual(run.status, 0, "a failed archive must fail the run");
+    assert.match(run.logText, /rm -rf.*\.backup-staging-/, "the failed run must clean up its staged snapshot dir");
+  });
+
+  it("backup.sh respects BACKUP_DESK_GLOB when picking desks", { skip: SHELL_OPTS.shellSkip }, () => {
+    const dir = tempDir("backup-glob-");
+    const tarPath = makeTarFixture(dir, { meta: {} });
+    const outDir = join(dir, "backups");
+    const run = runBackupScript("webapp-deploy/scripts/backup.sh", [outDir], {
+      desks: ["nultron-web", "pusat01", "pusat02"],
+      tarPath,
+      dir,
+      env: { BACKUP_REQUIRE_OFFSITE: "0", BACKUP_DESK_GLOB: "pusat*" },
+    });
+    assert.equal(run.status, 0, run.output);
+    const names = readdirSync(outDir).join(" ");
+    assert.match(names, /nultron-data-pusat01-/);
+    assert.match(names, /nultron-data-pusat02-/);
+    assert.doesNotMatch(names, /nultron-data-nultron-web-/);
+  });
+
+  it("restore.sh restores one named desk, reading the desk id from the archive name", { skip: SHELL_OPTS.shellSkip }, () => {
+    const dir = tempDir("restore-perdesk-");
+    const tarPath = makeTarFixture(dir);
+    const backup = encryptGcm(tarPath, join(dir, "nultron-data-pusat03-20261126T120000Z.tar.gz.enc"));
+    const run = runBackupScript("webapp-deploy/scripts/restore.sh", [backup, "--yes"], { dir });
+    assert.equal(run.status, 0, run.output);
+    assert.match(run.output, /restored desk 'pusat03'/);
+    assert.match(run.logText, /^stop /m, "the desk's containers must be stopped first");
+    assert.match(run.logText, /--volumes-from/, "the restore unpacks over the desk's own volume mounts");
+    assert.match(run.logText, /^start /m, "the desk's containers are started again");
+  });
+
+  it("restore.sh honours an explicit --desk over the archive name", { skip: SHELL_OPTS.shellSkip }, () => {
+    const dir = tempDir("restore-desk-flag-");
+    const tarPath = makeTarFixture(dir);
+    const backup = encryptGcm(tarPath, join(dir, "nultron-data-oldname-20261126T120000Z.tar.gz.enc"));
+    const run = runBackupScript("webapp-deploy/scripts/restore.sh", [backup, "--yes", "--desk", "tester-b"], { dir });
+    assert.equal(run.status, 0, run.output);
+    assert.match(run.output, /restored desk 'tester-b'/);
+  });
+
+  it("restore.sh refuses an archive whose embedded desk id does not match --desk", { skip: SHELL_OPTS.shellSkip }, () => {
+    const dir = tempDir("restore-meta-mismatch-");
+    const data = join(dir, "data");
+    mkdirSync(data, { recursive: true });
+    writeFileSync(join(data, "backup-meta.json"), '{"desk":"pusat01","createdAt":"stub"}\n');
+    const tarPath = join(dir, "withmeta.tar.gz");
+    assert.equal(runCapture("tar", ["-czf", posixPath(tarPath), "-C", posixPath(data), "."]).status, 0);
+    // The name claims pusat02; the embedded meta says pusat01. The embedded id wins.
+    const backup = encryptGcm(tarPath, join(dir, "nultron-data-pusat02-20261126T120000Z.tar.gz.enc"));
+    const run = runBackupScript("webapp-deploy/scripts/restore.sh", [backup, "--yes"], { dir });
+    assert.notEqual(run.status, 0, "a renamed archive must not restore into the wrong desk");
+    assert.match(run.output, /belongs to desk 'pusat01', not 'pusat02'/);
+    assert.doesNotMatch(run.logText, /^stop |^start |--volumes-from/m, "nothing destructive may run after a refused meta");
+  });
+
+  it("restore.sh still verifies the ciphertext before touching a named desk", { skip: SHELL_OPTS.shellSkip }, () => {
+    const dir = tempDir("restore-perdesk-tampered-");
+    const tarPath = makeTarFixture(dir);
+    const backup = encryptGcm(tarPath, join(dir, "nultron-data-pusat03-20261126T120000Z.tar.gz.enc"));
+    const bad = tamperedCopy(backup, join(dir, "nultron-data-pusat03-20261126T130000Z.tar.gz.enc"));
+    const run = runBackupScript("webapp-deploy/scripts/restore.sh", [bad, "--yes"], { dir });
+    assert.notEqual(run.status, 0, "a tampered backup must not restore");
+    assert.doesNotMatch(run.logText, /^stop |^start |--volumes-from/m, "nothing destructive may run after a failed authentication");
   });
 });
 
