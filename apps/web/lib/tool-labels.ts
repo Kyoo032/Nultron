@@ -28,6 +28,7 @@ const ACTIVITY_KEYS: Record<string, string> = {
   calculator: "chat.tool.calculating",
   datetime: "chat.tool.clock",
   self_check: "chat.tool.selfChecking",
+  query_data_source: "chat.tool.queryingDataSource",
   research_dossier: "agents.progress.working",
   finance_task: "agents.progress.working",
   delegate: "agents.delegate.working",
@@ -42,6 +43,7 @@ const DONE_KEYS: Record<string, string> = {
   calculator: "chat.tool.calculator",
   datetime: "chat.tool.datetime",
   self_check: "chat.tool.selfCheck",
+  query_data_source: "chat.tool.queryDataSource",
   research_dossier: "agents.dossier.label",
   finance_task: "agents.finance.label",
   delegate: "agents.delegate.label",
@@ -286,8 +288,7 @@ function webSearchSummary(label: string, input: unknown, output: unknown): strin
 function delegateSummary(label: string, input: unknown, output: unknown): string {
   const agent = delegatedAgentOf(input, output);
   const agentName = readString(asRecord(output), "agentName");
-  const agentLabel =
-    agentName ?? (agent ? (isTeamBotParam(agent) ? agent : t(`rail.${agent}`)) : null);
+  const agentLabel = agentName ?? (agent ? (isTeamBotParam(agent) ? agent : t(`rail.${agent}`)) : null);
   const named = agentLabel ? `${label} · ${agentLabel}` : label;
   const record = asRecord(output);
   const message = record?.ok === false ? readString(record, "message") : undefined;

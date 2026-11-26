@@ -44,8 +44,8 @@ export type KnowledgeMemory = {
   createdAt: number;
 };
 
-/** Where a work card came from. `thread` = Chat, `media` = Images / Videos / Edit, `artifact` = job outputs. */
-export type SourceOriginKind = "thread" | "media" | "artifact";
+/** Where a work card came from. `thread` = Chat, `media` = Images / Videos / Edit, `artifact` = job outputs, `data_source` = an F1 connector sync. */
+export type SourceOriginKind = "thread" | "media" | "artifact" | "data_source";
 
 export type SourceOrigin = { kind: SourceOriginKind; id: string };
 
@@ -456,11 +456,7 @@ export async function indexKnowledgeSource(tenant: TenantContext, raw: IndexSour
 }
 
 /** Record a source that could not be indexed. The work that produced it still succeeded. */
-export function markSourceFailed(
-  tenant: TenantContext,
-  raw: FailedSourceInput,
-  reason: string,
-): KnowledgeSource {
+export function markSourceFailed(tenant: TenantContext, raw: FailedSourceInput, reason: string): KnowledgeSource {
   const input = withSafeName(raw);
   const createdAt = nextCreatedAt();
   replaceSourceRows(tenant, input, [], reason, createdAt);
@@ -493,7 +489,7 @@ function injectionGuardBypass(tenant: TenantContext): boolean {
  * The name is scanned too: it becomes the `[n] <name>` citation line, and an upload filename or a
  * remote `<title>` is attacker-controlled in exactly the same way the body is.
  */
-function injectionRule(tenant: TenantContext, name: string, text: string): string | null {
+export function injectionRule(tenant: TenantContext, name: string, text: string): string | null {
   if (injectionGuardBypass(tenant)) {
     return null;
   }
@@ -747,6 +743,8 @@ const ORIGIN_OWNERS: Readonly<Record<SourceOriginKind, { select: string; param: 
     thread: { select: "SELECT id FROM threads WHERE workspace_id = ?", param: (tenant) => tenant.workspaceId },
     artifact: { select: "SELECT id FROM artifacts WHERE workspace_id = ?", param: (tenant) => tenant.workspaceId },
     media: { select: "SELECT id FROM media WHERE organization_id = ?", param: (tenant) => tenant.organizationId },
+    // A deleted or disabled connector's cards die with it in the same sweep.
+    data_source: { select: "SELECT id FROM data_sources WHERE tenant_id = ?", param: (tenant) => tenant.tenantId },
   };
 
 type OrphanRow = { id: string; external_id: string | null };
@@ -758,6 +756,24 @@ type OrphanRow = { id: string; external_id: string | null };
 function orphansOfKind(tenant: TenantContext, kind: SourceOriginKind): OrphanRow[] | null {
   const owner = ORIGIN_OWNERS[kind];
   try {
+    if (kind === "data_source") {
+      // A synced object's origin is the composite `<source id>/<object key>`, so one connector can
+      // hold many cards. Bare `origin_id NOT IN (SELECT id …)` never matches it, which swept every
+      // synced card as an orphan on the next Knowledge read. The row is owned when the id itself or
+      // the id plus a `/` prefix is a live source — deleting or disabling the connector still
+      // sweeps its cards, as the comment on ORIGIN_OWNERS intends.
+      return sql
+        .prepare(
+          `SELECT ks.id, ks.external_id FROM knowledge_sources ks
+           WHERE ks.workspace_id = ? AND ks.origin_kind = 'data_source'
+             AND NOT EXISTS (
+               SELECT 1 FROM data_sources ds
+               WHERE ds.tenant_id = ?
+                 AND (ks.origin_id = ds.id OR substr(ks.origin_id, 1, length(ds.id) + 1) = ds.id || '/')
+             )`,
+        )
+        .all(workspaceId(tenant), tenant.tenantId) as OrphanRow[];
+    }
     return sql
       .prepare(
         `SELECT id, external_id FROM knowledge_sources

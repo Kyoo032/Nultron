@@ -29,6 +29,7 @@ type SourceRow = {
   chunks: number;
   status: "Indexed" | "Indexing" | "Failed";
   error?: string | null;
+  origin?: { kind: string; id: string } | null;
 };
 
 type Memory = { id: string; text: string; pinned: boolean };
@@ -275,7 +276,6 @@ export function KnowledgePage() {
     // a list of their own. `modelsForMode` is the one place that knows which is which.
     const chatList = asModels(modelsForMode(wire, "chat"));
     const embeddingList = asModels(modelsForMode(wire, "embedding"));
-
 
     const saved =
       payload.models && typeof payload.models === "object" ? (payload.models as Partial<KnowledgeModels>) : {};
@@ -547,6 +547,26 @@ export function KnowledgePage() {
             key={`${workspaceId}:${graphCounts?.nodes ?? 0}:${graphCounts?.edges ?? 0}`}
             counts={graphCounts}
           />
+          {sources.some((row) => row.origin?.kind === "data_source") && (
+            <section
+              className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4"
+              data-testid="knowledge-synced-sources"
+            >
+              <p className="panel-label">{t("knowledge.sources.syncedTitle")}</p>
+              <ul className="mt-2 flex flex-col gap-1 text-sm text-[var(--text)]">
+                {sources
+                  .filter((row) => row.origin?.kind === "data_source")
+                  .map((row) => (
+                    <li key={row.id} className="flex items-center justify-between gap-2">
+                      <span className="truncate">{row.name}</span>
+                      <span className="text-xs text-[var(--muted)]">
+                        {row.chunks} {t("knowledge.sources.chunks")} · {row.status}
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+            </section>
+          )}
           <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
             <p className="panel-label">{t("knowledge.sources.add")}</p>
             <div className="mt-3 flex flex-wrap gap-2">

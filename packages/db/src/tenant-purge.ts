@@ -133,6 +133,12 @@ export const TENANT_SCOPED_TABLES = [
   // next request from any of those browsers finds no row and is a 401. Rows, not revocations: a
   // revoked row would keep a user id and a tenant id for an account that no longer exists.
   "auth_sessions",
+  // F1: the connectors and their sealed credentials go with the tenant's other secrets
+  // (migration 0027), and so does the operator allowlist (0028) — an erased tenant's
+  // destinations stay reachable to nobody.
+  "data_sources",
+  "data_source_sync_runs",
+  "destination_allowlist",
 ] as const;
 
 /**

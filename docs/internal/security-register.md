@@ -7612,3 +7612,155 @@ extract and render; a playlist, a concat script and a metadata file are refused;
   or an address, because the whitelist is `file` only and uploads are stored per tenant. The gate refuses the format
   at the probe, so this stays closed unless detection differs between the probe and the run. Do not remove the gate
   as redundant.
+
+### SR-215 {#sr-215}
+
+**The read-only SQL guard missed relationless server-side reads.** Raised by Devin Review on the F1
+data-sources PR (2026-11-26). High. **Fixed in this change** (commit 7862d5fe).
+
+Evidence before the fix: `packages/host/src/data-sources/sql-guard.ts` enforced single-statement SELECT +
+read-only transaction + a FROM/JOIN table allowlist, but functions like `pg_read_file(...)`,
+`pg_ls_dir(...)`, `dblink(...)`, `pg_logical_slot_get_changes(...)` and `http_get(...)` return rows without
+naming a relation, so a query like `SELECT pg_read_file('/etc/passwd')` passed every check and read outside
+the table allowlist.
+
+Fix: the guard's FORBIDDEN set now names the server-side read functions (`pg_read_file`,
+`pg_read_binary_file`, `pg_ls_dir`, `pg_stat_file`, `pg_ls_*` catalog variants, `pg_export_snapshot`, the
+`dblink_*` family, replication-slot functions, `pg_logical_slot_*_changes`, and the `http*` extension
+functions — `packages/host/src/data-sources/sql-guard.ts:84`). `sql-guard.test.ts:35` adds a refusal case
+for each class. Catalog views were already covered by the
+FROM/JOIN allowlist.
+
+Gate: closed — the function names are refused before the query reaches Postgres.
+
+### SR-216 {#sr-216}
+
+**Destination allowlist lookups ignored the tenant.** Raised by Devin Review on the F1 data-sources PR
+(2026-11-26). High. **Fixed in this change** (commit c4a00e13).
+
+Evidence before the fix: `installDestinationAllowlist` in `packages/host/src/data-sources/allowlist.ts`
+matched `host`+`port` without `tenant_id`, so one tenant's approved destination allowed every tenant's
+connector to reach it.
+
+Fix: `DestinationAllowlist` (`packages/core/src/security/safe-fetch.ts`) and `assertAllowedDestination`
+take the caller's `tenantId` and fail closed without one; the host reader scopes the row lookup by
+`tenant_id`; S3 and Postgres connectors pass their row's tenant
+(`packages/core/src/security/safe-fetch.ts:229`, `packages/host/src/data-sources/allowlist.ts:53`).
+`handlers/data-sources.test.ts` adds a cross-tenant refusal case.
+
+Gate: closed — a tenant cannot reach another tenant's approved destination.
+
+### SR-217 {#sr-217}
+
+**`secretLast4` returned short secrets whole.** Raised by Devin Review on the F1 data-sources PR
+(2026-11-26). Medium. **Fixed in this change** (commit 7862d5fe).
+
+Evidence before the fix: `packages/host/src/data-sources/store.ts` returned `raw.slice(-4)`, which is the
+entire secret when it is four characters or shorter — the list endpoint then exposed it.
+
+Fix: secrets of ≤4 characters return a fixed `••••` mask; longer ones still show their last four
+(`packages/host/src/data-sources/store.ts:80`).
+
+Gate: closed — no response body can carry a whole stored credential.
+
+### SR-218 {#sr-218}
+
+**Data-source sync skipped the injection scan and PII masking.** Raised by Devin Review on the F1
+data-sources PR (2026-11-26). Medium. **Fixed in this change** (commit 7862d5fe).
+
+Evidence before the fix: `syncDataSource` (`packages/host/src/data-sources/sync.ts`) indexed parsed text
+straight into the knowledge base, while manual uploads through `knowledge.ts` run `injectionRule` (prompt
+injection / secret-shaped content) and `maskPii` first — so a hostile or sensitive file pulled from a
+connected source bypassed both gates.
+
+Fix: sync runs `injectionRule(tenant, key, text)` per object (a hit counts the file failed with
+`injection_blocked`) and indexes `maskPii(text)` (`packages/host/src/data-sources/sync.ts:56` and `:66`),
+matching the manual-upload path.
+
+Gate: closed — synced content gets the same gates as an upload.
+
+### SR-219 {#sr-219}
+
+**Synced objects shared one knowledge origin, so only the last file survived.** Raised by Devin Review on
+the F1 data-sources PR (2026-11-26). Low (correctness; listed here because it was raised as a finding on a
+security-adjacent change). **Fixed in this change** (commit 7862d5fe).
+
+Evidence: `syncDataSource` used `origin: { kind: "data_source", id: row.id }` for every object; the
+unique-origin index in `knowledge.ts` folds rows sharing `origin_kind`/`origin_id`, deleting the previous
+row each write.
+
+Fix: each object gets `id: "<row.id>/<object.key>"`, so files coexist in the knowledge base.
+
+### SR-220 {#sr-220}
+
+**The orphan sweep deleted every synced data-source card.** Found by local QA on the F1 data-sources PR
+(2026-11-26): after a successful sync the knowledge rows were present, and one `GET /api/v1/knowledge`
+later they were all gone. Medium (data loss on a security-adjacent feature). **Fixed in this change.**
+
+Evidence: `syncDataSource` stamps each object `origin: "<source id>/<object key>"` (SR-219), but the
+orphan sweep (`packages/host/src/knowledge.ts:756`) matched `origin_id` against bare `data_sources.id`
+values, so a composite origin never matched a live connector and `sweepOrphanSources` — which runs on
+every Knowledge page read — deleted every synced card and its projections.
+
+Fix: the `data_source` arm of `orphansOfKind` owns a row when its origin is the source id or the id plus
+a `/` prefix (`packages/host/src/knowledge.ts:759`); a deleted connector's cards still die in the sweep.
+Regression: `knowledge-cascade.test.ts` ("keeps synced data-source cards whose composite origin a live
+connector owns").
+
+Gate: closed — synced cards survive Knowledge reads; orphaned ones are still swept.
+
+### SR-221 {#sr-221}
+
+**The sync pipeline trusted the key's extension over the object's bytes, and an empty file counted as
+synced.** Found by Devin Review on the F1 data-sources PR (2026-11-26). Medium (unvetted binary and
+false "ok" runs on a security-gated path). **Fixed in this change.**
+
+Evidence: `syncDataSource` reads objects through the upload reader `extractText`
+(`packages/host/src/data-sources/sync.ts:56`), which routed on the filename extension alone: an
+extensionless workbook the converter's `detectFormat` would accept was refused outright, a `.csv` key
+on workbook bytes was decoded as UTF-8 gibberish and indexed, and `indexKnowledgeSource` returns a
+`Failed` source without throwing when the text is empty — so every empty object counted toward `ok`.
+
+Fix: `knowledge-extract.ts` `rawText` now checks the leading-byte container signature (`containerOf`,
+exported from `file-extract/detect.ts`) before honoring a `text` or unmatched kind — bytes with a real
+container signature go to the converter, whose own `detectFormat` refuses a lying extension
+(`format_mismatch`); and `syncDataSource` counts a non-`Indexed` result as a failure (`file_empty`)
+instead of a synced file.
+
+Gate: closed — extension decides nothing the bytes contradict; empty objects no longer report `ok`.
+
+### SR-222 {#sr-222}
+
+**The MySQL connector could outlive its deadline, buffer an unbounded result, and round BIGINTs.**
+Found by Devin Review on the F1 data-sources PR (2026-11-26). Medium (resource exhaustion on the
+agent's own host plus silent data corruption). **Fixed in this change.**
+
+Evidence: `runMysqlSelect` (`packages/host/src/data-sources/mysql.ts`) buffered the whole result and
+sliced to the row cap, mysql2's `timeout` rejects the promise without stopping the server-side
+statement (the `ROLLBACK` awaited behind it), and the driver's default number conversion silently
+rounds a BIGINT outside `Number.MAX_SAFE_INTEGER`.
+
+Fix: the checked SELECT runs inside `SELECT * FROM (…) AS __agentforge_q LIMIT sqlMaxRows + 1`, so the
+server can never return more than one row past the cap; a query error destroys the socket — a dead
+connection rolls its read-only transaction back — instead of awaiting `ROLLBACK` behind the runaway;
+`bigNumberStrings` + `supportBigNumbers` hand oversized integers to the agent as strings.
+
+Gate: closed — deadline, buffer and precision all fail closed; `mysql.test.ts` pins the dispatch.
+
+### SR-223 {#sr-223}
+
+**Backtick-quoted tables walked past the data-source table allowlist.** Found by local QA on the F1
+head `b7bb643a`, still open at `ccc232d0` (2026-11-26): the table scan in `runSourceQuery` matched
+bare and double-quoted identifiers after FROM/JOIN but not MySQL's own backtick quoting, so
+``SELECT * FROM `salaries`` extracted no table reference at all and the allowlist check passed
+vacuously — on a live MySQL the query would have read any table in the database. High
+(confidentiality; W1.2/W1.3 bypass). **Fixed in this change.**
+
+Evidence: the FROM/JOIN scan in `checkedSelect` (`packages/host/src/data-sources/sql-query.ts:36`).
+Postgres was not exploitable (it rejects backticks server-side); the hole opened the moment the
+mysql2 connector landed.
+
+Fix: the scan accepts bare, double-quoted and backtick-quoted identifier parts and strips the quotes
+before the allowlist compare (`packages/host/src/data-sources/sql-query.ts`). Regression:
+`mysql.test.ts` refuses ``SELECT * FROM `salaries``` and ``SELECT * FROM `d`.`salaries``` with
+`table_not_allowed` while ``SELECT * FROM `orders``` passes the table check.

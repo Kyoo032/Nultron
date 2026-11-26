@@ -119,6 +119,7 @@
     "run_code": "Run code in a sandbox",
     "self_check": "Self check",
     "build_deck": "Build a slide deck",
+    "query_data_source": "Query a connected data source",
     "research_dossier": "Research dossier",
     "delegate": "Ask another agent",
     "run_sql": "Run a SQL query",

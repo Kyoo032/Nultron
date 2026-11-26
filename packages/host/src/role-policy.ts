@@ -96,6 +96,12 @@ export const ADMINISTER_ROUTES: ReadonlySet<string> = new Set([
   // Datasets (data sources).
   "POST /api/v1/datasets",
   "DELETE /api/v1/datasets/:datasetId",
+  // F1 connectors: owner/admin manage; GET /api/v1/data-sources stays `read` (member sees state).
+  "POST /api/v1/data-sources",
+  "POST /api/v1/data-sources/:id/test",
+  "POST /api/v1/data-sources/:id/sync",
+  "POST /api/v1/data-sources/:id/disable",
+  "DELETE /api/v1/data-sources/:id/credentials",
   // Knowledge: the backend/model configuration is administer. Content operations (sources,
   // memories, map, reindex) are `agents` — a member works its own desk's knowledge, and the
   // handler's privacy rules (a colleague's hidden card is answered as absent) stay intact.

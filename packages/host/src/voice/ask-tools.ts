@@ -45,6 +45,7 @@ export const VOICE_READ_TOOLS: readonly string[] = Object.freeze([
   "self_check",
   "web_search",
   "web_fetch",
+  "query_data_source",
 ]);
 
 /**

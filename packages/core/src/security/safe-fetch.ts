@@ -21,6 +21,13 @@ export type HostLookup = (hostname: string) => Promise<readonly ResolvedAddress[
 export type SafeFetchOptions = {
   fetchImpl?: typeof fetch;
   lookupImpl?: HostLookup;
+  /**
+   * Skip the private-range refusal for this call's literal host and its resolved addresses.
+   * Set only by the F1 connector path when the operator's destination allowlist row for this
+   * `host:port` carries `allow_private` (`assertAllowedDestination` below); anything else that
+   * passes it would punch the SSRF wall this file exists for.
+   */
+  allowPrivate?: boolean;
   maxHops?: number;
   maxBytes?: number;
   oversize?: "throw" | "truncate";
@@ -63,7 +70,7 @@ function isPrivateHost(hostname: string): boolean {
 /**
  * Public HTTPS only: no credentials, no loopback, no private ranges. Applied to every redirect hop.
  */
-export function assertPublicHttpsUrl(url: string): URL {
+export function assertPublicHttpsUrl(url: string, options: { allowPrivate?: boolean } = {}): URL {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -76,7 +83,7 @@ export function assertPublicHttpsUrl(url: string): URL {
   if (parsed.username || parsed.password) {
     throw new ApiError("invalid_endpoint", "URL must not contain credentials", 400);
   }
-  if (isPrivateHost(parsed.hostname)) {
+  if (!options.allowPrivate && isPrivateHost(parsed.hostname)) {
     throw new ApiError("invalid_endpoint", "URL must point at a public host", 400);
   }
   return parsed;
@@ -98,6 +105,7 @@ const NOT_PUBLIC_MESSAGE = "URL must point at a public host";
 export async function resolvePublicAddresses(
   hostname: string,
   lookupImpl: HostLookup = defaultLookup,
+  options: { allowPrivate?: boolean } = {},
 ): Promise<readonly ResolvedAddress[]> {
   if (parseIpAddress(hostname)) {
     return [];
@@ -115,7 +123,7 @@ export async function resolvePublicAddresses(
   }
   for (const { address } of resolved) {
     const parsed = parseIpAddress(address);
-    if (!parsed || isPrivateIpAddress(parsed)) {
+    if (!parsed || (!options.allowPrivate && isPrivateIpAddress(parsed))) {
       throw new ApiError("invalid_endpoint", NOT_PUBLIC_MESSAGE, 400);
     }
   }
@@ -181,6 +189,60 @@ export function pinnedAgent(hostname: string, addresses: readonly ResolvedAddres
 
 export const defaultFetch = undiciFetch as unknown as typeof fetch;
 
+/* ------------------------------------------------------------------ the destination allowlist */
+
+/**
+ * F1: the per-org `host:port` allowlist every connector goes through before a byte leaves.
+ *
+ * The rows live in the desk's own SQLite (`destination_allowlist`, host migration 0028), which
+ * core cannot read — so the host installs this lookup the same way it installs the audit writer
+ * (`packages/host/src/data-sources/install.ts`, imported by `router.ts`). With nothing installed
+ * the default is to refuse: a connector that cannot read its policy never guesses.
+ */
+export type DestinationRule = {
+  /** True when the operator marked this entry reachable over a private address (an internal MinIO). */
+  readonly allowPrivate: boolean;
+};
+/**
+ * Answers the rule for one `host` (lowercase) + `port` + `tenantId`, or `null` when there is none.
+ * The allowlist is per tenant: a `null`/`undefined` `tenantId` must fail closed.
+ */
+export type DestinationAllowlist = (host: string, port: number, tenantId?: string | null) => DestinationRule | null;
+
+let destinationAllowlist: DestinationAllowlist = () => null;
+
+/** Host-side install point; `null` restores refuse-all (tests). */
+export function installDestinationAllowlist(next: DestinationAllowlist | null): void {
+  destinationAllowlist = next ?? (() => null);
+}
+
+/** The currently installed lookup; `null` answer means the destination is refused. */
+export function currentDestinationAllowlist(): DestinationAllowlist {
+  return destinationAllowlist;
+}
+
+/**
+ * Refuse a `host:port` a connector was pointed at unless the operator's allowlist names it.
+ * Throws `invalid_destination` (400) — an operator fix, not a caller's bug — and returns the
+ * rule so the caller knows whether private addresses are permitted for this entry.
+ */
+export function assertAllowedDestination(
+  host: string,
+  port: number,
+  lookup: DestinationAllowlist = destinationAllowlist,
+  tenantId?: string | null,
+): DestinationRule {
+  const name = host.trim().toLowerCase();
+  if (!name || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new ApiError("invalid_destination", "Destination host or port is not valid", 400);
+  }
+  const rule = lookup(name, port, tenantId);
+  if (!rule) {
+    throw new ApiError("invalid_destination", "This destination is not on the operator's host:port allowlist", 400);
+  }
+  return rule;
+}
+
 async function readCapped(
   response: Response,
   maxBytes: number,
@@ -243,10 +305,12 @@ export async function fetchPublicHttps(url: string, options: SafeFetchOptions = 
   const maxBytes = options.maxBytes ?? SAFE_FETCH_DEFAULT_MAX_BYTES;
   const { controller, dispose } = linkSignals(options);
   try {
-    let parsed = assertPublicHttpsUrl(url.trim());
+    let parsed = assertPublicHttpsUrl(url.trim(), { allowPrivate: options.allowPrivate });
     let current = parsed.toString();
     for (let hop = 0; hop <= maxHops; hop += 1) {
-      const addresses = await resolvePublicAddresses(parsed.hostname, options.lookupImpl);
+      const addresses = await resolvePublicAddresses(parsed.hostname, options.lookupImpl, {
+        allowPrivate: options.allowPrivate,
+      });
       const agent = pinnedAgent(parsed.hostname, addresses);
       try {
         const response = await fetchImpl(current, {

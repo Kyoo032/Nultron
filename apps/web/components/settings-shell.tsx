@@ -5,7 +5,7 @@ import { Link, usePathname } from "@/lib/nav";
 import { t } from "@/lib/i18n";
 
 export type SettingsTab = {
-  readonly id: "general" | "users" | "channels" | "customers" | "activity" | "mcp";
+  readonly id: "general" | "users" | "channels" | "customers" | "activity" | "mcp" | "data-sources";
   readonly href: string;
   readonly labelKey: string;
   readonly testId: string;
@@ -18,6 +18,12 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { id: "customers", href: "/customers", labelKey: "settings.tabs.customers", testId: "settings-tab-customers" },
   { id: "activity", href: "/activity", labelKey: "settings.tabs.activity", testId: "settings-tab-activity" },
   { id: "mcp", href: "/mcp", labelKey: "settings.tabs.mcp", testId: "settings-tab-mcp" },
+  {
+    id: "data-sources",
+    href: "/data-sources",
+    labelKey: "settings.tabs.dataSources",
+    testId: "settings-tab-data-sources",
+  },
 ];
 
 export const SETTINGS_HUB_PATHS: readonly string[] = SETTINGS_TABS.map((tab) => tab.href);

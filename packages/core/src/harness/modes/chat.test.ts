@@ -25,6 +25,7 @@ describe("chat harness spec", () => {
       "run_code",
       "self_check",
       "build_deck",
+      "query_data_source",
     ]);
   });
 
@@ -40,6 +41,7 @@ describe("chat harness spec", () => {
         run_code: 6,
         self_check: 4,
         build_deck: 4,
+        query_data_source: 8,
       },
     });
   });

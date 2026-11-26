@@ -211,10 +211,15 @@ describe("0015_tenants on a fresh database", () => {
     // off the organization the reset deletes. audit_events is F2: the desk's trail is the tenant's,
     // and it has to outlive a workspace or an org the way the reset audit does. Nothing else is
     // allowed to carry a second tenant_id.
+    // data_sources, data_source_sync_runs and destination_allowlist are F1 (0027/0028): a
+    // source, its sync runs and the allowlist all belong to the tenant outright.
     expect(carriers.sort()).toEqual([
       "audit_events",
       "auth_sessions",
       "billing_events",
+      "data_source_sync_runs",
+      "data_sources",
+      "destination_allowlist",
       "tenant_plan",
       "tenant_reset_audit",
       "tenant_seat",

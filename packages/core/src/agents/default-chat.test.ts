@@ -22,6 +22,7 @@ describe("default chat tools", () => {
       "run_code",
       "self_check",
       "build_deck",
+      "query_data_source",
     ]);
   });
 

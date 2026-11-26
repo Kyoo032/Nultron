@@ -257,6 +257,15 @@ import {
   handlePostMcpConnector,
   handlePostMcpConnectorTest,
 } from "./handlers/mcp";
+import "./data-sources/install";
+import {
+  handleDeleteDataSourceCredentials,
+  handleGetDataSources,
+  handlePostDataSourceDisable,
+  handlePostDataSourceSync,
+  handlePostDataSourceTest,
+  handlePostDataSources,
+} from "./handlers/data-sources";
 import { handleGetUsage } from "./handlers/usage";
 import { handleGetStorageUsage } from "./handlers/storage";
 import { handleGetVideoExampleFile, handleGetVideoExamples } from "./handlers/video-examples";
@@ -409,6 +418,12 @@ const routes: Route[] = [
   compile("POST", "/api/v1/mcp/connectors/:connectorId", (req) => handlePostMcpConnector(req)),
   compile("DELETE", "/api/v1/mcp/connectors/:connectorId", handleDeleteMcpConnector),
   compile("POST", "/api/v1/mcp/connectors/:connectorId/test", (req) => handlePostMcpConnectorTest(req)),
+  compile("GET", "/api/v1/data-sources", handleGetDataSources),
+  compile("POST", "/api/v1/data-sources", handlePostDataSources),
+  compile("POST", "/api/v1/data-sources/:id/test", handlePostDataSourceTest),
+  compile("POST", "/api/v1/data-sources/:id/sync", handlePostDataSourceSync),
+  compile("POST", "/api/v1/data-sources/:id/disable", handlePostDataSourceDisable),
+  compile("DELETE", "/api/v1/data-sources/:id/credentials", handleDeleteDataSourceCredentials),
   compile("POST", "/api/v1/threads/:threadId/runs/text", (req) => handleRun(req, "text")),
   compile("POST", "/api/v1/threads/:threadId/runs/image", (req) => handleRun(req, "image")),
   compile("POST", "/api/v1/threads/:threadId/runs/video", (req) => handleRun(req, "video")),

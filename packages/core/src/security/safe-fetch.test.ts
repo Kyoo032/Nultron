@@ -5,8 +5,11 @@ import { Agent, fetch as undiciFetch } from "undici";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../errors";
 import {
+  assertAllowedDestination,
   assertPublicHttpsUrl,
   assertResolvesPublic,
+  currentDestinationAllowlist,
+  installDestinationAllowlist,
   defaultFetch,
   fetchPublicHttps,
   nextHopUrl,
@@ -14,7 +17,7 @@ import {
   pinnedLookup,
   SAFE_FETCH_TLS_OPTIONS,
 } from "./safe-fetch";
-import type { HostLookup } from "./safe-fetch";
+import type { DestinationAllowlist, HostLookup } from "./safe-fetch";
 
 vi.mock("undici", async (importOriginal) => {
   const actual = await importOriginal<typeof import("undici")>();
@@ -527,5 +530,34 @@ describe("the default fetch", () => {
       await agent.destroy();
       await new Promise<void>((resolve) => listener.close(() => resolve()));
     }
+  });
+});
+
+describe("assertAllowedDestination", () => {
+  it("returns the rule for an allowlisted host:port and refuses everything else", () => {
+    const list: DestinationAllowlist = (host, port) =>
+      host === "db.example.com" && port === 5432 ? { allowPrivate: true } : null;
+    expect(assertAllowedDestination("DB.example.com", 5432, list)).toEqual({ allowPrivate: true });
+    expect(() => assertAllowedDestination("db.example.com", 5433, list)).toThrow(/allowlist/);
+    expect(() => assertAllowedDestination("other.example.com", 5432, list)).toThrow(/allowlist/);
+    expect(() => assertAllowedDestination("", 443, list)).toThrow(ApiError);
+    expect(() => assertAllowedDestination("x", 0, list)).toThrow(ApiError);
+    expect(() => assertAllowedDestination("x", 65536, list)).toThrow(ApiError);
+  });
+
+  it("defaults to refuse-all when the host never installed a lookup", () => {
+    installDestinationAllowlist(null);
+    expect(() => assertAllowedDestination("db.example.com", 5432)).toThrow(/allowlist/);
+    installDestinationAllowlist(() => ({ allowPrivate: false }));
+    expect(currentDestinationAllowlist()("db.example.com", 5432)).toEqual({ allowPrivate: false });
+    installDestinationAllowlist(null);
+  });
+});
+
+describe("assertPublicHttpsUrl allowPrivate", () => {
+  it("keeps private hosts refused by default and passes them only when asked", () => {
+    expect(() => assertPublicHttpsUrl("https://minio.internal/b")).toThrow(/public host/);
+    expect(assertPublicHttpsUrl("https://minio.internal/b", { allowPrivate: true }).hostname).toBe("minio.internal");
+    expect(() => assertPublicHttpsUrl("https://127.0.0.1/b", { allowPrivate: true })).not.toThrow();
   });
 });

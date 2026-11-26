@@ -16,6 +16,7 @@ const STARTER_TOOLS_SORTED = [
   "knowledge_search",
   "list_files",
   "past_sessions",
+  "query_data_source",
   "read_file",
   "run_code",
   "search_files",

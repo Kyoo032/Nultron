@@ -179,6 +179,8 @@
     "calculator": "Kalkulator",
     "datetime": "Jam",
     "selfChecking": "Memeriksa meja kerja ini…",
+    "queryingDataSource": "Menjalankan kueri sumber data…",
+    "queryDataSource": "Kueri sumber data",
     "selfCheck": "Pemeriksaan meja kerja",
     "imageAsk": "Gambar menunggu persetujuan Anda",
     "videoAsk": "Klip menunggu persetujuan Anda"
@@ -193,7 +195,8 @@
       "delete_file": "Hapus file",
       "knowledge_search": "Pencarian pengetahuan",
       "run_code": "Jalankan kode",
-      "build_deck": "Buat deck"
+      "build_deck": "Buat deck",
+      "query_data_source": "Kueri sumber data"
     },
     "doing": {
       "list_files": "Menampilkan daftar file di {dir}…",
@@ -206,6 +209,7 @@
       "knowledge_search": "Mencari “{query}” di Knowledge Base Anda…",
       "run_code": "Sedang menjalankan {language}…",
       "build_deck": "Sedang menyusun “{title}”…",
+      "query_data_source": "Sedang menjalankan kueri {name}…",
       "web_fetch": "Sedang membuka {host}…"
     },
     "done": {
@@ -219,6 +223,7 @@
       "knowledge_search": "Pencarian “{query}” di Knowledge Base Anda",
       "run_code": "Menjalankan {language}",
       "build_deck": "Menyusun “{title}”",
+      "query_data_source": "Menjalankan kueri {name}",
       "web_fetch": "Membuka {host}"
     },
     "failed": {
@@ -231,6 +236,7 @@
       "knowledge_search": "Gagal mencari di Knowledge Base Anda",
       "run_code": "Gagal menjalankan {language}",
       "build_deck": "Gagal membuat deck",
+      "query_data_source": "Gagal menjalankan kueri sumber data",
       "web_fetch": "Gagal membuka {host}"
     },
     "pending": {
