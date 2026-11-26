@@ -39,6 +39,10 @@ async function connect(row: DataSourceRow): Promise<Connection> {
     password: secret.secret,
     ssl: { rejectUnauthorized: true, verifyIdentity: true },
     connectTimeout: 5_000,
+    // A BIGINT past Number.MAX_SAFE_INTEGER reaches the agent as a string, not a silently
+    // rounded float — the row cap and LIMIT math are unaffected (they never touch values).
+    bigNumberStrings: true,
+    supportBigNumbers: true,
   }).catch((error: unknown) => {
     // Credentials or TLS refused: the message names the class, never the password or host detail.
     throw new ApiError(
@@ -73,22 +77,28 @@ export async function runMysqlSelect(
   const client = await connect(row);
   try {
     await client.query("START TRANSACTION READ ONLY");
-    try {
-      const [rows, fields] = await client.query({
-        sql: checked,
-        rowsAsArray: true,
-        timeout: Math.floor(limits.sqlTimeoutMs),
-      });
-      const result = rows as unknown[][];
-      return {
-        columns: (fields as Array<{ name: string }>).map((f) => f.name),
-        rows: result.slice(0, limits.sqlMaxRows),
-        rowCount: result.length,
-        truncated: result.length > limits.sqlMaxRows,
-      };
-    } finally {
-      await client.query("ROLLBACK").catch(() => undefined);
-    }
+    // The derived-table `LIMIT max+1` caps what the server can return — no unbounded buffering
+    // — and the extra row is what marks `truncated`. `checked` keeps its own ORDER BY/LIMIT.
+    const [rows, fields] = await client.query({
+      sql: `SELECT * FROM (${checked}) AS __agentforge_q LIMIT ${limits.sqlMaxRows + 1}`,
+      rowsAsArray: true,
+      timeout: Math.floor(limits.sqlTimeoutMs),
+    });
+    await client.query("ROLLBACK").catch(() => undefined);
+    const result = rows as unknown[][];
+    const truncated = result.length > limits.sqlMaxRows;
+    return {
+      columns: (fields as Array<{ name: string }>).map((f) => f.name),
+      rows: result.slice(0, limits.sqlMaxRows),
+      rowCount: Math.min(result.length, limits.sqlMaxRows),
+      truncated,
+    };
+  } catch (error) {
+    // mysql2's query `timeout` rejects the promise while the statement keeps running on the
+    // server; only dying with the socket stops it, and a dead connection rolls its own read-only
+    // transaction back — so no `ROLLBACK` waits behind the runaway.
+    client.destroy();
+    throw error;
   } finally {
     await client.end().catch(() => undefined);
   }

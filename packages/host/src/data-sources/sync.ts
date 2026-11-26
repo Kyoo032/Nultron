@@ -61,7 +61,7 @@ export async function syncDataSource(
           errorCode = errorCode ?? "injection_blocked";
           continue;
         }
-        await indexKnowledgeSource(tenant, {
+        const indexed = await indexKnowledgeSource(tenant, {
           id: `data-source/${row.id}/${object.key}`,
           name: object.key,
           type: extOf(object.key) || "file",
@@ -70,6 +70,13 @@ export async function syncDataSource(
           // shared `row.id` origin would keep only the last synced file searchable.
           origin: { kind: "data_source", id: `${row.id}/${object.key}` },
         });
+        // An empty file indexes nothing but returns a failed source rather than throwing —
+        // count it the same as a refused read, else the run reports it as synced.
+        if (indexed.status !== "Indexed") {
+          failed += 1;
+          errorCode = errorCode ?? "file_empty";
+          continue;
+        }
         ok += 1;
       } catch {
         failed += 1;

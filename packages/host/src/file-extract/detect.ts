@@ -52,7 +52,8 @@ export function extensionOf(filename: string): string {
   return dot > 0 ? base.slice(dot + 1) : "";
 }
 
-function containerOf(bytes: Uint8Array): Container {
+/** The container a file's leading bytes claim to be, regardless of its name. */
+export function containerOf(bytes: Uint8Array): Container {
   const found = SIGNATURES.find(({ magic }) => magic.every((byte, index) => bytes[index] === byte));
   return found ? found.container : null;
 }

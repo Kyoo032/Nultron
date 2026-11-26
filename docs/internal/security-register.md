@@ -7708,3 +7708,41 @@ Regression: `knowledge-cascade.test.ts` ("keeps synced data-source cards whose c
 connector owns").
 
 Gate: closed — synced cards survive Knowledge reads; orphaned ones are still swept.
+
+### SR-221 {#sr-221}
+
+**The sync pipeline trusted the key's extension over the object's bytes, and an empty file counted as
+synced.** Found by Devin Review on the F1 data-sources PR (2026-11-26). Medium (unvetted binary and
+false "ok" runs on a security-gated path). **Fixed in this change.**
+
+Evidence: `syncDataSource` reads objects through the upload reader `extractText`
+(`packages/host/src/data-sources/sync.ts:56`), which routed on the filename extension alone: an
+extensionless workbook the converter's `detectFormat` would accept was refused outright, a `.csv` key
+on workbook bytes was decoded as UTF-8 gibberish and indexed, and `indexKnowledgeSource` returns a
+`Failed` source without throwing when the text is empty — so every empty object counted toward `ok`.
+
+Fix: `knowledge-extract.ts` `rawText` now checks the leading-byte container signature (`containerOf`,
+exported from `file-extract/detect.ts`) before honoring a `text` or unmatched kind — bytes with a real
+container signature go to the converter, whose own `detectFormat` refuses a lying extension
+(`format_mismatch`); and `syncDataSource` counts a non-`Indexed` result as a failure (`file_empty`)
+instead of a synced file.
+
+Gate: closed — extension decides nothing the bytes contradict; empty objects no longer report `ok`.
+
+### SR-222 {#sr-222}
+
+**The MySQL connector could outlive its deadline, buffer an unbounded result, and round BIGINTs.**
+Found by Devin Review on the F1 data-sources PR (2026-11-26). Medium (resource exhaustion on the
+agent's own host plus silent data corruption). **Fixed in this change.**
+
+Evidence: `runMysqlSelect` (`packages/host/src/data-sources/mysql.ts`) buffered the whole result and
+sliced to the row cap, mysql2's `timeout` rejects the promise without stopping the server-side
+statement (the `ROLLBACK` awaited behind it), and the driver's default number conversion silently
+rounds a BIGINT outside `Number.MAX_SAFE_INTEGER`.
+
+Fix: the checked SELECT runs inside `SELECT * FROM (…) AS __agentforge_q LIMIT sqlMaxRows + 1`, so the
+server can never return more than one row past the cap; a query error destroys the socket — a dead
+connection rolls its read-only transaction back — instead of awaiting `ROLLBACK` behind the runaway;
+`bigNumberStrings` + `supportBigNumbers` hand oversized integers to the agent as strings.
+
+Gate: closed — deadline, buffer and precision all fail closed; `mysql.test.ts` pins the dispatch.

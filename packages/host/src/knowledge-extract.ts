@@ -20,6 +20,7 @@ import { ApiError, htmlToText } from "@agentforge/core";
 import { DOCX_MAX_INFLATED_BYTES, bodyOrder, declaredInflatedBytes, readDocx } from "@agentforge/core/docx";
 import { PDF_MAX_BYTES, PdfExtractError, extractPdfText, type PdfExtractOptions } from "@agentforge/core/pdf";
 import { FileExtractError, extractFile } from "./file-extract";
+import { containerOf } from "./file-extract/detect";
 import { KNOWLEDGE_TEXT_MAX_CHARS, capKnowledgeText } from "./knowledge-text";
 import { log } from "./log";
 
@@ -253,7 +254,17 @@ export async function extractText(
 }
 
 function rawText(name: string, mime: string, bytes: Buffer, options: ExtractOptions): Promise<string> {
-  switch (sourceKind(name, mime)) {
+  let kind = sourceKind(name, mime);
+  const container = containerOf(new Uint8Array(bytes));
+  if (container && (kind === null || kind === "text")) {
+    // The bytes outrank the name in the two cases they must: an extensionless workbook that
+    // no kind claimed (a bucket's `reports/quarterly` with zip magic), and a text-ish name on
+    // binary bytes — a workbook shipped as `.csv` goes to the converter, which refuses the
+    // mismatch, instead of indexing its bytes as UTF-8 gibberish. Container signatures inside
+    // an html/pdf/docx name are left to each parser's own damage check.
+    kind = "document";
+  }
+  switch (kind) {
     case "pdf":
       return pdfText(bytes, options.pdf);
     case "docx":
