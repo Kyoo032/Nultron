@@ -108,12 +108,15 @@ export async function handlePostAgentSoul(request: HostRequest): Promise<HostRes
     if (!hasSoulFields) {
       // Allowlist-only save: no revision to publish (the default Chat agent cannot get
       // one either — its soul edit restriction must not reject an allowlist update).
-      if (allowedTools !== undefined) {
-        agentToolAllowlistReplace(request.params.agentId, allowedTools);
-      }
+      // The tenancy check comes before the write: the allowlist table keys on the bare
+      // agent id, so replacing it before the agent resolves would edit another
+      // organization's list behind a 404.
       const agent = await agentService.get(tenant, request.params.agentId);
       if (!agent) {
         throw new ApiError("not_found", "Agent not found", 404);
+      }
+      if (allowedTools !== undefined) {
+        agentToolAllowlistReplace(request.params.agentId, allowedTools);
       }
       return jsonOk({ agent });
     }

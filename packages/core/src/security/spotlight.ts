@@ -100,8 +100,15 @@ export function isRunUntrusted(): boolean {
 const SENSITIVE_TOOL_RE =
   /send|mail|forward|post|publish|share|delet|remov|writ|edit_|clear|cancel|upload|clip|timeline|move|trim|mutat/i;
 
+/**
+ * Read-only verb prefixes. `list_clips` names `clip` but only enumerates the timeline —
+ * refusing it on a marked run would strand a read, the thing the taint gate is not for.
+ * Only a leading verb counts: `send_list` is still a send.
+ */
+const READ_ONLY_TOOL_RE = /^(list|get|read|probe|detect|transcribe|describe|view|show|search|find)_/i;
+
 export function isSensitiveTool(toolKey: string): boolean {
-  return SENSITIVE_TOOL_RE.test(toolKey);
+  return SENSITIVE_TOOL_RE.test(toolKey) && !READ_ONLY_TOOL_RE.test(toolKey);
 }
 
 /** The refusal the model sees. One sentence, no attacker text. */

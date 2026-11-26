@@ -86,6 +86,24 @@ describe("spotlight", () => {
     ]) {
       expect(isSensitiveTool(key)).toBe(false);
     }
+    // Read-only Edit tools name a write noun but only read: a marked run must still
+    // be able to list and probe (Devin Review BUG on F6: list_clips was refused).
+    for (const key of [
+      "list_clips",
+      "list_ingredients",
+      "get_project",
+      "probe_asset",
+      "detect_silence",
+      "detect_scenes",
+      "transcribe_media",
+      "search_files",
+    ]) {
+      expect(isSensitiveTool(key)).toBe(false);
+    }
+    // Writes that ride on those same nouns stay refused.
+    for (const key of ["split_clip", "move_clip", "trim_clip", "extend_clip", "send_list"]) {
+      expect(isSensitiveTool(key)).toBe(true);
+    }
   });
 
   it("the refusal names the tool and carries no attacker text", () => {
