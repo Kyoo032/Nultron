@@ -12,9 +12,10 @@
  * cap it refuses with 429 `too_many_jobs` instead of starting more. Every caller of `extractFile`
  * (Knowledge ingest, Finance import, Education, Chat) goes through it, so it is fixed once, here.
  *
- * What this does not do: stop the work. A conversion that never ends holds its slot for good. The
- * longer-term fix is the one the code sandbox already has, a child process the host can kill
- * (`packages/host/src/code-runner`), recorded in the security register (SR-145).
+ * What this does not do: spawn anything. The work it gates is the parse CHILD (`child-parse.ts`),
+ * which the deadline SIGKILLs — so unlike the old in-process napi call, a conversion that never
+ * answers really does end at the deadline and hands its slot back. The slot cap still bounds how
+ * many parse children may exist at once.
  */
 import { ApiError, type EnvLike, isServerMode } from "@agentforge/core";
 import { maxFromEnv } from "../concurrency";

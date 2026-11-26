@@ -59,6 +59,10 @@ const ALLOWLIST: ReadonlyArray<{ readonly file: string; readonly why: string }> 
     file: "src/knowledge-embed.ts",
     why: "work-card auto-ingest embeds the saved brief at the same pinned gateway; the base URL comes from resolveProviderKeys, never from a stored setting",
   },
+  {
+    file: "src/file-extract/parse-worker.ts",
+    why: "the socket names here are the F7a egress SEAL: it replaces net/tls/http/https/dns/fetch/WebSocket with throwing stubs so the parse child can open no socket at all",
+  },
 ];
 
 const ALLOWED = new Set(ALLOWLIST.map((entry) => entry.file));
@@ -189,8 +193,12 @@ describe("nothing in the Finance import graph can open a socket of its own", () 
     expect(REACHABLE.map(repoPath).filter((file) => file.startsWith("src/market/"))).toEqual([]);
   });
 
-  it("keeps the allowlist to the two modules that are meant to reach the gateway", () => {
-    expect(ALLOWLIST.map((entry) => entry.file)).toEqual(["src/job-regen.ts", "src/knowledge-embed.ts"]);
+  it("keeps the allowlist to the gateway modules and the child's own egress seal", () => {
+    expect(ALLOWLIST.map((entry) => entry.file)).toEqual([
+      "src/job-regen.ts",
+      "src/knowledge-embed.ts",
+      "src/file-extract/parse-worker.ts",
+    ]);
     expect(ALLOWLIST.every((entry) => entry.why.length > 20)).toBe(true);
     expect(REACHABLE.map(repoPath)).toContain("src/job-regen.ts");
   });

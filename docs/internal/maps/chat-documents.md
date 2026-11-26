@@ -3,6 +3,8 @@
 Product: both · Instance: main :3000
 
 Last verified: 2026-10-20 at 0fdf2bb1 (tester tree). Every citation on this page was re-read against the code at that commit, including the figures file the tester added (§ 2b, and the figures lines in §§ 2, 3, 4 and 5). Code-read only: no test was run and nothing was driven in this pass; `features/chat.md` "Documents" is the recipe. The figures file and the `finance_task` worker that reads it exist only on `tester/chat-first`; [`finance-chat-worker.md`](finance-chat-worker.md) maps them.
+Last verified: 2026-11-26 on `devin/1795703634-f7a-exec-limits` (F7a, DFIND-177): `extractFile` now parses in a killable `--permission` child (`file-extract/child-parse.ts` + `parse-worker.ts`), deadline = SIGKILL, no network, 384 MiB heap; the native-gate cap now bounds parse children (`child-parse.test.ts`, index.test.ts parity). Nothing else on the page was re-read.
+
 
 Last verified: 2026-10-13 at 73db3c30 (branch `fix/safe-web-search`, before merge) for the `egress-guard.ts` line number of `userTextOf` only, moved by the outbound guard. Since that change the text of every attached file is also registered with the turn's outbound guard as private material ([`chat-send.md`](chat-send.md) § 3); nothing else was re-read.
 

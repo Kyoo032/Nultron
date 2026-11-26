@@ -7612,3 +7612,16 @@ extract and render; a playlist, a concat script and a metadata file are refused;
   or an address, because the whitelist is `file` only and uploads are stored per tenant. The gate refuses the format
   at the probe, so this stays closed unless detection differs between the probe and the run. Do not remove the gate
   as redundant.
+
+### SR-215 {#sr-215}
+
+**Untrusted file parsing moved into a killable child process, and runs gained duration and output caps (F7a, DFIND-177).** Both products.
+Raised 2026-11-26 by the Dev Findings review; fixed in tree, tested at unit level; not driven against a live container.
+
+The reader that [SR-145](#sr-145) residual (1) flagged — a memory-safety bug in the native converter running in the app process — and residual (2) — a conversion that ignores its deadline holding a native slot for good — are both closed by `packages/host/src/file-extract/child-parse.ts` + `parse-worker.ts`: every `extractFile` call runs in a fresh child under `--permission` (fs read on the repository only, no fs write, no child-process), `--max-old-space-size=$AGENTFORGE_PARSE_CHILD_MAX_MB` (default 384), an empty environment, and a worker-side seal of `net`/`tls`/`http`/`https`/`http2`/`dgram`/`dns`/`fetch`/`WebSocket` before any converter module loads. The deadline now SIGKILLs the process instead of merely racing a timer; the `native-gate` 2/3 cap bounds how many parse children exist at once; `child-parse.test.ts` proves the kill, the heap-cap death and the egress seal. A child that cannot boot degrades to the in-process pipeline with a `file_extract_child_unavailable` log line.
+
+New caps beside the step and tool budgets: `createToolBudget(undefined)` now applies `DEFAULT_RUN_BUDGET` instead of admit-all (`tool-budget.ts`); `runExecutionCaps` (`run-limits.ts`) adds `AGENTFORGE_RUN_MAX_SECONDS` (default 1800) and `AGENTFORGE_RUN_MAX_OUTPUT_BYTES` (default 2 MB), enforced in `runs.ts` as `run.failed` + model abort; `ip-range.test.ts` adds the metadata-address matrix (`169.254.169.254`, `fd00:ec2::254`, `fe80::`, the `::ffff:` spelling) — `isPrivateIpLiteral` already refused them, the test now pins it. The deploy-side claims are written down line by line in `docs/security/isolation-and-hardening.md`; the live-container check waits for the deploy hold to lift (AC-7.4).
+
+Residuals: (1) `--allow-addons` and `--allow-worker` are structural grants the parse child cannot do without (anydoc is a `.node`, tsx/esbuild compiles on a worker) — wider than the code sandbox's flags; a `.mjs` ship-layout like `code-runner`'s would remove both but requires the worker's dependencies to be vendored. (2) The heap cap covers JS old space only; a converter's native memory is bounded by the SIGKILL and the container `mem_limit`, not by a flag. (3) On a host with no tsx (a bare-node deploy) the reader degrades in-process, i.e. the SR-145 posture — logged, not silent.
+
+Gate: none. Proof against the live compose waits for the hold to lift.
