@@ -7,7 +7,8 @@
 -- `email_sender_allowlist` is a pattern → user map; a null `user_id` means "the desk's owner".
 -- `email_inbound_seen` is the at-least-once dedupe: the provider's message id is the primary key,
 -- so a redelivery is refused by the insert itself inside the same transaction that stores the mail.
--- `email_threads` maps a mail thread (RFC 5322 References root) to the chat thread the reply runs in.
+-- `email_threads` maps a mail thread (RFC 5322 References root) to the chat thread the reply runs
+-- in — per allowlisted user (`user_id`), so two senders in one mail conversation never share a chat.
 --
 -- BODIES ARE NOT HERE. Inbound and outbound text lives only in the sealed message store
 -- (`messages.content`, sealed by `sealJson` on insert), same as every chat turn (S1).
@@ -52,7 +53,8 @@ CREATE TABLE IF NOT EXISTS `email_threads` (
   `id` text PRIMARY KEY NOT NULL,
   `channel_id` text NOT NULL REFERENCES `email_channels`(`id`) ON DELETE cascade,
   `thread_id` text NOT NULL,
-  `root_message_id` text NOT NULL
+  `root_message_id` text NOT NULL,
+  `user_id` text NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS `email_threads_root_unique` ON `email_threads` (`channel_id`,`root_message_id`);
+CREATE UNIQUE INDEX IF NOT EXISTS `email_threads_root_unique` ON `email_threads` (`channel_id`,`root_message_id`,`user_id`);

@@ -57,16 +57,18 @@ describe("0030_email_channel", () => {
           )
           .run(),
       ).toThrow();
-      // A mail thread files one chat thread per root message id per channel.
+      // A mail thread files one chat thread per root message id per channel per user.
       sqlite
         .prepare(
-          `INSERT INTO email_threads (id, channel_id, thread_id, root_message_id) VALUES ('e1', 'c1', 't1', '<r@m>')`,
+          `INSERT INTO email_threads (id, channel_id, thread_id, root_message_id, user_id)
+           VALUES ('e1', 'c1', 't1', '<r@m>', 'u1')`,
         )
         .run();
       expect(() =>
         sqlite
           .prepare(
-            `INSERT INTO email_threads (id, channel_id, thread_id, root_message_id) VALUES ('e2', 'c1', 't2', '<r@m>')`,
+            `INSERT INTO email_threads (id, channel_id, thread_id, root_message_id, user_id)
+             VALUES ('e2', 'c1', 't2', '<r@m>', 'u1')`,
           )
           .run(),
       ).toThrow();

@@ -1075,9 +1075,10 @@ function ensureEmailChannelTables(sqlite: Database.Database): void {
       id text PRIMARY KEY NOT NULL,
       channel_id text NOT NULL REFERENCES email_channels(id) ON DELETE cascade,
       thread_id text NOT NULL,
-      root_message_id text NOT NULL
+      root_message_id text NOT NULL,
+      user_id text NOT NULL
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS email_threads_root_unique ON email_threads (channel_id, root_message_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS email_threads_root_unique ON email_threads (channel_id, root_message_id, user_id);
   `);
 }
 

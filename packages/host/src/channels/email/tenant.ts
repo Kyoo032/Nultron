@@ -50,6 +50,10 @@ export function resolveEmailActor(sql: Sql, workspaceId: string, userId: string 
   const member = sql
     .prepare(`SELECT role FROM workspace_members WHERE workspace_id = ? AND user_id = ?`)
     .get(workspaceId, resolvedUserId) as { role: MembershipRole } | undefined;
+  // An allowlist may outlive the member it names; a removed user never regains mail access.
+  if (!member) {
+    return null;
+  }
   return {
     agentId,
     tenant: {
@@ -57,7 +61,7 @@ export function resolveEmailActor(sql: Sql, workspaceId: string, userId: string 
       organizationId: organization.id,
       workspaceId: workspace.id,
       userId: resolvedUserId,
-      role: member?.role ?? "member",
+      role: member.role,
     },
   };
 }

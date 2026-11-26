@@ -49,6 +49,9 @@ function fakeStore(overrides: Partial<EmailStore> = {}): EmailStore & { seen: Se
       seen.add(id);
       return true;
     },
+    unmarkInboundSeen: (id: string) => {
+      seen.delete(id);
+    },
     listAllowlist: () => [{ id: "s1", channelId: "c1", pattern: "@x.com", userId: null }],
     listChannels: () => [],
     getChannel: () => null,
@@ -61,12 +64,15 @@ function fakeStore(overrides: Partial<EmailStore> = {}): EmailStore & { seen: Se
     },
     removeAllowlistEntry: () => true,
     findThread: () => null,
-    createThread: (channelId: string, threadId: string, rootMessageId: string) => ({
+    createThread: (channelId: string, threadId: string, rootMessageId: string, userId: string) => ({
       id: "et1",
       channelId,
       threadId,
       rootMessageId,
+      userId,
     }),
+    removeThread: () => undefined,
+    dropWorkspace: () => undefined,
     ...overrides,
   } as EmailStore & { seen: Set<string> };
   return store;

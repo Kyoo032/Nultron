@@ -39,6 +39,8 @@ export type EmailThreadRow = {
   /** The chat thread the mail thread's replies run in. */
   threadId: string;
   rootMessageId: string;
+  /** The desk user this mail thread belongs to — senders never share a chat thread. */
+  userId: string;
 };
 
 type ChannelDb = {
@@ -81,8 +83,14 @@ export interface EmailStore {
    * same transaction the caller stores the mail in.
    */
   markInboundSeen(providerMessageId: string, channelId: string, at: number): boolean;
-  findThread(channelId: string, rootMessageId: string): EmailThreadRow | null;
-  createThread(channelId: string, threadId: string, rootMessageId: string): EmailThreadRow;
+  /** Drops the dedupe mark so a transiently failed delivery can be retried by the provider. */
+  unmarkInboundSeen(providerMessageId: string, channelId: string): void;
+  findThread(channelId: string, rootMessageId: string, userId: string): EmailThreadRow | null;
+  createThread(channelId: string, threadId: string, rootMessageId: string, userId: string): EmailThreadRow;
+  /** Drops a stale mapping (its chat thread was deleted). */
+  removeThread(id: string): void;
+  /** Desk delete: the channel rows go, and the keyed tables cascade with them. */
+  dropWorkspace(workspaceId: string): void;
 }
 
 export function createEmailStore(sql: EmailSql): EmailStore {
@@ -174,23 +182,40 @@ export function createEmailStore(sql: EmailSql): EmailStore {
       return result.changes > 0;
     },
 
-    findThread(channelId, rootMessageId) {
+    unmarkInboundSeen(providerMessageId, channelId) {
+      sql
+        .prepare(`DELETE FROM email_inbound_seen WHERE provider_message_id = ? AND channel_id = ?`)
+        .run(providerMessageId, channelId);
+    },
+
+    findThread(channelId, rootMessageId, userId) {
       return (
         (sql
           .prepare(
-            `SELECT id, channel_id AS channelId, thread_id AS threadId, root_message_id AS rootMessageId
-             FROM email_threads WHERE channel_id = ? AND root_message_id = ?`,
+            `SELECT id, channel_id AS channelId, thread_id AS threadId, root_message_id AS rootMessageId,
+                    user_id AS userId
+             FROM email_threads WHERE channel_id = ? AND root_message_id = ? AND user_id = ?`,
           )
-          .get(channelId, rootMessageId) as EmailThreadRow | undefined) ?? null
+          .get(channelId, rootMessageId, userId) as EmailThreadRow | undefined) ?? null
       );
     },
 
-    createThread(channelId, threadId, rootMessageId) {
-      const row: EmailThreadRow = { id: randomUUID(), channelId, threadId, rootMessageId };
+    createThread(channelId, threadId, rootMessageId, userId) {
+      const row: EmailThreadRow = { id: randomUUID(), channelId, threadId, rootMessageId, userId };
       sql
-        .prepare(`INSERT INTO email_threads (id, channel_id, thread_id, root_message_id) VALUES (?, ?, ?, ?)`)
-        .run(row.id, row.channelId, row.threadId, row.rootMessageId);
+        .prepare(
+          `INSERT INTO email_threads (id, channel_id, thread_id, root_message_id, user_id) VALUES (?, ?, ?, ?, ?)`,
+        )
+        .run(row.id, row.channelId, row.threadId, row.rootMessageId, row.userId);
       return row;
+    },
+
+    removeThread(id) {
+      sql.prepare(`DELETE FROM email_threads WHERE id = ?`).run(id);
+    },
+
+    dropWorkspace(workspaceId) {
+      sql.prepare(`DELETE FROM email_channels WHERE workspace_id = ?`).run(workspaceId);
     },
   };
 }

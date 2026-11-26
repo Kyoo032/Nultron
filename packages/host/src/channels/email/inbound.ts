@@ -74,6 +74,12 @@ export type EmailDelivery = {
   subject?: unknown;
   /** The sender's plain-text body. Attachments are not taken yet (F7a). */
   text?: unknown;
+  /**
+   * The relay's authenticated envelope sender (`from`, `sender` or `envelope_sender` at the
+   * payload's top level), set by the relay — never by the mail. Wins over `headers.from`, which
+   * a sender can forge.
+   */
+  envelopeSender?: string;
 };
 
 type Verdict = { ok: true } | { ok: false; code: string; message: string; status: number };
@@ -119,7 +125,9 @@ function readDelivery(payload: unknown): EmailDelivery | null {
   if (!providerMessageId || !to) {
     return null;
   }
-  return { providerMessageId, to, headers, subject: body.subject, text: body.text };
+  const envelopeField = body.from ?? body.sender ?? body.envelope_sender;
+  const envelopeSender = senderAddressOf(typeof envelopeField === "string" ? envelopeField : undefined) ?? undefined;
+  return { providerMessageId, to, headers, subject: body.subject, text: body.text, envelopeSender };
 }
 
 export type EmailWebhookTally = {
@@ -226,7 +234,7 @@ async function handleEmailWebhookInner(request: HostRequest, deps: EmailWebhookD
       continue;
     }
 
-    const sender = senderAddressOf(delivery.headers.from);
+    const sender = delivery.envelopeSender ?? senderAddressOf(delivery.headers.from);
     const hash = sender ? senderHash(sender) : "";
     if (!sender || !cap.admit(channel.id, hash)) {
       tally.capped += 1;
@@ -278,21 +286,38 @@ async function handleEmailWebhookInner(request: HostRequest, deps: EmailWebhookD
     void (async () => {
       const actor = resolveEmailActor(db, channel.workspaceId, entry.userId, channel.agentId);
       if (!actor) {
+        // The allowlisted user left the desk — a redelivery cannot fix that, so the mark stays.
         audit(db, channel, "failed", "no_actor", hash);
         return;
       }
-      // A mail in an already-filed mail thread reuses its chat thread; a new one starts a chat
-      // thread under the sender's user, and `email_threads` files it under the References root.
-      const existing = threadHeaders.threadKey ? store.findThread(channel.id, threadHeaders.threadKey) : null;
-      let threadId = existing?.threadId ?? "";
+      // A mail in an already-filed mail thread reuses its chat thread — the mapping is per
+      // user, so two allowlisted senders in one mail conversation never share a chat. A mapping
+      // whose chat thread was deleted is dropped and refiled.
+      const existing = threadHeaders.threadKey
+        ? store.findThread(channel.id, threadHeaders.threadKey, actor.tenant.userId)
+        : null;
+      let threadId = "";
+      if (existing) {
+        const alive = db.prepare(`SELECT id FROM threads WHERE id = ?`).get(existing.threadId) as
+          | { id: string }
+          | undefined;
+        if (alive) {
+          threadId = existing.threadId;
+        } else {
+          store.removeThread(existing.id);
+        }
+      }
       if (!threadId) {
         const openThread = deps.openThread ?? ((input) => createThread(input.tenantId, input.agentId, input.title));
         const thread = await openThread({ tenantId: actor.tenant, agentId: channel.agentId, title: subject });
         threadId = thread.id;
         if (threadHeaders.threadKey) {
-          store.createThread(channel.id, threadId, threadHeaders.threadKey);
+          store.createThread(channel.id, threadId, threadHeaders.threadKey, actor.tenant.userId);
         }
       }
+      // Anything transient from here on unmarks the dedupe row, so the provider's redelivery
+      // gets another attempt once capacity or configuration recovers.
+      const retry = () => store.unmarkInboundSeen(delivery.providerMessageId, channel.id);
       const runReply = deps.runReply ?? runEmailReply;
       const result = await runReply({
         tenant: actor.tenant,
@@ -300,11 +325,15 @@ async function handleEmailWebhookInner(request: HostRequest, deps: EmailWebhookD
         body: text,
       });
       if (result.kind === "refused") {
+        if (result.reason !== "injection") {
+          retry();
+        }
         audit(db, channel, result.reason === "injection" ? "denied" : "failed", result.reason, hash);
         return;
       }
       const mailer = deps.mailer === undefined ? createMailer(env) : deps.mailer;
       if (!mailer) {
+        retry();
         audit(db, channel, "failed", "unconfigured", hash);
         return;
       }
@@ -328,6 +357,7 @@ async function handleEmailWebhookInner(request: HostRequest, deps: EmailWebhookD
         });
         audit(db, channel, "ok", "replied", hash);
       } catch {
+        retry();
         audit(db, channel, "failed", "send_failed", hash);
       }
     })().catch(() => {
