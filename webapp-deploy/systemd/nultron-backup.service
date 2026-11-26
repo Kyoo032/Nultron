@@ -1,0 +1,31 @@
+# Nultron per-desk encrypted backup — the host-level job (spec S8: it runs on the host,
+# outside the 768 MiB desk containers, so no desk's RAM ceiling is touched).
+#
+# Install:
+#   install -m 0644 webapp-deploy/systemd/nultron-backup.service /etc/systemd/system/
+#   install -m 0644 webapp-deploy/systemd/nultron-backup.timer   /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now nultron-backup.timer
+#
+# BACKUP_KEY and BACKUP_HEARTBEAT_URL come from Secrets Manager, never .env (SR-206):
+# put them in the EnvironmentFile at /etc/nultron/backup.env (mode 0600), e.g.
+#   BACKUP_KEY=<from nultron/prod/backup-key>
+#   BACKUP_HEARTBEAT_URL=<from nultron/prod/backup-heartbeat-url>
+# or add a per-run fetch in an ExecStartPre wrapper. A failed run sends the heartbeat's
+# /fail ping and exits non-zero, which the unit records in the journal.
+[Unit]
+Description=Nultron per-desk encrypted backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/nultron/webapp-deploy
+# systemd's default PATH covers /usr/local/bin, which is where coscli usually lands. When the
+# uploader is user-installed instead (a tccli under a deploy user's ~/.local/bin), this unit
+# would silently skip every offsite upload — add a `PATH=` line to /etc/nultron/backup.env
+# with that bin dir appended (EnvironmentFile wins over this default).
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+EnvironmentFile=-/etc/nultron/backup.env
+ExecStart=/bin/sh /srv/nultron/webapp-deploy/scripts/backup.sh /srv/nultron/backups
+# Backups of every desk can take a while; do not let systemd kill a slow run.
+TimeoutStartSec=30min

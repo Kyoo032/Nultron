@@ -102,6 +102,12 @@ export type PortalTokens = {
    * needs_key, never to the company key. Never logged or echoed.
    */
   readonly gatewayKey?: string | null;
+  /**
+   * The tenant's model allowlist from the body's `model_allowlist` (`tenant_config`), sent on
+   * every mint and refresh. `null` only when the portal does not send the field at all — an
+   * absent or malformed value must not empty a list an older token carried.
+   */
+  readonly modelAllowlist?: readonly string[] | null;
 };
 
 /**
@@ -306,6 +312,11 @@ function toTokens(body: unknown): PortalTokens {
     gatewayEndpoint: normalizeAssignedGatewayEndpoint(record.gateway_endpoint),
     // The bearer key the portal issued for that endpoint (DFIND-155). Opaque; only length-checked.
     gatewayKey: asEndpointKey(record.gateway_key),
+    // An array of strings is a real answer (an empty one allows every model); anything else is
+    // the portal not sending the field, which must not clear a list a previous token carried.
+    modelAllowlist: Array.isArray(record.model_allowlist)
+      ? record.model_allowlist.filter((model): model is string => typeof model === "string")
+      : null,
   };
 }
 
@@ -419,6 +430,7 @@ const FAKE_TOKENS: PortalTokens = {
   role: "member",
   gatewayEndpoint: null,
   gatewayKey: null,
+  modelAllowlist: null,
 };
 
 /**

@@ -55,8 +55,8 @@ function personalPool(overrides: { boot?: BootOutcome; idleMs?: number } = {}): 
   });
 }
 
-function hostedPool(idleMs?: number): ChildPool {
-  return createChildPool({ serverMode: true, idleMs, spawn: (language) => fakeChild(language) });
+function hostedPool(idleMs?: number, hostedWarmTotal?: number): ChildPool {
+  return createChildPool({ serverMode: true, idleMs, hostedWarmTotal, spawn: (language) => fakeChild(language) });
 }
 
 async function checkout(pool: ChildPool, k: PoolKey) {
@@ -119,7 +119,7 @@ describe("warm reuse", () => {
   });
 
   it("does not hand a leased child to a second caller", async () => {
-    const pool = hostedPool();
+    const pool = hostedPool(undefined, 2);
     const first = await checkout(pool, key("t", "d"));
     const second = await checkout(pool, key("t", "d"));
     expect(second.child).not.toBe(first.child);
@@ -151,9 +151,25 @@ describe("capacity", () => {
     pool.shutdown();
   });
 
-  it("hosted keeps two warm children in total and evicts the least recently used", async () => {
+  it("hosted keeps one warm child by default, so a 768 MiB desk holds it beside the host", async () => {
+    const pool = hostedPool();
+    const a = await checkout(pool, key("a", "d"));
+    a.release(true);
+    const b = await checkout(pool, key("b", "d"));
+    expect(pool.size()).toBe(1);
+    expect(a.child.alive()).toBe(false);
+    expect(b.cold).toBe(true);
+    pool.shutdown();
+  });
+
+  it("hosted keeps the configured warm children in total and evicts the least recently used", async () => {
     let clock = 1000;
-    const pool = createChildPool({ serverMode: true, now: () => clock, spawn: (language) => fakeChild(language) });
+    const pool = createChildPool({
+      serverMode: true,
+      hostedWarmTotal: 2,
+      now: () => clock,
+      spawn: (language) => fakeChild(language),
+    });
     const a = await checkout(pool, key("a", "d"));
     a.release(true);
     clock += 10;
@@ -174,10 +190,9 @@ describe("capacity", () => {
   it("answers busy rather than evicting a child that is running", async () => {
     const pool = hostedPool();
     await checkout(pool, key("a", "d"));
-    await checkout(pool, key("b", "d"));
-    const third = await pool.checkout(key("c", "d"));
-    expect(third).toEqual({ ok: false, why: "busy" });
-    expect(pool.size()).toBe(2);
+    const second = await pool.checkout(key("b", "d"));
+    expect(second).toEqual({ ok: false, why: "busy" });
+    expect(pool.size()).toBe(1);
     pool.shutdown();
   });
 
@@ -271,7 +286,7 @@ describe("idle timeout", () => {
 
 describe("shutdown", () => {
   it("kills every child, idle or running", async () => {
-    const pool = hostedPool();
+    const pool = hostedPool(undefined, 2);
     const running = await checkout(pool, key("a", "d"));
     const idle = await checkout(pool, key("b", "d"));
     idle.release(true);

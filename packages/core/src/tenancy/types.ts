@@ -1,18 +1,19 @@
-export const MEMBERSHIP_ROLES = ["owner", "admin", "builder", "member"] as const;
+export const MEMBERSHIP_ROLES = ["owner", "admin", "builder", "member", "auditor"] as const;
 export type MembershipRole = (typeof MEMBERSHIP_ROLES)[number];
 
 /**
  * The role claim the hosted portal sends beside `tenant_id` in every token body
- * (`apps/portal/src/flows/token.ts`): exactly these three strings. It is the portal's fact about
+ * (`apps/portal/src/flows/token.ts`): exactly these four strings. It is the portal's fact about
  * the person, read from the member's row at every mint and refresh. `MembershipRole` is the wider
  * set the host's own tables may hold (`builder` is the host's, not the portal's).
  */
-export const PORTAL_ROLES = ["owner", "admin", "member"] as const;
+export const PORTAL_ROLES = ["owner", "admin", "member", "auditor"] as const;
 export type PortalRole = (typeof PORTAL_ROLES)[number];
 
 /**
- * A claim read as a role, or `null`. Exact match only: `"Owner"`, `" owner"` and `"builder"` are not
- * roles. A missing or unknown claim is "no role" — least privilege — and never an owner.
+ * A claim read as a role, or `null`. Exact match only: `"Owner"`, `" owner"`, `"Auditor"` and
+ * `"builder"` are not roles. A missing or unknown claim is "no role" — least privilege — and
+ * never an owner.
  */
 export function parsePortalRole(value: unknown): PortalRole | null {
   return typeof value === "string" && (PORTAL_ROLES as readonly string[]).includes(value)
@@ -63,4 +64,21 @@ export function canBuild(role: MembershipRole): boolean {
 
 export function canAdminister(role: MembershipRole): boolean {
   return role === "owner" || role === "admin";
+}
+
+/**
+ * The OPC Auditor seat (F8a): a read-only delegation that sees the Activity Log and Usage, never
+ * content. The Owner holds audit rights with no flag and no extra step — Owner implies Admin +
+ * Auditor — so the list is exactly `owner` and `auditor`.
+ */
+export function canAudit(role: MembershipRole): boolean {
+  return role === "owner" || role === "auditor";
+}
+
+/**
+ * Anything an auditor may not do: start a run, invoke a tool, write a thread. `false` for the
+ * auditor alone, so a hosted `member` keeps every capability it already has.
+ */
+export function canUseAgents(role: MembershipRole): boolean {
+  return role !== "auditor";
 }

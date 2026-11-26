@@ -1,4 +1,4 @@
-import { isServerMode } from "@agentforge/core";
+import { ApiError, isServerMode } from "@agentforge/core";
 // Phase 4: installs the hosted tenant-state backend as an import side effect. It lives here, on the
 // one module every request goes through, rather than under `settings-store.ts`, because importing
 // `@agentforge/db` opens the database and `settings-store.ts` is reached from unit tests that have
@@ -27,6 +27,8 @@ import { withRequestLocale } from "./run-context";
 import { withAssignedGatewayEndpoint } from "./gateway-endpoint-scope";
 import { withRequestSession } from "./tenant-scope";
 import { clearedWorkspaceCookie } from "./workspace";
+import { roleDenied, routeGate } from "./role-policy";
+import { getTenant } from "./tenant";
 import {
   handleGetAgent,
   handleGetAgentCapabilities,
@@ -671,6 +673,18 @@ export async function dispatch(request: HostRequest, options: DispatchOptions = 
     const scoped = session ? { ...rest, params, path, session } : { ...rest, params, path };
     if (!session) {
       return route.handler(scoped);
+    }
+    // The OPC role gate (./role-policy.ts): the membership role the portal's word resolves to is
+    // checked against the route's class before the handler ever runs — an auditor's run or content
+    // read, and a member's administer change, are refused here with one 403 shape.
+    try {
+      const denial = roleDenied((await getTenant(scoped)).role, routeGate(method, route.path));
+      if (denial) {
+        return jsonError(new ApiError("forbidden", denial, 403));
+      }
+    } catch {
+      // The tenant could not be resolved here (no membership in this test or an unprovisioned
+      // session): the handler runs its own getTenant and gives the same answer it always has.
     }
     // Phase 3 lane C: the verified session is the tenant, for this handler and for everything it
     // awaits. Lane E swept every host call site to `getTenant(request)`, so the session now reaches

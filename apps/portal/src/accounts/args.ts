@@ -4,7 +4,7 @@ import { EMAIL_SHAPE, MAX_INVITE_EMAIL_LENGTH } from "../invites/args";
 import { isValidUsername, normaliseUsername } from "../password/policy";
 
 const DEFAULT_TENANT = "nultron";
-const ROLES = ["owner", "admin", "member"] as const;
+const ROLES = ["owner", "admin", "member", "auditor"] as const;
 export type AccountRole = (typeof ROLES)[number];
 
 export class AccountArgsError extends Error {
@@ -23,7 +23,7 @@ person at first sign-in.
 
 Commands:
   create          Make a person who signs in with a username and a password.
-                    --username <name>  --email <address>  [--role owner|admin|member]  [--name <display name>]  [--gateway-endpoint <url>]
+                    --username <name>  --email <address>  [--role owner|admin|member|auditor]  [--name <display name>]  [--gateway-endpoint <url>]
                   Prints a generated initial password ONCE. The person must choose their own before a
                   session is issued. Refused when the org has no seat left. For an active person who has
                   no password yet (the owner "seed" made), it attaches the credential to them and ends
@@ -37,7 +37,7 @@ Commands:
   enable          Let a disabled person back in, with the password they had. Refused when no seat is left.
                     --username <name> | --email <address>
   set-role        Change an active person's role. Refused for the last owner.
-                    --username <name> | --email <address>  --role owner|admin|member
+                    --username <name> | --email <address>  --role owner|admin|member|auditor
   set-endpoint    Assign or clear a person's API gateway endpoint (Nultron admin only).
                   --key-stdin reads the write-only endpoint key from stdin.
                     --username <name> | --email <address>  (--gateway-endpoint <url> | --clear)
@@ -161,7 +161,7 @@ function readRole(raw: string | undefined): AccountRole | null {
     return null;
   }
   if (!(ROLES as readonly string[]).includes(role)) {
-    throw new AccountArgsError(`--role must be owner, admin or member; got ${JSON.stringify(role)}`);
+    throw new AccountArgsError(`--role must be owner, admin, member or auditor; got ${JSON.stringify(role)}`);
   }
   return role as AccountRole;
 }
@@ -169,7 +169,7 @@ function readRole(raw: string | undefined): AccountRole | null {
 function requireRole(raw: string | undefined): AccountRole {
   const role = readRole(raw);
   if (role === null) {
-    throw new AccountArgsError(`--role owner|admin|member is required.\n\n${ACCOUNT_USAGE}`);
+    throw new AccountArgsError(`--role owner|admin|member|auditor is required.\n\n${ACCOUNT_USAGE}`);
   }
   return role;
 }

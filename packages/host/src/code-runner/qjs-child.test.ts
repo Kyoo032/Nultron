@@ -1,7 +1,7 @@
 import { type ChildProcess, fork } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { JS_HEAP_LIMIT_BYTES, JS_STACK_KB, JS_WASM_MAX_MB } from "./limits";
+import { CHILD_OLD_SPACE_MB, JS_HEAP_LIMIT_BYTES, JS_STACK_KB, JS_WASM_MAX_MB } from "./limits";
 import { classifyGuestError } from "./outcome";
 import { type ChildResult, parseChildMessage } from "./protocol";
 
@@ -25,7 +25,7 @@ async function runInRealQuickJs(
   overrides: { deadlineMs?: number; heapLimitBytes?: number } = {},
 ): Promise<ChildResult> {
   const child = fork(QJS_CHILD, [JSON.stringify({ wasmMaxMb: JS_WASM_MAX_MB })], {
-    execArgv: ["--disallow-code-generation-from-strings", "--max-old-space-size=256"],
+    execArgv: ["--disallow-code-generation-from-strings", `--max-old-space-size=${CHILD_OLD_SPACE_MB}`],
     stdio: ["ignore", "pipe", "pipe", "ipc"],
     serialization: "advanced",
   });

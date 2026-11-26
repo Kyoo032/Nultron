@@ -1,14 +1,17 @@
 import { type CodeLanguage, type CodeRunFailure, isServerMode } from "@agentforge/core";
 import { isFileRefusal, parseDeskPath } from "@agentforge/core/tools/files";
-import type { Release } from "../concurrency";
+import { type Release, maxFromEnv } from "../concurrency";
 import { log } from "../log";
 import { type CodeLimiter, createCodeLimiter } from "./code-limiter";
 import { type RunJob, type RunOutcome, type SandboxChild, spawnSandboxChild } from "./child-process";
 import {
+  HOSTED_MAX_RUNS,
+  HOSTED_WARM_TOTAL,
   JS_DEADLINE_MARGIN_MS,
   JS_HEAP_LIMIT_BYTES,
   JS_STACK_KB,
   MAX_CODE_BYTES,
+  MAX_CODE_RUNS_ENV,
   MAX_INPUT_BYTES,
   MAX_INPUT_FILES,
   MAX_OUTPUT_FILE_BYTES,
@@ -190,10 +193,19 @@ export function createSandboxRunner(deps: RunnerDeps = {}): SandboxRunner {
   const verify = deps.checkShip ?? checkShip;
   const limiter = deps.limiter ?? createCodeLimiter();
   let shipDir = "";
+  // A leased child counts against the pool's total, so the pool must hold at least as many children as
+  // the limiter admits runs; otherwise an operator who raises AGENTFORGE_MAX_CODE_RUNS buys nothing but
+  // a `busy` answer. The default caps are both 1, so a 768 MiB desk still holds one child in all
+  // (DFIND-166); raising the run cap is the operator accepting the extra memory, as SR-123 notes.
+  const hostedWarmTotal = Math.max(
+    HOSTED_WARM_TOTAL,
+    maxFromEnv(MAX_CODE_RUNS_ENV, HOSTED_MAX_RUNS, process.env),
+  );
   const pool =
     deps.pool ??
     createChildPool({
       serverMode: isServerMode(),
+      hostedWarmTotal,
       spawn: (language) =>
         (deps.spawn ?? ((l, dir) => spawnSandboxChild({ shipDir: dir, language: l })))(language, shipDir),
     });

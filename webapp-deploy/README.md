@@ -48,7 +48,7 @@ webapp-deploy/
    ├─ _common.sh              shared helpers (sourced, not run)
    ├─ build.sh                build the app and portal images, print their sizes
    ├─ deploy.sh               secrets from SSM, build, up -d, health, log the sha
-   ├─ backup.sh               SQLite snapshot + encrypted tar of /data -> COS
+   ├─ backup.sh               per-desk loop: SQLite snapshot + encrypted tar of each desk's /data -> COS
    ├─ restore.sh              decrypt and restore an archive into the volume
    ├─ portal.sh               run an apps/portal script (seed, invite, ...) in the running portal
    ├─ components.sh           status / check / install the server's native components
@@ -668,14 +668,21 @@ export BACKUP_KEY=...                               # from Secrets Manager, neve
 sh webapp-deploy/scripts/backup.sh [output-dir]     # default webapp-deploy/backups
 ```
 
-No downtime. In order it takes a consistent SQLite snapshot into `/data/.backup-staging/`,
-tars `/data` **minus `components/`, `logs/` and `.master-key`**, encrypts the stream, and
-uploads the result to the COS backup bucket.
+No downtime. **One run covers every desk on the host.** A desk is any running container
+labelled `com.docker.compose.service=app`; its desk id is the compose project (`nultron-web`,
+`pusat01`, a tester desk), so desks in other compose projects are found by docker label, not by
+this folder's compose file. `BACKUP_DESK_GLOB` narrows the set (default `*`). For each desk it
+takes a consistent SQLite snapshot into `/data/.backup-staging/`, tars `/data` **minus
+`components/`, `logs/` and `.master-key`**, encrypts the stream, and uploads
+`nultron-data-<desk>-<stamp>.tar.gz.enc` to the COS backup bucket. One archive per desk.
 
 - **Snapshot.** The image has no `sqlite3` binary, so the snapshot is `VACUUM INTO`
   through `better-sqlite3` - one committed transaction, compacted, with no `-wal`/`-shm`
   of its own. `backup.sh` checks for `sqlite3` first and uses `.backup` if a future image
   ever adds it; both do the same job.
+- **Per-desk heartbeat.** Each run writes `backup-status.json` (result and timestamp only) into
+  that desk's data volume; `GET /api/v1/health` surfaces it as the `backup` check — the app's
+  "last backup: ok / pending" line (spec R12.9).
 - **Encryption (spec S6).** chunked AES-256-GCM with scrypt key derivation, by
   `scripts/aead-crypt.mjs` (SR-171), on this host, before the bytes leave it. A leaked bucket is
   then not a leaked database, and a tampered or truncated ciphertext fails authentication instead
@@ -684,18 +691,27 @@ uploads the result to the COS backup bucket.
   restore scripts tell the two apart by the file's first 8 bytes and still read both.
 - **Verification.** Every run decrypts and lists the archive it just wrote. Set
   `BACKUP_VERIFY=0` to skip it on a very large volume.
-- **Upload.** `coscli cp` if `coscli` is installed, else `tccli cos put-object`, else the
-  file stays in `webapp-deploy/backups/` and the script prints a warning. Local copies
+- **Upload.** `coscli cp` if `coscli` is installed, else `tccli cos put-object`. **A skipped
+  upload is a failed backup**: with no bucket or no uploader the desk's heartbeat records
+  `failed`, the script exits non-zero and the heartbeat monitor alarms (DFIND-168).
+  `BACKUP_REQUIRE_OFFSITE=0` downgrades that to a warning for local tests only. Local copies
   older than `BACKUP_RETAIN_DAYS` (7) are pruned.
+- **Failure.** One desk failing does not stop the others; the run exits non-zero with the
+  failed desk ids on the last line.
 
 **The key is not in the backup.** `AGENTFORGE_SECRETS_KEY` lives only in Secrets Manager.
 Lose it and `settings.enc` is unreadable no matter how good the backup is. `BACKUP_KEY` is
 a second, separate secret - losing that one makes the tarballs unreadable instead.
 
-### Hourly cron
+### Hourly schedule
 
-RPO is one hour (placement doc section 5). Install on the CVM as the deploy user, with
-`crontab -e`:
+RPO is one hour (placement doc section 5). Preferred on a systemd host: install
+`webapp-deploy/systemd/nultron-backup.service` and `.timer` per the comments in the unit
+files — the timer runs hourly on the **host**, outside the 768 MiB desk containers, and
+`Persistent=true` catches up a missed run. Secrets go in `/etc/nultron/backup.env` (0600),
+never `.env`.
+
+The equivalent cron line, on the CVM as the deploy user with `crontab -e`:
 
 ```cron
 # m h  dom mon dow  command
@@ -765,8 +781,9 @@ create the check. Nothing here has been deployed.
 ## Restore / roll back
 
 ```sh
-# data
-sh webapp-deploy/scripts/restore.sh backups/nultron-data-20260918T120000Z.tar.gz
+# data, one desk — the desk id is read from the archive name, or passed as --desk
+sh webapp-deploy/scripts/restore.sh backups/nultron-data-pusat01-20260918T120000Z.tar.gz.enc
+sh webapp-deploy/scripts/restore.sh backups/nultron-data-20260918T120000Z.tar.gz --desk nultron-web
 
 # code, one step back: the images from before the LAST deploy (run from webapp-deploy/)
 docker image tag nultron-web:previous nultron-web:local
@@ -1164,6 +1181,9 @@ matter:
 | `BACKUP_KEY` | Passphrase for the backup tarball's AES-256-GCM encryption (spec S6; pre-SR-171 backups used `openssl enc`). Separate from the wrap key. Empty in `.env` on the server |
 | `TENCENT_REGION` | `ap-jakarta`. SSM, COS and the CVM. Personal data stays in-country; `ap-singapore` is the backup replica only |
 | `COS_BACKUP_BUCKET` / `COS_MEDIA_BUCKET` | `<name>-<appid>` as the console shows them. Both private, both SSE-KMS |
+| `BACKUP_DESK_GLOB` | Which compose projects count as desks in the backup loop (default `*`, every `app` service). E.g. `pusat*` for only the Pusat desks |
+| `BACKUP_REQUIRE_OFFSITE` | `1` (default): a skipped COS upload is a failed backup — the run exits non-zero and the desk heartbeat records `failed`. `0` downgrades it to a warning for local tests only |
+| `BACKUP_RETAIN_DAYS`, `BACKUP_VERIFY`, `BACKUP_PORTAL`, `COS_BACKUP_PREFIX`, `BACKUP_HEARTBEAT_URL` | Local-prune days (7), decrypt-and-list after each archive (1), portal pg_dump toggle (1), COS object prefix (`hourly/`), external monitor ping URL (process env only, SR-206) |
 | `AGENTFORGE_SERVER`, `AGENTFORGE_TRUSTED_ORIGINS`, `BIND_HOST`, `AGENTFORGE_PORTAL_URL`, `AGENTFORGE_MAX_FFMPEG`, `AGENTFORGE_MAX_SQL_WORKERS`, `AGENTFORGE_JOB_QUEUE_TIMEOUT_MS`, `AGENTFORGE_LOG_LEVEL`, `AGENTFORGE_RATE_IP_RPM`, `AGENTFORGE_RATE_SESSION_RPM`, `AGENTFORGE_RATE_AUTH_RPM` | Hosted mode (Phase 1 and 2). See the comments in `.env.example`; the switch is `AGENTFORGE_SERVER=1` |
 | `AGENTFORGE_APPLY_PENDING_RESET` | **Never set by hand.** `apps/web/server-env.ts` sets it to apply a queued "Start over" wipe |
 

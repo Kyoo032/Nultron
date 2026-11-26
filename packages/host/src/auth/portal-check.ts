@@ -52,6 +52,7 @@ import type { PortalRole } from "@agentforge/core";
 import type { PortalIdentity } from "@agentforge/db";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
 import { log } from "../log";
+import { recordTenantModelAllowlist } from "../model-allowance";
 import { PortalError, type PortalClient } from "./portal-client";
 import type { PortalClientCredentials } from "./portal-config";
 import { portalCheckDue, revokedSession, type AuthReason, type SessionRecord } from "./session";
@@ -319,6 +320,7 @@ export function createPortalSessionCheck(options: PortalSessionCheckOptions): Po
     let role: PortalRole | null;
     let gatewayEndpoint: string | null;
     let gatewayKey: string | null;
+    let modelAllowlist: readonly string[] | null;
     try {
       const client = clientCredentials();
       const answer = await options.portal.refresh({
@@ -329,6 +331,7 @@ export function createPortalSessionCheck(options: PortalSessionCheckOptions): Po
       role = answer.role;
       gatewayEndpoint = answer.gatewayEndpoint ?? null;
       gatewayKey = answer.gatewayKey ?? null;
+      modelAllowlist = answer.modelAllowlist ?? null;
       rotated = {
         refreshToken: answer.refreshToken,
         accessToken: answer.accessToken,
@@ -376,6 +379,9 @@ export function createPortalSessionCheck(options: PortalSessionCheckOptions): Po
       log.error("portal_check_not_recorded", { tenantId: session.tenantId, fault: faultOf(error) });
     }
     await reconcileRole(session, role);
+    // The tenant's allowlist rides the same answer; `null` (the portal sent none) leaves the
+    // last record, and the desk's own setting when no record was ever kept.
+    recordTenantModelAllowlist(session.tenantId, modelAllowlist);
     return { kind: "rotated", tokens: rotated, gatewayEndpoint };
   }
 

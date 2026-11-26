@@ -358,9 +358,14 @@ export type ModelCatalogBody = {
  * it is left off; see `ModeCatalogModes`. A caller that wants a mode's models reads them through
  * `modelsForMode` in `@agentforge/core/mode-catalog`, which knows which modes are the chat catalogue.
  */
-export function modelCatalogBody(scope?: ModelCacheScope): ModelCatalogBody {
-  const models = listSelectableModels(scope);
-  const { modes, defaults } = modeCatalogPayload(undefined, scope);
+export function modelCatalogBody(scope?: ModelCacheScope, allowedIds?: ReadonlySet<string>): ModelCatalogBody {
+  // F8d: a tenant with a non-empty `model_allowlist` only ever sees the ids on it — the picker's
+  // chat list, every mode list and the mode defaults all come from the same filtered catalog.
+  const catalog = allowedIds
+    ? listCatalogModels(scope).filter((model) => allowedIds.has(model.id.trim().toLowerCase()))
+    : listCatalogModels(scope);
+  const models = applyCuration(routeForScope(catalog, scope).chat);
+  const { modes, defaults } = modeCatalogPayload(catalog, scope);
   const { chat: _chat, ...ownLists } = modes;
   return { models, defaultModel: defaultSelectableModel(models, scope), modes: ownLists, defaults };
 }

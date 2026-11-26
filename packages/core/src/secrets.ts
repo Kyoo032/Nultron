@@ -70,6 +70,12 @@ export type StoredSecrets = {
    * same settings.enc envelope as gateway/Telegram/WhatsApp tokens and never returned to the renderer.
    */
   mcpTokens?: Record<string, string>;
+  /**
+   * The desk-side model allowlist, used only when no portal supplies one
+   * (`tenant_config.model_allowlist`). Empty or absent keeps the default: every model is allowed.
+   * A configuration value, not a secret.
+   */
+  modelAllowlist?: string[];
 };
 
 /** The retrieval engines a desk may select. */
@@ -259,6 +265,13 @@ export function mergeSecrets(current: StoredSecrets, patch: SecretPatch): Stored
   if (patch.disabledTools !== undefined) {
     next.disabledTools = Array.isArray(patch.disabledTools)
       ? patch.disabledTools.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim())
+      : [];
+  }
+  if (patch.modelAllowlist !== undefined) {
+    // Same shape rule as disabledTools: a present field is the whole new list, so [] clears it and
+    // an emptied desk allowlist goes back to allowing every model.
+    next.modelAllowlist = Array.isArray(patch.modelAllowlist)
+      ? patch.modelAllowlist.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim())
       : [];
   }
   if (patch.editTurnCapUsd !== undefined) {
