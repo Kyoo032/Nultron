@@ -7297,6 +7297,7 @@ Gate: none for week one (voice is Rizky's only); before customer voice or any al
 - **Post-run failures keep the dedupe mark**: a send failure after turns are saved cannot rerun the agent on redelivery; only pre-run failures (unconfigured mailer, capacity refusals) unmark.
 - **Desk delete frees addresses**: `emailStore().dropWorkspace` runs inside workspace deletion so `email_channels` rows go with the desk.
 - **Relay domains are case-normalised** at channel create, matching the lowercased recipient lookup on intake; the Email card's mutation controls render disabled for hosted members.
+- **Replies run serially per chat thread** (`threadReplyQueues`): a same-batch second mail can never enter the first reply's prompt history, the history bound also drops turns stored after the mail's own, and settled queue tails are pruned.
 
 ## Must be true before the Tencent Cloud deploy
 
