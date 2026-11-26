@@ -90,7 +90,7 @@ export async function runEmailReply(input: {
     // The inbound mail is stored first — the user's turn — even when the run then refuses, so the
     // thread reads like the mailbox did. Content is sealed by insertMessage.
     const userParts: ContentPart[] = [{ type: "text", text: body }];
-    await insertMessage(tenant, threadId, "user", userParts);
+    const storedUser = await insertMessage(tenant, threadId, "user", userParts);
 
     const runId = `email-${crypto.randomUUID()}`;
     const state = { answer: "", failed: false, usageRecorded: false };
@@ -104,9 +104,14 @@ export async function runEmailReply(input: {
         locale,
       });
       const rows = await listMessages(tenant, threadId);
+      // Exclude this mail's own stored turn by id, not by position: a same-batch mail can land
+      // between the insert and the read, making it the last row instead of ours.
       const history = await prepareChatImageHistory(
         tenant,
-        [...chatHistoryFromRows(rows.slice(0, -1)), { role: "user" as const, parts: prepared.userParts }],
+        [
+          ...chatHistoryFromRows(rows.filter((row) => row.id !== storedUser?.id)),
+          { role: "user" as const, parts: prepared.userParts },
+        ],
         { model: prepared.version.model, locale },
       );
       const runtime = createRuntime(prepared.settings, toolMediaModels(tenant));
