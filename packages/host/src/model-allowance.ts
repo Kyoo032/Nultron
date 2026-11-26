@@ -3,11 +3,11 @@ import {
   explainRunUsd,
   resolvedGatewayBaseUrl,
   type PricingCatalog,
-  type TenantContext,
 } from "@agentforge/core";
 import { cachedPricingCatalog } from "./account-usage";
+import { modelCacheScopeOf } from "./model-cache";
 import { listSelectableModels, type SelectableModel } from "./selectable-models";
-import { loadSettings } from "./settings-store";
+import { loadSettings, type SettingsScope } from "./settings-store";
 
 export type PriceBand = 1 | 2 | 3;
 
@@ -102,16 +102,25 @@ export function clearTenantModelAllowlist(tenantId: string): void {
  * `modelAllowlist` setting when there is not (no portal). `null` means nothing is configured,
  * which is the same allow-everything answer as an empty list.
  */
-export function tenantModelAllowlist(tenant: TenantContext): readonly string[] | null {
-  const portalList = PORTAL_MODEL_ALLOWLISTS.get(tenant.tenantId);
+export function tenantModelAllowlist(scope: SettingsScope): readonly string[] | null {
+  const portalList = scope && typeof scope === "object" ? PORTAL_MODEL_ALLOWLISTS.get(scope.tenantId) : undefined;
   if (portalList !== undefined) {
     return portalList;
   }
-  return loadSettings({ tenantId: tenant.tenantId, workspaceId: tenant.workspaceId }).modelAllowlist ?? null;
+  return loadSettings(scope).modelAllowlist ?? null;
 }
 
-export function allowanceFor(tenant: TenantContext): ModelAllowance {
-  const allowlist = tenantModelAllowlist(tenant);
+/** The allowlist as the lowercased id set `listCatalogModels` filters by, or `null` to allow all. */
+export function tenantAllowedModelIds(scope: SettingsScope): ReadonlySet<string> | null {
+  const allowlist = tenantModelAllowlist(scope);
+  if (!allowlist || allowlist.length === 0) {
+    return null;
+  }
+  return new Set(allowlist.map((model) => model.trim().toLowerCase()));
+}
+
+export function allowanceFor(scope: SettingsScope): ModelAllowance {
+  const allowlist = tenantModelAllowlist(scope);
   if (!allowlist || allowlist.length === 0) {
     return { allows: () => true };
   }
@@ -121,9 +130,9 @@ export function allowanceFor(tenant: TenantContext): ModelAllowance {
   };
 }
 
-export function catalogFor(tenant: TenantContext, allowance: ModelAllowance): SelectableModel[] {
+export function catalogFor(scope: SettingsScope, allowance: ModelAllowance): SelectableModel[] {
   const pricing = cachedPricingCatalog(resolvedGatewayBaseUrl());
-  return listSelectableModels(tenant).filter((model) =>
+  return listSelectableModels(modelCacheScopeOf(scope)).filter((model) =>
     allowance.allows(model, priceInfoFromCatalog(pricing, model.id)),
   );
 }

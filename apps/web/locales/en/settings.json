@@ -126,6 +126,7 @@
   "usersRoles.emailLabel": "E-mail address",
   "usersRoles.emailPlaceholder": "auditor@company.com",
   "usersRoles.inviteBlurb": "Invites are an operator action, not a button in the app: this form writes the exact portal command for the operator to run. The invite code reaches the person by e-mail.",
+  "usersRoles.inviteBlurbPassword": "This portal signs people in with a password, so there is no invite: this form writes the exact account-create command for the operator to run. The account's initial password prints once, for the operator to hand over.",
   "usersRoles.inviteTitle": "Invite an auditor",
   "usersRoles.role.admin.blurb": "Changes settings, keys, channels, agents and data sources, and runs agents.",
   "usersRoles.role.admin.name": "Admin",
@@ -139,5 +140,7 @@
   "usersRoles.rolesTitle": "Roles on this desk",
   "usersRoles.tenantLabel": "Tenant slug",
   "usersRoles.ttlLabel": "Code valid (days)",
+  "usersRoles.usernameLabel": "Username",
+  "usersRoles.usernamePlaceholder": "jane.auditor",
   "usersRoles.you": "you"
 }

@@ -19,6 +19,7 @@ import {
   allowanceFor,
   clearTenantModelAllowlist,
   recordTenantModelAllowlist,
+  tenantAllowedModelIds,
   tenantModelAllowlist,
 } from "./model-allowance";
 import { loadSettings, saveSettings } from "./settings-store";
@@ -85,5 +86,15 @@ describe("allowanceFor", () => {
   it("matches ids case-insensitively and ignores padding", () => {
     recordTenantModelAllowlist(tenant.tenantId, ["  Mixed-Case  "]);
     expect(allowanceFor(tenant).allows(model("mixed-case"), null)).toBe(true);
+  });
+});
+
+describe("tenantAllowedModelIds", () => {
+  it("is the lowercased id set the catalog filters by, and null while every model is allowed", () => {
+    recordTenantModelAllowlist(tenant.tenantId, []);
+    expect(tenantAllowedModelIds(tenant)).toBeNull();
+    recordTenantModelAllowlist(tenant.tenantId, ["  One-Model "]);
+    expect(tenantAllowedModelIds(tenant)).toEqual(new Set(["one-model"]));
+    expect(tenantAllowedModelIds(tenant)?.has("unlisted")).toBe(false);
   });
 });

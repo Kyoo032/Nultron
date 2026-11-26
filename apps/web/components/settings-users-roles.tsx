@@ -15,24 +15,48 @@ const ROLES = ["owner", "admin", "member", "auditor"] as const;
  * command instead of hiding a broken button keeps the seat honest: the owner sees the right
  * command and hands it to whoever runs the portal.
  */
+/**
+ * One POSIX single-quoted word: the command is pasted into an operator's shell, so every value a
+ * person types here is quoted before it becomes syntax. `'` inside a value ends and restarts the
+ * quoted word around an escaped quote.
+ */
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 export function UsersRolesPage() {
   const session = useSession();
   const ownRole = session.identity?.role;
+  const passwordMode = session.signInMode === "password";
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [tenant, setTenant] = useState("");
   const [ttlDays, setTtlDays] = useState("7");
   const [copied, setCopied] = useState(false);
 
   const trimmedEmail = email.trim().toLowerCase();
-  const command =
-    trimmedEmail.length === 0
-      ? null
+  const trimmedUsername = username.trim();
+  // Password deployments have no invites (the `invite` CLI refuses there): the operator creates the
+  // account directly with `account create`, which needs a username besides the address.
+  const ready = passwordMode ? trimmedEmail.length > 0 && trimmedUsername.length > 0 : trimmedEmail.length > 0;
+  const command = !ready
+    ? null
+    : passwordMode
+      ? [
+          "pnpm --filter @agentforge/portal account -- create",
+          `--username ${shellQuote(trimmedUsername)}`,
+          `--email ${shellQuote(trimmedEmail)}`,
+          "--role auditor",
+          tenant.trim() ? `--tenant ${shellQuote(tenant.trim().toLowerCase())}` : null,
+        ]
+          .filter(Boolean)
+          .join(" ")
       : [
           "pnpm --filter @agentforge/portal invite --",
-          `--email ${trimmedEmail}`,
+          `--email ${shellQuote(trimmedEmail)}`,
           "--role auditor",
-          tenant.trim() ? `--tenant ${tenant.trim().toLowerCase()}` : null,
-          `--ttl-days ${ttlDays.trim() || "7"}`,
+          tenant.trim() ? `--tenant ${shellQuote(tenant.trim().toLowerCase())}` : null,
+          `--ttl-days ${shellQuote(ttlDays.trim() || "7")}`,
         ]
           .filter(Boolean)
           .join(" ");
@@ -78,20 +102,37 @@ export function UsersRolesPage() {
         <h2 className="font-heading text-base font-semibold text-[var(--text)]">
           {t("settings.usersRoles.inviteTitle")}
         </h2>
-        <p className="mt-1 text-sm text-[var(--text-3)]">{t("settings.usersRoles.inviteBlurb")}</p>
+        <p className="mt-1 text-sm text-[var(--text-3)]">
+          {t(passwordMode ? "settings.usersRoles.inviteBlurbPassword" : "settings.usersRoles.inviteBlurb")}
+        </p>
 
         <div className="mt-4 flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-[var(--text)]">{t("settings.usersRoles.emailLabel")}</span>
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder={t("settings.usersRoles.emailPlaceholder")}
-              className="rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]"
-              data-testid="invite-auditor-email"
-            />
-          </label>
+          <div className="flex flex-wrap gap-3">
+            {passwordMode ? (
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium text-[var(--text)]">{t("settings.usersRoles.usernameLabel")}</span>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder={t("settings.usersRoles.usernamePlaceholder")}
+                  className="w-48 rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]"
+                  data-testid="invite-auditor-username"
+                />
+              </label>
+            ) : null}
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-[var(--text)]">{t("settings.usersRoles.emailLabel")}</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder={t("settings.usersRoles.emailPlaceholder")}
+                className="rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]"
+                data-testid="invite-auditor-email"
+              />
+            </label>
+          </div>
           <div className="flex flex-wrap gap-3">
             <label className="flex flex-col gap-1 text-sm">
               <span className="font-medium text-[var(--text)]">{t("settings.usersRoles.tenantLabel")}</span>
@@ -104,18 +145,20 @@ export function UsersRolesPage() {
                 data-testid="invite-auditor-tenant"
               />
             </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-[var(--text)]">{t("settings.usersRoles.ttlLabel")}</span>
-              <input
-                type="number"
-                min={1}
-                max={30}
-                value={ttlDays}
-                onChange={(event) => setTtlDays(event.target.value)}
-                className="w-24 rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]"
-                data-testid="invite-auditor-ttl"
-              />
-            </label>
+            {passwordMode ? null : (
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium text-[var(--text)]">{t("settings.usersRoles.ttlLabel")}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={ttlDays}
+                  onChange={(event) => setTtlDays(event.target.value)}
+                  className="w-24 rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]"
+                  data-testid="invite-auditor-ttl"
+                />
+              </label>
+            )}
           </div>
         </div>
 

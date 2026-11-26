@@ -56,10 +56,10 @@ export const AUDITOR_READ_ROUTES: ReadonlySet<string> = new Set([
  */
 export const ADMINISTER_ROUTES: ReadonlySet<string> = new Set([
   // Settings and keys.
-  "POST /api/v1/settings",
-  "POST /api/v1/settings/gateway/check",
-  "POST /api/v1/settings/guide",
-  "POST /api/v1/settings/key-later",
+  // The settings mutations are `agents`, not administer: `handlePostSettings` keeps the role split
+  // itself — a member still saves what is theirs (`locale`, the guide and key-later records, the
+  // gateway probe) and every shared field is refused for a non-admin in server mode
+  // (`SETTINGS_KEY_FORBIDDEN` / operator-only in handlers/settings.ts).
   // settings/reset keeps its own refusal (`tenant_reset_forbidden`, handlers/settings.ts): the gate
   // lets member and builder reach it so that code is the answer, and the auditor never gets there
   // because the route is a mutation — `agents`.
