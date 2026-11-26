@@ -46,7 +46,8 @@ export async function loadEmailChannels(): Promise<EmailChannel[]> {
 }
 
 export async function createEmailChannel(input: {
-  address: string;
+  /** Optional: under the relay's from-domain only. Empty → the host generates one. */
+  address?: string;
   agentId: string;
   unknownSenderPolicy: "ignore" | "refuse";
 }): Promise<EmailChannel> {

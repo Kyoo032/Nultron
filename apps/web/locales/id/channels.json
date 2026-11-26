@@ -56,7 +56,7 @@
   "email": {
     "label": "Email",
     "intro": "Beri agen alamatnya sendiri. Pengirim yang diizinkan mengirim email dan mendapat balasan agen di utas yang sama.",
-    "addressPlaceholder": "agen@mail.example.com",
+    "addressPlaceholder": "agen@domain-email-anda (opsional)",
     "addressAria": "Alamat email",
     "agentPlaceholder": "Pilih agen",
     "agentAria": "Agen",

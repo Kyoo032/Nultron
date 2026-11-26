@@ -234,7 +234,7 @@ function EmailCard({
         onSubmit={(event: FormEvent) => {
           event.preventDefault();
           const value = address.trim();
-          if (!value || !agentId) {
+          if (!agentId) {
             return;
           }
           void (async () => {

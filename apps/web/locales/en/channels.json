@@ -56,7 +56,7 @@
   "email": {
     "label": "E-mail",
     "intro": "Give an agent its own address. Allowlisted senders mail it and get the agent's reply in the same thread.",
-    "addressPlaceholder": "agent@mail.example.com",
+    "addressPlaceholder": "agent@your-mail-domain (optional)",
     "addressAria": "E-mail address",
     "agentPlaceholder": "Pick an agent",
     "agentAria": "Agent",
