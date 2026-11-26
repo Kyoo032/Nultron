@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-11-26 on `devin/1795703668-oidc-signin`, for OIDC sign-in (F8b: `migrations/0017_oidc_identities.sql`, `src/oidc/**`, `src/routes/oidc.ts`, the `sso_required` gates in `src/flows/sign-in.ts` and `src/flows/password-sign-in.ts`, and the `sso` block on the sign-in screens). Before that: 2026-11-26 on `devin/1795686920-opc-auditor-allowlist`, for the `auditor` role value (`migrations/0015_auditor_role.sql` widening `users_role_chk` and `invites_role_chk`; `auditor` in `invite --role` and `account` role lists) and `model_allowlist` in the `POST /auth/token` body (`src/flows/token.ts`, from `tenant_config.model_allowlist`, on mint and refresh). Before that: 2026-11-24 on `main`, for per-user operator-assigned API gateway endpoints (`migrations/0014_user_gateway_endpoint.sql`, `src/gateway-endpoint.ts`, `account create --gateway-endpoint`, `account set-endpoint`, `invite --gateway-endpoint`, and `gateway_endpoint` in `POST /auth/token` responses), plus portal PII log scrubbing (`apps/portal/src/log.ts`), production Postgres TLS `sslmode` enforcement (`config.ts`, `store/postgres/index.ts`), SMTP `minVersion: "TLSv1.2"` (`mail/smtp.ts`), and production `X-Forwarded-Proto: https` enforcement (`server.ts`). Before that: 2026-11-23 on `feat/security-phase1-hardening`, for portal `esbuild` runtime bundling (`apps/portal/src/paths.ts`, `apps/portal/scripts/build-server.mjs`, `dist/main.mjs`, `dist/scripts/*.mjs`, `apps/portal/package.json` `build`/`start`) only; the rest keeps its prior readings below. Before that: 2026-11-09 on `claude/fix-portal-test-teardown` (from `39cd5f0`), for the idle-connection row of section 6 and the `testing/pg.ts` anchors of section 7 only (SR-200). Before that: 2026-11-03 at b79a5275 for the `GET /activate` row, the typed-code row of the Verify table and the `api.test.ts` count only (the form on the code screen is a GET to `?code=`). Before that: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-07 at 9aba37e + working tree for section 8 (password sign-in), Where things live, the
+Last verified: 2026-11-26 on `devin/1795703668-oidc-signin` (after the Devin Review hardening round, SR-216), for OIDC sign-in (F8b: `migrations/0017_oidc_identities.sql`, `src/oidc/**`, `src/routes/oidc.ts`, the `portal_oidc_tx` login-CSRF cookie in `security/cookies.ts`, the `sso_required` gates in `src/flows/sign-in.ts`, `src/flows/password-sign-in.ts` and `src/otp/verify.ts`, and the `sso` block on the sign-in screens). Before that: 2026-11-26 on `devin/1795686920-opc-auditor-allowlist`, for the `auditor` role value (`migrations/0015_auditor_role.sql` widening `users_role_chk` and `invites_role_chk`; `auditor` in `invite --role` and `account` role lists) and `model_allowlist` in the `POST /auth/token` body (`src/flows/token.ts`, from `tenant_config.model_allowlist`, on mint and refresh). Before that: 2026-11-24 on `main`, for per-user operator-assigned API gateway endpoints (`migrations/0014_user_gateway_endpoint.sql`, `src/gateway-endpoint.ts`, `account create --gateway-endpoint`, `account set-endpoint`, `invite --gateway-endpoint`, and `gateway_endpoint` in `POST /auth/token` responses), plus portal PII log scrubbing (`apps/portal/src/log.ts`), production Postgres TLS `sslmode` enforcement (`config.ts`, `store/postgres/index.ts`), SMTP `minVersion: "TLSv1.2"` (`mail/smtp.ts`), and production `X-Forwarded-Proto: https` enforcement (`server.ts`). Before that: 2026-11-23 on `feat/security-phase1-hardening`, for portal `esbuild` runtime bundling (`apps/portal/src/paths.ts`, `apps/portal/scripts/build-server.mjs`, `dist/main.mjs`, `dist/scripts/*.mjs`, `apps/portal/package.json` `build`/`start`) only; the rest keeps its prior readings below. Before that: 2026-11-09 on `claude/fix-portal-test-teardown` (from `39cd5f0`), for the idle-connection row of section 6 and the `testing/pg.ts` anchors of section 7 only (SR-200). Before that: 2026-11-03 at b79a5275 for the `GET /activate` row, the typed-code row of the Verify table and the `api.test.ts` count only (the form on the code screen is a GET to `?code=`). Before that: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-07 at 9aba37e + working tree for section 8 (password sign-in), Where things live, the
 Verify table's last four rows and one Why bullet, written the day the mode was built; the rest of the page keeps
 its reading below. Earlier: 2026-10-01 at 0b61a29 + working tree, by the sign-in-codes pass (four fixes found by driving
 the pilot: a replaced code no longer signs in, one request is one code, the fifth wrong invite code is the
@@ -440,23 +440,37 @@ unknown `kid`.
   and `nonce_hash` (sha256 bytea, like every credential), the code verifier and door context sealed
   with AES-256-GCM under a derived signing key (`src/oidc/seal.ts`), ten-minute expiry, single use —
   `consumeState` deletes it in the callback transaction. The callback has no tenant, so
-  `resolve_tenant_for_oidc_state` is the resolver.
+  `resolve_tenant_for_oidc_state` is the resolver. The start also sets `portal_oidc_tx`
+  (`__Host-` in secure mode, `security/cookies.ts`) holding `sha256(state)` for the state's TTL;
+  the callback requires the same hash back (`hashEquals`) before the row is consumed, so a
+  callback replayed into another browser signs nobody in (login-CSRF).
 - **The match is by verified e-mail, never a creation.** `findUserByIdentity`
-  (`user_oidc_identities`, issuer+subject) first, then `findByEmail` on the verified address; an
-  unknown one is `login.denied` `oidc_no_member` and the dead-end page. A first OIDC sign-in binds
+  (`user_oidc_identities`, keyed `(tenant_id, issuer, subject)`) first, then `findByEmail` on the
+  verified address; an unknown one is `login.denied` `oidc_no_member` and the dead-end page. For
+  Microsoft the verified address is `email` when `email_verified`, else `preferred_username` only
+  when the token's `tid` is the configured tenant (`microsoftEmail`, `src/oidc/providers.ts`) — an
+  attacker-administered Entra tenant can set any UPN. A first OIDC sign-in binds
   the identity so the second skips the e-mail lookup. Success audits `oidc.sign_in`; every denial
   audits `login.denied` (`oidc_token_exchange`, `oidc_token_<verify reason>`, `oidc_no_member`,
-  `user_not_active`, `seat_cap_reached`).
+  `user_not_active`, `seat_cap_reached`, `oidc_wrong_provider`).
 - **The tail is the code sign-in's own.** Door "a" ends on `completeSignIn`, door "c" on the
-  web-session cookie and `/activate?code=` — same authorization code, cookie, `role` claim.
+  web-session cookie and `/activate?code=` — same authorization code, cookie, `role` claim. The
+  callback re-runs `checkClient` on the sealed params for door "a", so a `redirect_uri` withdrawn
+  mid-round-trip gets nothing. The activate door's start URL carries the approval code as `code`
+  (the name the deploy proxy strips from its logs).
 - **`sso_required`** (`orgs.sso_required` + `tenant_config.feature_flags.sso_provider`) turns the
-  code and password off for non-owners, in `beginSignIn`/`submitInvite` (`flows/sign-in.ts`) and in
+  code and password off for non-owners, in `beginSignIn`/`submitInvite` (`flows/sign-in.ts`), in
   `verifyPasswordStep` (`flows/password-sign-in.ts`, after the active check, with the dummy
-  derivation so the refusal costs the same); the answer is the `ssoRequired` state page at 403.
-  The owner keeps password/OTP as recovery. `orgs.setSsoRequired` is the only writer.
+  derivation so the refusal costs the same) and in `verifyLoginOtp` (`src/otp/verify.ts`, refusing
+  codes minted before the flip); the answer is the `ssoRequired` state page at 403. When the flag
+  names a provider, a callback through another one is `oidc_wrong_provider`. A non-owner under it
+  has no password door, so OIDC sign-in passes `mustChangeExempt` — the `must_change` rule cannot
+  lock them out of the only door left. The owner keeps password/OTP as recovery.
+  `orgs.setSsoRequired` is the only writer.
 - **Rate limits:** `oidcStartIp` (30/15 min), `oidcCallbackIp` (60/15 min)
   (`src/security/rate-limit.ts`), on top of CSRF-free GET starts (the state itself is the
-  correlation value).
+  correlation value). `fetchDiscovery` requires https except parsed-host loopback
+  (`isLoopbackHost`).
 - **Tests seam:** `OidcSeams { fetchImpl?, verifyIdTokenImpl? }` reaches the routes through
   `PortalRouteOptions.oidcSeams` (`src/testing/server.ts` `routeOptions`), so `routes/oidc.test.ts`
   signs with a stub IdP and never calls out.
