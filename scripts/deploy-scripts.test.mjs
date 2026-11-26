@@ -62,7 +62,12 @@ function callSetting(name, extra = "") {
     REPO_ROOT=.
     ${read("_common.sh")
       .split("\n")
-      .filter((line) => !/^(set -eu|DEPLOY_DIR=|REPO_ROOT=|COMPOSE_FILE=|ENV_FILE=|PORTAL_ENV_FILE=)/.test(line))
+      .filter(
+        (line) =>
+          !/^(set -eu|DEPLOY_DIR=|REPO_ROOT=|COMPOSE_FILE=|ENV_FILE=|PORTAL_ENV_FILE=|\. "\$\(dirname "\$0"\)\/)/.test(
+            line,
+          ),
+      )
       .join("\n")
       .replace(/^if docker compose version[\s\S]*?^fi$/m, "dc() { :; }")}
     ${extra}
