@@ -228,6 +228,23 @@ export {
   attachmentCountOf,
 } from "./security/injection-guard";
 export type { InjectionHit, InjectionSeverity } from "./security/injection-guard";
+export {
+  runWithSpotlight,
+  isRunUntrusted,
+  markRunUntrusted,
+  spotlightWrap,
+  spotlightWrapJson,
+  isSensitiveTool,
+  taintedRunRefusal,
+} from "./security/spotlight";
+export { runWithCanary, canaryToken, canaryLeak, canaryLeakJson, canaryBlockedOutput } from "./security/canary";
+export {
+  judgeUntrusted,
+  installJudgeUsageSink,
+  injectionJudgeMinChars,
+  setJudgeCallForTests,
+} from "./security/injection-judge";
+export { installAgentAllowlistLookup, agentAllowedTools } from "./runtime/agent-allowlist";
 export { isOpenRouterBaseUrl, openRouterZdrBody } from "./privacy/openrouter";
 export { mergeOpenRouterZdr } from "./runtime/ai-sdk-runtime";
 export {

@@ -21,6 +21,9 @@ import "./model-availability";
 // F2: installs the audit-event sink's database writer — the same import-is-install seam; without
 // it `reportAuditEvent` is a no-op and the desk has no activity log.
 import "./audit/install";
+// F6 (B6+B2): installs the per-agent allowlist lookup and the judge's usage sink —
+// import-is-install, same seam as the audit writer.
+import "./agent-tool-allowlist";
 import { hostAuthRoutes, hostPortalCheck, hostSessionStore, isSessionExemptPath, requireSessionFor } from "./auth";
 import type { PortalSessionCheck, SessionStore } from "./auth";
 import { jsonError, jsonOk } from "./errors";

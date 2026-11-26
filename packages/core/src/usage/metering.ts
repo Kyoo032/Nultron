@@ -33,6 +33,11 @@ export const USAGE_MODES = [
   "meetings",
   "edit",
   "voice",
+  /**
+   * F6 layer 2 (B2): the prompt-injection judge's own calls — metered apart so the
+   * defence's cost is visible instead of hiding inside the run it protects.
+   */
+  "injection_judge",
   "other",
 ] as const;
 

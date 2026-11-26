@@ -1103,6 +1103,27 @@ describe("every by-id route refuses another tenant's id", () => {
     expect(JSON.stringify((result as HostJsonResult).body)).toContain(LEAK_MARKER);
   });
 
+  it("leaves tenant A's tool allowlist unwritten after tenant B posts an allowlist-only soul", async () => {
+    // F6 (B6) regression, Devin Review SEC on PR #291: the allowlist-only path of
+    // `POST /agents/:id/soul` used to replace the rows before the agent's tenancy was
+    // checked, so the 404 still rewrote another organization's list. The body must
+    // carry a registered tool key or the handler 404s on the key before this path runs.
+    const result = await dispatch(
+      {
+        method: "POST",
+        path: `/api/v1/agents/${seeds.agentId}/soul`,
+        query: {},
+        params: {},
+        headers: { cookie: `agentforge_session=${sessionB.id}` },
+        body: { allowedTools: ["calculator"] },
+      },
+      { serverMode: true, sessionStore: store, now: () => T0 },
+    );
+    expect(result.status).toBe(404);
+    const { agentToolAllowlistGet } = await import("./agent-tool-allowlist");
+    expect(agentToolAllowlistGet(seeds.agentId)).toBeNull();
+  });
+
   it("leaves tenant A's extraction, edit, comment and question as they were after tenant B called every doc-flow route", async () => {
     // B's PUT and POST carried a real edit and a real comment for `payment:S1`, the item A's seeded
     // extraction has. Each was refused at the matter lookup; this reads A's files back to prove it,

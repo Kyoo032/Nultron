@@ -7612,3 +7612,11 @@ extract and render; a playlist, a concat script and a metadata file are refused;
   or an address, because the whitelist is `file` only and uploads are stored per tenant. The gate refuses the format
   at the probe, so this stays closed unless detection differs between the probe and the run. Do not remove the gate
   as redundant.
+
+### SR-215 {#sr-215}
+
+**Prompt injection defence, layer 2 (F6).** Added 2026-11-26 on `devin/1795703645-injection-layer2`. Informational (mitigation entry, not a new exposure). Status: recorded — the gates are in the tree on the F6 branch, not yet deployed.
+
+Evidence: wider ID/EN rules in `packages/core/src/security/injection-guard.ts:45-106` (role-play, HTML-hidden, send-to, base64-blob); cheap LLM judge `injection-judge.ts:116-140` — masked input only (`:120`, S1), `store: false` provider option (`:95`), own `injection_judge` usage mode (`agent-tool-allowlist.ts:61-66` installs `recordTokenUsage`), fail-open (`:133-138`); spotlighting `spotlight.ts` — per-run `RUNDATA-<hex12>` fence (`:31-33`) plus run taint refusing send/delete/write (`spotlight.ts:100-112`, `invoke-guarded.ts:108-113`, rule `taint_gate`) until the F3 approval card lands; canary `canary.ts:29-39` — `node:crypto` token in each system prompt, leaks blocked in tool args (`invoke-guarded.ts:116-123`, rule `canary`, args logged as `[omitted: canary]`, never the token — S2) and in streamed output (`create-runtime.ts:54-85` rolling-tail check, `canary_output` guardrail event, `tool.started` input scrubbed); per-agent allowlist `agent_tool_allowlist` (migration `0031_agent_tool_allowlist.sql:1-5`, `ensure-schema.ts:1108` healer, `handlers/agents.ts:34,98-130` `allowedTools`, `invoke-guarded.ts:99-104` rule `agent_allowlist` — no rows means unrestricted; tenancy checked before write, `handlers/agents.ts:108-121`); CI suite `scripts/injection-suite.mjs`.
+
+Gate: none — this is the mitigation itself. Known residual: a tainted run refuses write tools until F3 ships (spec-accepted); the judge is fail-open on gateway errors (detection loss is logged, not fatal).

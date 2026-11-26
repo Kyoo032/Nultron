@@ -420,6 +420,19 @@ export const agentToolBindings = sqliteTable(
   (table) => [index("agent_tool_bindings_org_idx").on(table.organizationId, table.agentVersionId)],
 );
 
+/**
+ * F6 layer 2 (B6): the tools an agent may run when it has a list. An agent with no
+ * rows keeps today's behaviour — every offered tool — so the table stays sparse.
+ */
+export const agentToolAllowlist = sqliteTable(
+  "agent_tool_allowlist",
+  {
+    agentId: text("agent_id").notNull(),
+    toolKey: text("tool_key").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.agentId, table.toolKey] })],
+);
+
 export const threads = sqliteTable(
   "threads",
   {

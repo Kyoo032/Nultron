@@ -3,6 +3,16 @@ import type { TenantContext } from "../tenancy/types";
 import { invokeTool, type ToolDefinition } from "../tools/define-tool";
 import { getDisabledTools, getInjectionGuardBypass } from "../tools/secret-scope";
 import { blockedInjectionOutput, scanJson } from "../security/injection-guard";
+import { canaryBlockedOutput, canaryLeakJson } from "../security/canary";
+import { judgeUntrusted } from "../security/injection-judge";
+import {
+  isRunUntrusted,
+  isSensitiveTool,
+  markRunUntrusted,
+  spotlightWrapJson,
+  taintedRunRefusal,
+} from "../security/spotlight";
+import { agentAllowedTools } from "./agent-allowlist";
 import { runInToolCall } from "../security/outbound-guard";
 import { maskPiiInJson } from "../security/pii";
 import { thinToolOutput } from "../security/tool-thin";
@@ -84,7 +94,34 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
     return blocked;
   }
 
+  // F6 (B6): the agent's own allowlist — an agent with no rows keeps every offered tool.
+  const allowedTools = agentId ? agentAllowedTools(agentId) : null;
+  if (allowedTools !== null && !allowedTools.includes(tool.key)) {
+    const blocked = { success: false as const, error: `Tool ${tool.key} is not allowed for this agent.` };
+    reportToolIo({ toolKey: tool.key, input: rawArgs, full: blocked, thin: blocked });
+    auditCall("denied", undefined, "agent_allowlist");
+    return blocked;
+  }
+
+  // F6 (B4): a run marked untrusted (untrusted tool output reached the model) may not
+  // send, delete or write on its own — the F3 approval card replaces this refusal.
+  if (isRunUntrusted() && isSensitiveTool(tool.key)) {
+    const blocked = taintedRunRefusal(tool.key);
+    reportToolIo({ toolKey: tool.key, input: rawArgs, full: blocked, thin: blocked });
+    auditCall("denied", undefined, "taint_gate");
+    return blocked;
+  }
+
   if (!getInjectionGuardBypass()) {
+    // F6 (B5): the canary echoed into a tool argument means the system prompt leaked.
+    if (canaryLeakJson(args)) {
+      const blocked = canaryBlockedOutput();
+      // The recorded call must not keep the token — S2: the log names the rule, never
+      // the text, and rawArgs here literally contains the secret.
+      reportToolIo({ toolKey: tool.key, input: "[omitted: canary]", full: blocked, thin: blocked });
+      auditCall("denied", undefined, "canary");
+      return blocked;
+    }
     const hit = scanJson(args);
     if (hit) {
       const blocked = blockedInjectionOutput(hit);
@@ -110,11 +147,34 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
   let thin = thinToolOutput(tool.key, full);
 
   let outputBlocked = false;
+  let outputBlockRule: string | undefined;
   if (!getInjectionGuardBypass() && tool.trust !== "internal") {
+    // F6 (B3): attacker-reachable output arrived — the run is untrusted for the rest
+    // of it, and the model sees the text inside the run's spotlight fence.
+    markRunUntrusted();
     const outputHit = scanJson(thin);
     if (outputHit) {
       thin = blockedInjectionOutput(outputHit);
       outputBlocked = true;
+      outputBlockRule = "injection_output";
+    } else {
+      // F6 (B2): the second layer — a cheap judge on untrusted content the regex set
+      // did not catch (size-thresholded, masked inside the judge, fail-open).
+      let judged = false;
+      try {
+        const verdict = await judgeUntrusted(JSON.stringify(thin), tenant);
+        if (verdict?.malicious) {
+          thin = { success: false, error: `Blocked by injection guard (rule: judge:${verdict.category})` };
+          outputBlocked = true;
+          outputBlockRule = `judge:${verdict.category}`;
+          judged = true;
+        }
+      } catch {
+        // The judge never fails a run closed: the regex layer already spoke.
+      }
+      if (!judged) {
+        thin = spotlightWrapJson(thin);
+      }
     }
   }
 
@@ -123,6 +183,6 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
   const success = (full as { success?: unknown } | null | undefined)?.success;
   // The outcome records what the model was given: a call whose result was withheld by the output
   // scan is a denial to the model even though the tool itself ran clean.
-  auditCall(outputBlocked ? "denied" : success === false ? "failed" : "ok", Date.now() - started, outputBlocked ? "injection_output" : undefined);
+  auditCall(outputBlocked ? "denied" : success === false ? "failed" : "ok", Date.now() - started, outputBlockRule);
   return thin;
 }

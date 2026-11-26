@@ -2,6 +2,7 @@ import { DEFAULT_CHAT_MODEL, isDefaultChatAgent, RUN_PATHS, getTool, ApiError } 
 import { DrizzleAgentRepository, db } from "@agentforge/db";
 import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
+import { agentToolAllowlistGet, agentToolAllowlistReplace } from "../agent-tool-allowlist";
 import { agentService, getTenant } from "../tenant";
 import { defaultSelectableModel, listSelectableModels } from "../selectable-models";
 import { ensureToolsRegistered } from "../register-tools";
@@ -29,6 +30,8 @@ export async function handleGetAgent(request: HostRequest): Promise<HostResult> 
       publishedBindings,
       draftBindings,
       isDefaultChat: isDefaultChatAgent(agent),
+      // F6 (B6): the agent's own tool allowlist; absent means unrestricted.
+      allowedTools: agentToolAllowlistGet(agentId) ?? undefined,
     });
   } catch (error) {
     return jsonError(error);
@@ -83,12 +86,49 @@ export async function handlePostAgentSoul(request: HostRequest): Promise<HostRes
   try {
     const tenant = await getTenant(request);
     const body = request.body && typeof request.body === "object" ? (request.body as Record<string, unknown>) : {};
+    const hasSoulFields =
+      body.systemPrompt !== undefined ||
+      body.model !== undefined ||
+      body.inputModalities !== undefined ||
+      body.toolKeys !== undefined;
+    // F6 (B6): `allowedTools` replaces the per-agent allowlist; an empty array clears it
+    // (back to unrestricted). Every key must name a registered tool — validated before
+    // the soul writes so a bad list cannot publish a revision it did not ask for.
+    let allowedTools: string[] | undefined;
+    if (Array.isArray(body.allowedTools)) {
+      ensureToolsRegistered();
+      const keys = body.allowedTools as unknown[];
+      for (const key of keys) {
+        if (typeof key !== "string" || !getTool(key)) {
+          throw new ApiError("not_found", `Tool not found: ${String(key)}`, 404);
+        }
+      }
+      allowedTools = keys as string[];
+    }
+    if (!hasSoulFields) {
+      // Allowlist-only save: no revision to publish (the default Chat agent cannot get
+      // one either — its soul edit restriction must not reject an allowlist update).
+      // The tenancy check comes before the write: the allowlist table keys on the bare
+      // agent id, so replacing it before the agent resolves would edit another
+      // organization's list behind a 404.
+      const agent = await agentService.get(tenant, request.params.agentId);
+      if (!agent) {
+        throw new ApiError("not_found", "Agent not found", 404);
+      }
+      if (allowedTools !== undefined) {
+        agentToolAllowlistReplace(request.params.agentId, allowedTools);
+      }
+      return jsonOk({ agent });
+    }
     const { version } = await agentService.createRevision(tenant, request.params.agentId, {
       systemPrompt: typeof body.systemPrompt === "string" ? body.systemPrompt : undefined,
       model: typeof body.model === "string" ? body.model : undefined,
       inputModalities: Array.isArray(body.inputModalities) ? (body.inputModalities as InputModality[]) : undefined,
       toolKeys: Array.isArray(body.toolKeys) ? (body.toolKeys as string[]) : undefined,
     });
+    if (allowedTools !== undefined) {
+      agentToolAllowlistReplace(request.params.agentId, allowedTools);
+    }
     return jsonOk({ version: { id: version.id, version: version.version } });
   } catch (error) {
     return jsonError(error);
