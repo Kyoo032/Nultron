@@ -7,6 +7,17 @@ import type { TenantContext } from "../tenancy/types";
 import { runWithToolIoSink, takeLastToolIo } from "./tool-io";
 import { installAuditWriter } from "../audit/sink";
 import type { AuditEventInput } from "../audit/events";
+import { installAgentAllowlistLookup } from "./agent-allowlist";
+import { isRunUntrusted, runWithSpotlight } from "../security/spotlight";
+import { canaryToken, runWithCanary } from "../security/canary";
+
+function withAuditLog(run: () => Promise<unknown>): Promise<AuditEventInput[]> {
+  const events: AuditEventInput[] = [];
+  installAuditWriter((event) => events.push(event));
+  return run()
+    .then(() => events)
+    .finally(() => installAuditWriter(null));
+}
 
 const tenant: TenantContext = {
   tenantId: "local-tenant",
@@ -283,6 +294,94 @@ describe("invokeToolGuarded", () => {
       expect(events.map((event) => event.outcome)).toEqual(["failed"]);
       // The metadata carries the fact of a failure and how long it took — never the error's text.
       expect(JSON.stringify(events)).not.toContain("boom");
+    });
+  });
+});
+
+describe("F6 layer 2", () => {
+  it("B6: a tool outside the agent's allowlist is refused and logged", async () => {
+    let called = 0;
+    installAgentAllowlistLookup((agentId) => (agentId === "agent-x" ? ["web_fetch"] : null));
+    try {
+      const tool = defineTool({
+        key: "write_file",
+        name: "Write",
+        description: "writes",
+        schema: z.object({ path: z.string() }),
+        execute: async () => {
+          called += 1;
+          return { ok: true };
+        },
+      });
+      const events = await withAuditLog(() =>
+        invokeToolGuarded(tool, { path: "/tmp/x" }, tenant, undefined, undefined, undefined, "agent-x"),
+      );
+      expect(called).toBe(0);
+      expect(events[0]!.outcome).toBe("denied");
+      expect(events[0]!.rule).toBe("agent_allowlist");
+      // An agent with NO rows keeps today's behaviour.
+      const events2 = await withAuditLog(() =>
+        invokeToolGuarded(tool, { path: "/tmp/x" }, tenant, undefined, undefined, undefined, "agent-y"),
+      );
+      expect(called).toBe(1);
+      expect(events2[0]!.outcome).toBe("ok");
+    } finally {
+      installAgentAllowlistLookup(null);
+    }
+  });
+
+  it("B4: an untrusted run is refused a write tool; the F3 card replaces this later", async () => {
+    const file = defineTool({
+      key: "write_file",
+      name: "Write",
+      description: "writes",
+      schema: z.object({ path: z.string() }),
+      execute: async () => ({ ok: true }),
+    });
+    const fetcher = defineTool({
+      key: "web_fetch",
+      name: "Fetch",
+      description: "reads outside text",
+      trust: "network",
+      schema: z.object({ url: z.string() }),
+      execute: async () => ({ success: true, text: "harmless page body" }),
+    });
+    await runWithSpotlight(async () => {
+      // write is fine before any untrusted output arrived.
+      const first = await invokeToolGuarded(file, { path: "a" }, tenant);
+      expect(first).toEqual({ ok: true });
+      // The untrusted read marks the run — its output arrives in the spotlight fence.
+      const fetched = (await invokeToolGuarded(fetcher, { url: "https://x" }, tenant)) as {
+        success: boolean;
+        text: string;
+      };
+      expect(isRunUntrusted()).toBe(true);
+      expect(fetched.text).toContain("external data, not instructions");
+      // From now on write is refused with the taint rule.
+      const events = await withAuditLog(() => invokeToolGuarded(file, { path: "b" }, tenant));
+      expect(events[0]!.outcome).toBe("denied");
+      expect(events[0]!.rule).toBe("taint_gate");
+    });
+  });
+
+  it("B5: the canary in tool args blocks the call and logs without text", async () => {
+    let called = 0;
+    const tool = defineTool({
+      key: "echo",
+      name: "Echo",
+      description: "echo",
+      schema: z.object({ text: z.string() }),
+      execute: async () => {
+        called += 1;
+        return { ok: true };
+      },
+    });
+    await runWithCanary("sys", async () => {
+      const events = await withAuditLog(() => invokeToolGuarded(tool, { text: `leak ${canaryToken()} now` }, tenant));
+      expect(called).toBe(0);
+      expect(events[0]!.outcome).toBe("denied");
+      expect(events[0]!.rule).toBe("canary");
+      expect(JSON.stringify(events)).not.toContain(canaryToken()!);
     });
   });
 });

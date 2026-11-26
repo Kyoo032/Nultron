@@ -164,6 +164,8 @@ export const SHARED_TABLES: Readonly<Record<string, string>> = Object.freeze({
   tools: "the tool catalogue; the per-tenant bindings go with the cascade",
   market_cache: "a read-through cache of public market data, keyed by ticker",
   market_news_fts: "the FTS index over that same public cache",
+  agent_tool_allowlist:
+    "F6: per-agent tool allowlist — keyed by agent_id, not tenant_id; agent ids already resolve inside their org",
   __drizzle_migrations: "the migration journal",
   sqlite_sequence: "SQLite's own AUTOINCREMENT counter (F2 audit_events); not a data table",
 });

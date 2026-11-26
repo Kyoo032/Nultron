@@ -96,7 +96,9 @@ describe("createRuntime outbound PII mask", () => {
       });
 
       const passed = executeSpy.mock.calls[0]?.[0];
-      expect(passed?.version.systemPrompt).toBe("Contact Ibu [name] at a.n. [name].");
+      // F6: the canary token rides on the masked copy; the person-visible body is still fully masked.
+      expect(passed?.version.systemPrompt).toContain("Contact Ibu [name] at a.n. [name].");
+      expect(passed?.version.systemPrompt).toContain("[Runtime integrity token:");
       expect(passed?.history[0]?.parts[0]).toEqual({
         type: "text",
         text: "Kirim ringkasan ke [name] di [email] via Rekening BCA [account]",

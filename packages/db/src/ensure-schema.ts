@@ -252,6 +252,7 @@ export function ensureSchema(sqlite: Database.Database): void {
   ensureCustomerInboxTables(sqlite);
   ensureWorkspaceColumns(sqlite);
   ensureAuditTables(sqlite);
+  ensureAgentToolAllowlistTable(sqlite);
   assertKernelTables(sqlite);
 }
 
@@ -1009,9 +1010,9 @@ function ensureKnowledgeTables(sqlite: Database.Database): void {
  */
 function enableFtsSecureDelete(sqlite: Database.Database, table: string): void {
   try {
-    const existing = sqlite
-      .prepare(`SELECT v FROM ${table}_config WHERE k = 'secure-delete'`)
-      .get() as { v: number } | undefined;
+    const existing = sqlite.prepare(`SELECT v FROM ${table}_config WHERE k = 'secure-delete'`).get() as
+      | { v: number }
+      | undefined;
     if (existing?.v === 1) {
       return;
     }
@@ -1096,4 +1097,18 @@ export function assertKernelTables(sqlite: Database.Database): void {
   if (missing.length > 0) {
     throw new Error(`SQLite kernel tables missing: ${missing.join(", ")}`);
   }
+}
+
+/**
+ * F6 per-agent allowlist (drizzle/0031_agent_tool_allowlist.sql), healed for
+ * baseline-stamped databases whose journal claims it is already applied.
+ */
+function ensureAgentToolAllowlistTable(sqlite: Database.Database): void {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS agent_tool_allowlist (
+      agent_id text NOT NULL,
+      tool_key text NOT NULL,
+      PRIMARY KEY (agent_id, tool_key)
+    )
+  `);
 }

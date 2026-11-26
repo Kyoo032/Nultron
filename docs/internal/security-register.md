@@ -7612,3 +7612,11 @@ extract and render; a playlist, a concat script and a metadata file are refused;
   or an address, because the whitelist is `file` only and uploads are stored per tenant. The gate refuses the format
   at the probe, so this stays closed unless detection differs between the probe and the run. Do not remove the gate
   as redundant.
+
+### SR-215 {#sr-215}
+
+**Prompt injection defence, layer 2 (F6).** Added 2026-11-26 on `devin/1795703645-injection-layer2`. Defense-in-depth, not a new exposure: records the gates added and their evidence.
+
+Evidence: wider ID/EN rules in `packages/core/src/security/injection-guard.ts` (role-play, HTML-hidden, send-to, base64-blob); cheap LLM judge `injection-judge.ts` — masked input only (S1), `store: false` provider option, own `injection_judge` usage mode, fail-open; spotlighting `spotlight.ts` — per-run `RUNDATA-<hex12>` fence plus run taint refusing send/delete/write (`invoke-guarded.ts`, rule `taint_gate`) until the F3 approval card lands; canary `canary.ts` — `node:crypto` token in each system prompt, leaks blocked in tool args (rule `canary`, args logged as `[omitted: canary]`, never the token — S2) and in streamed output (`create-runtime.ts` rolling-tail check, `canary_output` guardrail event, `tool.started` input scrubbed); per-agent allowlist `agent_tool_allowlist` (migration `0031_agent_tool_allowlist.sql`, `ensureAgentToolAllowlistTable` healer, `handlers/agents.ts` `allowedTools`, rule `agent_allowlist` — no rows means unrestricted); CI suite `scripts/injection-suite.mjs`.
+
+Gate: none — this is the mitigation itself. Known residual: a tainted run refuses write tools until F3 ships (spec-accepted); the judge is fail-open on gateway errors (detection loss is logged, not fatal).

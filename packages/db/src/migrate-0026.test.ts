@@ -25,9 +25,11 @@ function insert(sqlite: Database.Database, seq: number, id: string, tenantId = "
 
 describe("0026_audit_events", () => {
   it("follows every existing migration in the forward-only journal", () => {
-    const entry = journal.entries.at(-1)!;
-    expect(entry.tag).toBe("0026_audit_events");
-    for (const previous of journal.entries.slice(0, -1)) expect(entry.when).toBeGreaterThan(previous.when);
+    const index = journal.entries.findIndex((candidate) => candidate.tag === "0026_audit_events");
+    expect(index).toBeGreaterThanOrEqual(0);
+    const entry = journal.entries[index]!;
+    // Stacked features add entries after this one — order, not last place, is the invariant.
+    for (const previous of journal.entries.slice(0, index)) expect(entry.when).toBeGreaterThan(previous.when);
   });
 
   it("applies on a fresh database and enforces append-only plus checkpointed delete", () => {

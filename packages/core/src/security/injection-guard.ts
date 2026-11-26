@@ -13,6 +13,8 @@ type InjectionRule = {
   rule: string;
   severity: InjectionSeverity;
   pattern: RegExp;
+  /** Post-match filter — a rule whose regex alone cannot carry the full check. */
+  keep?: (match: string) => boolean;
 };
 
 /** Tight HIGH/CRITICAL subset. MEDIUM hypothetical/reward rules are not ported. */
@@ -43,7 +45,57 @@ const RULES: InjectionRule[] = [
     rule: "id-override",
     severity: "HIGH",
     pattern:
-      /\babaikan\s+(semua\s+)?(instruksi|perintah)(\s+sebelumnya|\s+sebelum\s+ini)?\b|\blupakan\s+(semua\s+)?instruksi\b/i,
+      /\babaikan\s+(semua\s+)?(instruksi|perintah)(\s+sebelumnya|\s+sebelum\s+ini)?\b|\blupakan\s+(semua|seluruh)\s+(semua\s+)?(instruksi|perintah)\b/i,
+  },
+  {
+    // F6 layer 2 (B1): persona-override jailbreaks — "pretend you are", "act as if you
+    // were", developer-mode personas. Worded to the imperative shapes only: ordinary
+    // "act as the spokesperson" prose is neutral.
+    rule: "role-play",
+    severity: "HIGH",
+    pattern:
+      /\b(pretend\s+(to\s+be|you\s+(are|were)|that\s+you\s+(are|were))|act\s+as\s+(if\s+you\s+(are|were)|(?:a|an|the)\s+\w*\s*(?:agent|assistant|mode|entity|ai)\b)|you\s+(are|will)\s+now\s+(be|act|respond|become)|new\s+persona|developer\s+mode|jailbreak\s+mode)\b/i,
+  },
+  {
+    rule: "id-role-play",
+    severity: "HIGH",
+    pattern:
+      /\b(berpura-?pura|berpura|pura-?pura|bayangkan|anggap)\s+(kamu|anda|dirimu|kau)\s+(adalah|sebagai|menjadi)\b|\bkamu\s+sekarang\s+(adalah|menjadi|bertindak)\b|\bmode\s+developer\b/i,
+  },
+  {
+    // F6 layer 2 (B1): instructions smuggled inside HTML/markup the renderer never
+    // shows — comments, display:none/zero-size elements, fake <system> tags.
+    rule: "html-hidden",
+    severity: "HIGH",
+    pattern:
+      /<!--[\s\S]*?(ignore|abaikan|system|instruksi|instruction|prompt|jangan)[\s\S]*?-->|<(?:div|span|p|section)\b[^>]*(?:display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0|opacity\s*:\s*0|height\s*:\s*0)[^>]*>|<\s*\/?\s*(system|instruction|prompt)\s*>/i,
+  },
+  {
+    // F6 layer 2 (B1): "send X to Y" exfil phrasing. The object must name data-carrying
+    // nouns (file, data, contents, document, secrets...) — "send the invoice to the
+    // client" stays benign.
+    rule: "send-to",
+    severity: "HIGH",
+    pattern:
+      /\b(send|forward|transmit|upload|exfiltrate|post|leak)\b.{0,60}?\b(files?|datas?|contents?|text|messages?|info(?:rmation)?|secrets?|keys?|passwords?|credentials?|documents?|emails?|mail|attachments?|everything|prompts?|history|records?)\b.{0,25}?\b(to|at|via)\b/i,
+  },
+  {
+    rule: "id-send-to",
+    severity: "HIGH",
+    pattern:
+      /\b(kirim|kirimkan|unggah|teruskan|pos)\s+(semua\s+|seluruh\s+)?(files?|data|isi|pesan|teks|informasi|dokumen|lampiran|konten|rahasia|kata\s+sandi)\s+(ke|kepada|via|melalui)\b/i,
+  },
+  {
+    // F6 layer 2 (B1): a long encoded run is where decoded instructions hide. The
+    // negative lookahead keeps pure-hex strings (hashes, keys, commit ids) out —
+    // a real base64 payload mixes the alphabet beyond [0-9a-fA-F].
+    rule: "base64-blob",
+    severity: "HIGH",
+    pattern: /(?<![A-Za-z0-9+/])(?![0-9a-fA-F]{80,})[A-Za-z0-9+/]{80,}={0,2}(?![A-Za-z0-9+/=])/,
+    // An encoded payload mixes at least three alphabet classes; a long single-case
+    // word (an identifier, a domain, a repeated filler) does not.
+    keep: (blob) =>
+      [/A-Z/, /[a-z]/, /[0-9]/, /[+/]/].filter((cls) => cls.test(blob)).length >= 3 || /=+$/.test(blob),
   },
 ];
 
@@ -132,8 +184,17 @@ export function scanInjection(text: string): InjectionHit | null {
   }
   const normalized = normalizeForScan(text);
   for (const rule of RULES) {
-    if (rule.pattern.test(normalized)) {
-      return { hit: true, rule: rule.rule, severity: rule.severity };
+    if (rule.keep === undefined) {
+      if (rule.pattern.test(normalized)) {
+        return { hit: true, rule: rule.rule, severity: rule.severity };
+      }
+      continue;
+    }
+    const re = new RegExp(rule.pattern.source, `${rule.pattern.flags}g`);
+    for (let match = re.exec(normalized); match !== null; match = re.exec(normalized)) {
+      if (rule.keep(match[0])) {
+        return { hit: true, rule: rule.rule, severity: rule.severity };
+      }
     }
   }
   return null;
