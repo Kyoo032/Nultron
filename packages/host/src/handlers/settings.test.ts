@@ -332,10 +332,12 @@ describe("POST /api/v1/settings", () => {
  * everything, and would change every other test in the file.
  */
 describe("POST /api/v1/settings audit rows (F2)", () => {
-  it("logs a locale change as the sha256 hashes of the old and new language, never the values' neighbours", async () => {
-    const { createHash } = await import("node:crypto");
+  it("logs a locale change as keyed hashes of the old and new language, never the values' neighbours", async () => {
+    const { createHmac } = await import("node:crypto");
     const { sql } = await import("@agentforge/db");
-    const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+    const { getLocalVaultKey } = await import("@agentforge/db/vault-key");
+    const digest = (value: unknown) =>
+      createHmac("sha256", getLocalVaultKey()).update(JSON.stringify(value ?? null)).digest("hex");
 
     await json("POST", "/api/v1/settings", { locale: "en" });
     const response = await json("POST", "/api/v1/settings", { locale: "id" });
