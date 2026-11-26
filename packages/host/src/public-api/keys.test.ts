@@ -66,6 +66,28 @@ describe("desk API keys (F5a)", () => {
     expect(rows.find((r) => r.id === apiKey.id)?.status).toBe("revoked");
   });
 
+  it("rotation carries the key's jobs and threads to the replacement id", () => {
+    const sqlite = db();
+    sqlite.pragma("foreign_keys = OFF"); // the lineage check needs no org/agent fixtures
+    const { apiKey } = createApiKey(input, sqlite);
+    sqlite
+      .prepare(
+        `INSERT INTO api_jobs (id, tenant_id, key_id, agent_id, status, created_at, updated_at)
+         VALUES ('j1', 't1', ?, 'agent-a', 'done', 0, 0)`,
+      )
+      .run(apiKey.id);
+    sqlite
+      .prepare("INSERT INTO threads (id, organization_id, workspace_id, user_id, agent_id, title, created_at) VALUES ('th1', 'o1', 'w1', ?, 'agent-a', 't', 0)")
+      .run(`apikey-${apiKey.id}`);
+    const rotated = rotateApiKey("t1", apiKey.id, {}, sqlite);
+    expect(
+      sqlite.prepare("SELECT key_id FROM api_jobs WHERE id = 'j1'").get(),
+    ).toEqual({ key_id: rotated.apiKey.id });
+    expect(sqlite.prepare("SELECT user_id FROM threads WHERE id = 'th1'").get()).toEqual({
+      user_id: `apikey-${rotated.apiKey.id}`,
+    });
+  });
+
   it("enforces the agent allow-list", async () => {
     const sqlite = db();
     const { key } = createApiKey(input, sqlite);

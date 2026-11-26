@@ -284,6 +284,10 @@ export function rotateApiKey(
         replacement.created_at,
       );
     sqlite.prepare("UPDATE agent_api_keys SET status = 'revoked', revoked_at = ? WHERE id = ?").run(now, row.id);
+    // A rotated key continues the old one's lineage: its jobs and threads move to the
+    // replacement id. Without this neither key could read history minted before rotation.
+    sqlite.prepare("UPDATE api_jobs SET key_id = ? WHERE key_id = ?").run(newId, row.id);
+    sqlite.prepare("UPDATE threads SET user_id = ? WHERE user_id = ?").run(`apikey-${newId}`, `apikey-${row.id}`);
   };
   if (tx) {
     tx(apply)();
