@@ -67,7 +67,9 @@ refused before the handler. A strict schema per kind splits config and secret fi
 ## Sync into the KB
 
 `data-sources/sync.ts` reads the sealed config, lists objects, extracts text with the same
-`extractFile` path the upload route uses (25 MB per file, magic-byte checked), and indexes
+`extractText` reader the upload route uses (25 MB per file cap) — the narrower document-only
+`extractFile` could not read the plain text / markdown / JSON a bucket mostly holds (found by QA
+2026-11-26) — and indexes
 through `indexKnowledgeSource` with `origin: { kind: "data_source", id: "<source id>/<object key>" }` —
 which is what the Knowledge page's *Synced sources* section (`knowledge-synced-sources`) filters on.
 The composite origin is why the orphan sweep's `data_source` arm matches on the id-plus-`/` prefix

@@ -2,13 +2,13 @@
  * F1: sync an S3 source's objects into the knowledge base, one file at a time.
  *
  * Each object flows list → `getS3Object` (already capped at `AGENTFORGE_DATA_SYNC_MAX_BYTES`,
- * floor 25 MB) → `extractFile` → `indexKnowledgeSource` with origin `data_source`, so a removed
+ * floor 25 MB) → `extractText` (the upload reader) → `indexKnowledgeSource` with origin `data_source`, so a removed
  * connector's cards die in the same orphan sweep as a removed thread's. Only counts and an error
  * code land in `data_source_sync_runs` — never a filename, never content (migration 0027's note).
  */
 import { ApiError, maskPii, reportAuditEvent, type TenantContext } from "@agentforge/core";
 import { indexKnowledgeSource, injectionRule } from "../knowledge";
-import { extractFile } from "../file-extract";
+import { extractText } from "../knowledge-extract";
 import type { DataSourceRow } from "./store";
 import { getS3Object, listS3Objects } from "./s3";
 import { finishSyncRun, insertSyncRun, recordSourceSync } from "./store";
@@ -51,9 +51,11 @@ export async function syncDataSource(
           continue;
         }
         const buffer = await getS3Object(row, object.key);
-        const parsed = await extractFile({ filename: object.key.split("/").pop() ?? object.key, bytes: buffer });
+        // The same reader a manual upload goes through (`extractText`, not the narrower document-only
+        // `extractFile`): a bucket mostly holds plain text, markdown and JSON, which only it reads.
+        const text = await extractText(object.key.split("/").pop() ?? object.key, "", buffer);
         // The same gates a manual upload passes: injection scan first, PII masked into the index.
-        const rule = injectionRule(tenant, object.key, parsed.text);
+        const rule = injectionRule(tenant, object.key, text);
         if (rule) {
           failed += 1;
           errorCode = errorCode ?? "injection_blocked";
@@ -63,7 +65,7 @@ export async function syncDataSource(
           id: `data-source/${row.id}/${object.key}`,
           name: object.key,
           type: extOf(object.key) || "file",
-          text: maskPii(parsed.text),
+          text: maskPii(text),
           // One origin per object: the unique origin index folds same-origin writes, so a
           // shared `row.id` origin would keep only the last synced file searchable.
           origin: { kind: "data_source", id: `${row.id}/${object.key}` },
