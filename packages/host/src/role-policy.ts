@@ -60,8 +60,9 @@ export const ADMINISTER_ROUTES: ReadonlySet<string> = new Set([
   "POST /api/v1/settings/gateway/check",
   "POST /api/v1/settings/guide",
   "POST /api/v1/settings/key-later",
-  "POST /api/v1/settings/reset",
-  "DELETE /api/v1/settings/reset",
+  // settings/reset keeps its own refusal (`tenant_reset_forbidden`, handlers/settings.ts): the gate
+  // lets member and builder reach it so that code is the answer, and the auditor never gets there
+  // because the route is a mutation — `agents`.
   // Billing and components.
   "POST /api/v1/billing/top-up",
   "POST /api/v1/components/install/stream",
@@ -76,9 +77,9 @@ export const ADMINISTER_ROUTES: ReadonlySet<string> = new Set([
   "POST /api/v1/agents/:agentId/share",
   "POST /api/v1/agents/:agentId/product-modes",
   "POST /api/v1/agents/:agentId/generate-defaults",
-  // Team membership: hiring and releasing an agent is administer; proposing one is an agent run.
-  "POST /api/v1/team/hire",
-  "POST /api/v1/team/release",
+  // Team membership: hire/release enforce their own ownership rule (a builder manages the bot it
+  // created, `requireOwned` in handlers/team.ts), so they are `agents` — the auditor is refused
+  // anyway and a member who does not own the bot gets the handler's 403, not this gate's.
   // MCP connectors.
   "POST /api/v1/mcp/connectors/:connectorId",
   "DELETE /api/v1/mcp/connectors/:connectorId",
@@ -95,20 +96,13 @@ export const ADMINISTER_ROUTES: ReadonlySet<string> = new Set([
   // Datasets (data sources).
   "POST /api/v1/datasets",
   "DELETE /api/v1/datasets/:datasetId",
-  // Knowledge (data sources): every mutation.
+  // Knowledge: the backend/model configuration is administer. Content operations (sources,
+  // memories, map, reindex) are `agents` — a member works its own desk's knowledge, and the
+  // handler's privacy rules (a colleague's hidden card is answered as absent) stay intact.
   "PUT /api/v1/knowledge/backend",
   "POST /api/v1/knowledge/backend/reindex",
   "POST /api/v1/knowledge/verify",
   "PUT /api/v1/knowledge/models",
-  "POST /api/v1/knowledge/map",
-  "PUT /api/v1/knowledge/soul",
-  "POST /api/v1/knowledge/memories",
-  "DELETE /api/v1/knowledge/memories/:memoryId",
-  "POST /api/v1/knowledge/sources",
-  "POST /api/v1/knowledge/sources/url",
-  "POST /api/v1/knowledge/sources/:sourceId/reindex",
-  "POST /api/v1/knowledge/reindex",
-  "DELETE /api/v1/knowledge/sources/:sourceId",
   // Registered models.
   "POST /api/v1/models",
 ]);
