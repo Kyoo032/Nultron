@@ -1,4 +1,4 @@
-import { DEFAULT_MAX_STEPS } from "../harness/defaults";
+import { DEFAULT_MAX_STEPS, DEFAULT_RUN_BUDGET } from "../harness/defaults";
 import type { BudgetRefusal, RunBudget } from "../harness/spec";
 
 export { DEFAULT_MAX_STEPS };
@@ -10,8 +10,6 @@ export type ToolBudget = {
    */
   admit(toolKey: string): BudgetRefusal | null;
 };
-
-const ADMIT_ALL: ToolBudget = { admit: () => null };
 
 export function resolveMaxSteps(budget: RunBudget | undefined): number {
   return budget?.maxSteps ?? DEFAULT_MAX_STEPS;
@@ -31,9 +29,9 @@ function refusal(message: string): BudgetRefusal {
  * tool's own ceiling.
  */
 export function createToolBudget(budget: RunBudget | undefined): ToolBudget {
-  if (!budget) {
-    return ADMIT_ALL;
-  }
+  // No budget passed no longer means "admit all": the default budget always applies, so a runtime
+  // or a mode that forgets its own numbers is still inside a ceiling (F7a).
+  budget ??= DEFAULT_RUN_BUDGET;
   let total = 0;
   const perTool = new Map<string, number>();
   return {

@@ -3,6 +3,8 @@
 Product: both Â· Instance: main :3000
 
 Last verified: 2026-11-26 on `devin/dfind-166-run-code-memory`, for the memory caps only (DFIND-166: Python wasm 256 MB, JavaScript wasm 128 MB and heap 64 MB, child old space 128 MB, hosted keeps one warm child and one run, so a sandboxed run fits inside a 768 MiB desk; `packages/host/src/code-runner/limits.ts`, `pool.test.ts` "hosted keeps one warm child by default"). Before that: 2026-11-24 on `fix/dfind-deploy-ci-formal`, for the QuickJS memory-limit guard and classification only (`packages/host/src/code-runner/child/qjs-child.mjs` `wasmMem.grow` cap + memory-before-deadline interrupt order, and `packages/host/src/code-runner/outcome.ts` classifying `wasm-memory` / OOM before `deadline`; tested against the real QuickJS child in `qjs-child.test.ts`). Nothing else on the page was re-read.
+Last verified: 2026-11-26 on `devin/1795703634-f7a-exec-limits` (F7a): a run with no declared budget now runs under `DEFAULT_RUN_BUDGET` (60 tool calls / 6 steps) instead of admit-all (`tool-budget.ts`, `tool-budget.test.ts`). Nothing else on the page was re-read.
+
 
 Last verified: 2026-11-06 on `fix/redactor-gaps` (before merge) for the "Redaction of tool input and output" paragraph of § 13 only (the shapes and key names it lists, and the `redact-deep.ts` line numbers). Read against the code and the redactor tests; not driven.
 

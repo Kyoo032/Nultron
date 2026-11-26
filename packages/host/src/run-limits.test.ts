@@ -9,7 +9,10 @@ import {
   MAX_RUNS_PER_TENANT_ENV,
   MAX_RUNS_TOTAL_ENV,
   parseRunCap,
+  RUN_MAX_OUTPUT_BYTES_ENV,
+  RUN_MAX_SECONDS_ENV,
   runCapsFromEnv,
+  runExecutionCaps,
   runLimitKey,
   SERVER_BUSY,
   TOO_MANY_RUNS,
@@ -484,5 +487,27 @@ describe("withRunSlot", () => {
     const results = await Promise.all([1, 2, 3].map((n) => withRunSlot(tenant, async () => n, env)));
     expect(results).toEqual([1, 2, 3]);
     expect(activeRuns(tenant)).toBe(0);
+  });
+});
+
+describe("runExecutionCaps (F7a)", () => {
+  it("defaults both caps on", () => {
+    expect(runExecutionCaps({})).toEqual({ maxSeconds: 1800, maxOutputBytes: 2_000_000 });
+  });
+  it("reads env overrides", () => {
+    expect(runExecutionCaps({ [RUN_MAX_SECONDS_ENV]: "90", [RUN_MAX_OUTPUT_BYTES_ENV]: "5000" })).toEqual({
+      maxSeconds: 90,
+      maxOutputBytes: 5000,
+    });
+  });
+  it("takes off words and never reads 0 as off", () => {
+    expect(runExecutionCaps({ [RUN_MAX_SECONDS_ENV]: "off", [RUN_MAX_OUTPUT_BYTES_ENV]: "unlimited" })).toEqual({
+      maxSeconds: null,
+      maxOutputBytes: null,
+    });
+    expect(runExecutionCaps({ [RUN_MAX_SECONDS_ENV]: "0" }).maxSeconds).toBe(0);
+  });
+  it("applies on a desk too (no server flag needed)", () => {
+    expect(runExecutionCaps({ AGENTFORGE_SERVER: "" }).maxSeconds).toBe(1800);
   });
 });

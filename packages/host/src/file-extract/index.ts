@@ -25,6 +25,8 @@ import { type AnydocFormat, type AnydocLoader, type AnydocModule, loadAnydoc, to
 import { detectFormat } from "./detect";
 import { DEFAULT_FALLBACK, type FallbackExtractors, hasFallback, runFallback } from "./fallback";
 import { type ExtractedTable, markdownToText, parseMarkdownTables } from "./markdown-tables";
+import { ParseChildUnavailableError, parseFileInChild } from "./child-parse";
+import { nativeGate } from "./native-gate";
 import { log } from "../log";
 
 export type { ExtractedTable } from "./markdown-tables";
@@ -75,6 +77,8 @@ export type ExtractFileOptions = {
   readonly fallback?: FallbackExtractors;
   /** Test seam: the gate that holds a native conversion's slot (`native-gate.ts`). */
   readonly nativeGate?: NativeGate;
+  /** Test seam: parse in this process instead of the isolated child. */
+  readonly inProcess?: boolean;
 };
 
 const PAGE_MARKER = /<!-- page \d+ -->/g;
@@ -168,14 +172,16 @@ async function viaFallback(
 }
 
 /**
- * Read one local file into Markdown, text and tables.
+ * The whole pipeline, in this process: detect, convert, cap, tabulate.
  *
- * Throws {@link FileExtractError} and nothing else: `empty` / `too_large` before a byte is parsed,
- * `unsupported` or `format_mismatch` when the name and the bytes do not agree, `needs_ocr` for a
- * scan, `timeout` past the deadline, and `malformed` / `encrypted` / `resource_limit` /
- * `missing_part` for the ways a document can be unreadable.
+ * This is what the parse child runs (`parse-worker.ts` calls exactly this), and it is also the path
+ * `extractFile` takes when a caller injects one of its seams — a fake loader, fake extractors or a
+ * test gate cannot cross an IPC boundary, so those calls stay in-process by definition.
  */
-export async function extractFile(input: ExtractFileInput, options: ExtractFileOptions = {}): Promise<ExtractedFile> {
+export async function extractFileInProcess(
+  input: ExtractFileInput,
+  options: ExtractFileOptions = {},
+): Promise<ExtractedFile> {
   const maxBytes = options.maxBytes ?? FILE_EXTRACT_MAX_BYTES;
   const timeoutMs = options.timeoutMs ?? FILE_EXTRACT_TIMEOUT_MS;
   requireReadableSize(input.bytes, maxBytes);
@@ -185,4 +191,41 @@ export async function extractFile(input: ExtractFileInput, options: ExtractFileO
     return viaFallback(format, input, options.fallback ?? DEFAULT_FALLBACK, timeoutMs);
   }
   return viaAnydoc(anydoc, format, input.bytes, timeoutMs, options.nativeGate);
+}
+
+/**
+ * Read one local file into Markdown, text and tables.
+ *
+ * Throws {@link FileExtractError} and nothing else: `empty` / `too_large` before a byte is parsed,
+ * `unsupported` or `format_mismatch` when the name and the bytes do not agree, `needs_ocr` for a
+ * scan, `timeout` past the deadline, and `malformed` / `encrypted` / `resource_limit` /
+ * `missing_part` for the ways a document can be unreadable.
+ *
+ * ISOLATION (F7a): the parse runs in a killable child process (`child-parse.ts`) under the same
+ * `--permission` posture as the code sandbox, and the deadline SIGKILLs it — a converter that
+ * ignores its deadline can no longer hold the host's libuv pool, and a crash in a native parser
+ * costs a disposable process. When no child can even boot (a platform without the TypeScript
+ * loader), the call degrades to {@link extractFileInProcess} and the choice is logged once.
+ */
+export async function extractFile(input: ExtractFileInput, options: ExtractFileOptions = {}): Promise<ExtractedFile> {
+  const maxBytes = options.maxBytes ?? FILE_EXTRACT_MAX_BYTES;
+  const timeoutMs = options.timeoutMs ?? FILE_EXTRACT_TIMEOUT_MS;
+  requireReadableSize(input.bytes, maxBytes);
+  // Test seams imply an in-process run: nothing injected can cross into the child.
+  if (options.loadAnydoc || options.fallback || options.inProcess) {
+    return extractFileInProcess(input, options);
+  }
+  const gate = options.nativeGate ?? nativeGate;
+  try {
+    return await gate.run(
+      () => parseFileInChild({ bytes: input.bytes, filename: input.filename, timeoutMs }),
+      timeoutMs,
+    );
+  } catch (error) {
+    if (error instanceof ParseChildUnavailableError) {
+      log.warn("file_extract_child_unavailable", { detail: extractDetail(error) });
+      return extractFileInProcess(input, options);
+    }
+    throw error;
+  }
 }

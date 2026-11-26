@@ -153,3 +153,24 @@ describe("isPrivateHostname", () => {
     }
   });
 });
+
+describe("cloud metadata endpoints (F7a)", () => {
+  it("refuses the IPv4 metadata service and its IPv6-carried spellings", () => {
+    for (const host of ["169.254.169.254", "::ffff:169.254.169.254", "[::ffff:169.254.169.254]"]) {
+      expect(isPrivateIpLiteral(host), host).toBe(true);
+    }
+  });
+
+  it("refuses the IPv6 metadata and link-local addresses", () => {
+    // AWS/GCP instance metadata on IPv6 (fd00:ec2::254 sits inside fc00::/7), plus link-local.
+    for (const host of ["fd00:ec2::254", "fe80::1", "[fe80::1]", "fec0::1"]) {
+      expect(isPrivateIpLiteral(host), host).toBe(true);
+    }
+  });
+
+  it("keeps the rest of 169.254/16 and public addresses' verdicts intact", () => {
+    expect(isPrivateIpLiteral("169.254.0.1")).toBe(true);
+    expect(isPrivateIpLiteral("8.8.8.8")).toBe(false);
+    expect(isPrivateIpLiteral("2606:4700::1111")).toBe(false);
+  });
+});

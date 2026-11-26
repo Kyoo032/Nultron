@@ -41,11 +41,14 @@ describe("resolveMaxSteps", () => {
 });
 
 describe("createToolBudget", () => {
-  it("admits everything when the run has no budget", () => {
+  it("applies the default budget when the run passes none (F7a)", () => {
     const budget = createToolBudget(undefined);
-    for (let call = 0; call < 50; call += 1) {
+    // Under the default's 60-call ceiling: every call admitted.
+    for (let call = 0; call < 60; call += 1) {
       expect(budget.admit("echo")).toBeNull();
     }
+    // The 61st is refused: no budget no longer means admit-all.
+    expect(budget.admit("echo")?.message).toMatch(/^Tool budget spent: this run allows 60 calls in all/);
   });
 
   it("refuses every call past maxToolCalls, all tools counted together", () => {

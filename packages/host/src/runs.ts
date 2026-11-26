@@ -39,6 +39,7 @@ import {
 import { ApiError } from "@agentforge/core";
 import { agentService } from "./tenant";
 import { armRunStallGuard, isRunOutputEvent } from "./run-stall";
+import { runExecutionCaps } from "./run-limits";
 import { knowledgeInjection } from "./knowledge";
 import { citedSources } from "./knowledge-cites";
 import { recordCites } from "./knowledge-graph";
@@ -427,6 +428,26 @@ export async function* startModalityRun(options: {
     }
     void finishRun(options.tenant, runId, "failed", message, null).catch(() => undefined);
   };
+  // The F7a execution caps beside the stall guard: one wall-clock deadline for the whole run, and
+  // one ceiling on how much it may stream. Both end the run the way the watchdog does — the person
+  // sees a clear reason and the model call is cancelled so it stops billing.
+  const execCaps = runExecutionCaps();
+  const failActiveRun = (message: string) => {
+    if (queueClosed || finishing || settled) {
+      return;
+    }
+    send({ type: "run.failed", message });
+    send({ type: "run.completed", runId: runId ?? "unknown" });
+    closeQueue();
+    settleRun(message);
+    modelAbort.abort(new Error(message));
+  };
+  const wallClock =
+    execCaps.maxSeconds === null
+      ? null
+      : setTimeout(() => failActiveRun("This run reached its time limit and was stopped."), execCaps.maxSeconds * 1000);
+  wallClock?.unref?.();
+  let assistantBytes = 0;
   // Rearmed by every runtime event below, so it guards the first token and then the gaps
   // between them instead of capping the whole run.
   const stall = armRunStallGuard({
@@ -790,6 +811,12 @@ export async function* startModalityRun(options: {
               send(safe);
               if (event.type === "assistant.delta") {
                 assistantText += event.text;
+                if (execCaps.maxOutputBytes !== null) {
+                  assistantBytes += Buffer.byteLength(event.text, "utf8");
+                  if (assistantBytes > execCaps.maxOutputBytes) {
+                    failActiveRun("This run produced more output than allowed and was stopped.");
+                  }
+                }
               }
               if (event.type === "assistant.thinking") {
                 thinkingText = event.replace ? event.text : thinkingText + event.text;
@@ -942,6 +969,9 @@ export async function* startModalityRun(options: {
       send({ type: "run.completed", runId: runId ?? "unknown" });
     } finally {
       stall.close();
+      if (wallClock) {
+        clearTimeout(wallClock);
+      }
       options.abortSignal?.removeEventListener("abort", onClientAbort);
       closeQueue();
     }

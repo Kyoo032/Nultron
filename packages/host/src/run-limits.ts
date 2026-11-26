@@ -207,6 +207,32 @@ export function activeRuns(tenant?: RunTenant): number {
  * returned before its first `next()` never runs its `finally`, and that is exactly the case a slot
  * would leak in.
  */
+export const RUN_MAX_SECONDS_ENV = "AGENTFORGE_RUN_MAX_SECONDS";
+export const RUN_MAX_OUTPUT_BYTES_ENV = "AGENTFORGE_RUN_MAX_OUTPUT_BYTES";
+/** Half an hour for one turn: a real dossier with worker tools finishes well inside it. */
+export const DEFAULT_RUN_MAX_SECONDS = 1800;
+/** About 2 MB of streamed answer text. A legitimate answer is an essay, not a novel. */
+export const DEFAULT_RUN_MAX_OUTPUT_BYTES = 2_000_000;
+
+/** How long one run may stream and how much it may say. `null` means that cap is off. */
+export type RunExecutionCaps = {
+  readonly maxSeconds: number | null;
+  readonly maxOutputBytes: number | null;
+};
+
+/**
+ * The per-run wall-clock and output-size caps (F7a), beside the step and tool budgets that already
+ * bound what a run may do. Unlike the admission caps above these apply on a desk too: a stalled
+ * model call or a runaway generation is just as expensive for one owner as for a tenant. `off` /
+ * `none` / `unlimited` switches a cap off; `0` refuses every run's work immediately.
+ */
+export function runExecutionCaps(env: EnvLike = process.env): RunExecutionCaps {
+  return {
+    maxSeconds: parseRunCap(env[RUN_MAX_SECONDS_ENV], DEFAULT_RUN_MAX_SECONDS),
+    maxOutputBytes: parseRunCap(env[RUN_MAX_OUTPUT_BYTES_ENV], DEFAULT_RUN_MAX_OUTPUT_BYTES),
+  };
+}
+
 export function guardRunStream(release: Release, events: AsyncIterable<string>): AsyncIterable<string> {
   return {
     [Symbol.asyncIterator](): AsyncIterator<string> {
