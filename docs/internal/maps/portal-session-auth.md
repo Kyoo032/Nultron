@@ -21,7 +21,7 @@ sessions and stored refresh tokens (the "Removed" bullet under the token at rest
 owner decision 2026-10-01 on SR-65, detail in [hosted-surfaces-and-reset.md](hosted-surfaces-and-reset.md) § 2.
 Every other line is as verified next.
 
-Last verified: 2026-09-23 at d4561b8 + working tree, in two passes the same day. The first: the
+Last verified: 2026-11-26 on `devin/1795687213-endpoint-integrity`, for endpoint integrity: `gateway_endpoint` rows carry an HMAC (`auth-session-endpoint-mac-v1`, `endpointMac`/`endpointMacVerify` in `session-secrets.ts`); a failing check falls back to the pinned gateway, a future `portal_checked_at` is due on the next read, and the issued key travels sealed via `gateway_endpoint_key` (host `session-store.ts`, `portal-client.ts` `gateway_key`, `routes.ts`, `portal-check.ts`). Earlier: 2026-09-23 at d4561b8 + working tree, in two passes the same day. The first: the
 gate's portal re-check, digest session ids, refresh-first sign-out. The second: the refresh token
 kept sealed at rest so a restart signs nobody out, and every refresh authenticated as the
 confidential client. The sections those passes changed — the session gate, Verify / slide / expire,
