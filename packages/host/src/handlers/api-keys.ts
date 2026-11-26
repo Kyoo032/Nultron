@@ -67,6 +67,7 @@ export async function handlePostApiKeys(request: HostRequest): Promise<HostResul
       throw new ApiError("invalid_request", "expiresInDays must be a positive number", 400);
     }
     const { key, apiKey } = createApiKey({
+      workspaceId: tenant.workspaceId,
       tenantId: tenant.tenantId,
       name,
       allowedAgents,

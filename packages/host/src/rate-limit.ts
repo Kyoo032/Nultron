@@ -259,12 +259,11 @@ export function checkRequestRate(input: RateCheckInput): RateDecision {
  * "sensible default", never "unlimited". The burst is the rpm itself, so a steady
  * caller never sees a refusal and a spike is capped.
  *
- * Buckets are kept per (key id, rpm) and rebuilt when the row's rpm changes, so a rotate
- * or edit does not leave a stale allowance behind. F9 is where the full per-key policy
- * lands; this is the single-counter floor.
+ * Buckets are kept per (key id, rpm): a caller whose rpm differs never resets another
+ * key's balance, and a rotate or rpm edit gets a fresh bucket under its new name. F9 is
+ * where the full per-key policy lands; this is the single-counter floor.
  */
-let apiKeyLimiter: RateLimiter | null = null;
-let apiKeyLimiterRpm = -1;
+const apiKeyLimiters = new Map<string, RateLimiter>();
 
 export const DEFAULT_API_KEY_RPM = 60;
 
@@ -273,15 +272,16 @@ export function checkApiKeyRate(
   now = Date.now(),
 ): { allowed: boolean; retryAfterSeconds: number } {
   const rpm = key.rate_limit_rpm ?? DEFAULT_API_KEY_RPM;
-  if (!apiKeyLimiter || apiKeyLimiterRpm !== rpm) {
-    apiKeyLimiterRpm = rpm;
-    apiKeyLimiter = createRateLimiter({ rpm, burst: Math.max(1, Math.min(rpm, 60)) });
+  const bucket = `apikey:${key.id}:${rpm}`;
+  let limiter = apiKeyLimiters.get(bucket);
+  if (!limiter) {
+    limiter = createRateLimiter({ rpm, burst: Math.max(1, Math.min(rpm, 60)) });
+    apiKeyLimiters.set(bucket, limiter);
   }
-  return apiKeyLimiter.take(`apikey:${key.id}`, now);
+  return limiter.take(`apikey:${key.id}`, now);
 }
 
 /** Test hook: drops the per-key bucket together with the others. */
 export function resetApiKeyRateLimiter(): void {
-  apiKeyLimiter = null;
-  apiKeyLimiterRpm = -1;
+  apiKeyLimiters.clear();
 }

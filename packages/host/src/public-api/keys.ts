@@ -25,6 +25,8 @@ export const API_KEY_NAME_MAX = 80;
 export type ApiKeyRow = {
   id: string;
   tenant_id: string;
+  /** The desk the key was minted on; NULL reads as the tenant's home desk. */
+  workspace_id: string | null;
   name: string;
   key_prefix: string;
   key_hash: Buffer;
@@ -98,6 +100,8 @@ function summary(row: ApiKeyRow): ApiKeySummary {
 
 export type CreateApiKeyInput = {
   tenantId: string;
+  /** The desk the key acts on; defaults to the tenant's home desk at resolve time. */
+  workspaceId?: string | null;
   name: string;
   /** `["*"]` or an explicit agent-id list. Anything else is refused by the session route. */
   allowedAgents: string[];
@@ -126,6 +130,7 @@ export function createApiKey(
   const row: ApiKeyRow = {
     id: crypto.randomUUID(),
     tenant_id: input.tenantId,
+    workspace_id: input.workspaceId ?? null,
     name,
     key_prefix: minted.prefix,
     key_hash: keyHash(minted.raw),
@@ -143,13 +148,14 @@ export function createApiKey(
     sqlite
       .prepare(
         `INSERT INTO agent_api_keys
-         (id, tenant_id, name, key_prefix, key_hash, last4, allowed_agents, rate_limit_rpm,
+         (id, tenant_id, workspace_id, name, key_prefix, key_hash, last4, allowed_agents, rate_limit_rpm,
           status, expires_at, revoked_at, last_used_at, created_by, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, NULL, NULL, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, NULL, NULL, ?, ?)`,
       )
       .run(
         row.id,
         row.tenant_id,
+        row.workspace_id,
         row.name,
         row.key_prefix,
         row.key_hash,
@@ -259,13 +265,14 @@ export function rotateApiKey(
     sqlite
       .prepare(
         `INSERT INTO agent_api_keys
-         (id, tenant_id, name, key_prefix, key_hash, last4, allowed_agents, rate_limit_rpm,
+         (id, tenant_id, workspace_id, name, key_prefix, key_hash, last4, allowed_agents, rate_limit_rpm,
           status, expires_at, revoked_at, last_used_at, created_by, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, NULL, NULL, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, NULL, NULL, ?, ?)`,
       )
       .run(
         replacement.id,
         replacement.tenant_id,
+        replacement.workspace_id,
         replacement.name,
         replacement.key_prefix,
         replacement.key_hash,

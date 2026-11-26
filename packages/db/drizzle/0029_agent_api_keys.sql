@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS `agent_api_keys` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
+	`workspace_id` text,
 	`name` text NOT NULL,
 	`key_prefix` text NOT NULL,
 	`key_hash` blob NOT NULL,

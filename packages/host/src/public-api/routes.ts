@@ -110,6 +110,12 @@ async function requireAgent(identity: ServiceIdentity, agentId: string): Promise
 async function streamRun(identity: ServiceIdentity, agentId: string, body: unknown, abort?: AbortSignal) {
   const tenant = identity.tenant;
   requireGatewayAllowedFor(tenant);
+  // A key is not the owner: `paidMedia` grants are a session-card decision, and a service
+  // caller may not forward one. The turn runs in `ask` mode with an empty grant list.
+  if (body && typeof body === "object" && "paidMedia" in (body as Record<string, unknown>)) {
+    body = { ...(body as Record<string, unknown>) };
+    delete (body as Record<string, unknown>).paidMedia;
+  }
   const thread = await createThread(tenant, agentId);
   const release = admitRun(tenant);
   try {
@@ -240,6 +246,8 @@ const routes: PublicRoute[] = [
     if (!name || !text) {
       throw new ApiError("invalid_request", "name and text are required", 400);
     }
+    // Ingestion embeds through the gateway — same gate the session handler enforces.
+    requireGatewayAllowedFor(identity.tenant);
     const source = await addPastedSource(identity.tenant, name, text, pastedSourceType(bodyIn.type));
     return jsonOk(source, 201);
   }),
@@ -248,6 +256,8 @@ const routes: PublicRoute[] = [
     if (!query.trim()) {
       throw new ApiError("invalid_request", "query is required", 400);
     }
+    // Retrieval embeds the query through the gateway — same gate the session handler enforces.
+    requireGatewayAllowedFor(identity.tenant);
     return jsonOk(await retrieveChunks(identity.tenant, query, 8));
   }),
   compile("POST", "/api/public/v1/files", async (request, identity) => {
@@ -314,6 +324,7 @@ export async function dispatchPublicApi(request: HostRequest): Promise<HostResul
   }
   let identity: ServiceIdentity;
   let outcome: { status: number; code: string } = { status: 200, code: "ok" };
+  let auditTarget = `${method} unmatched`;
   try {
     identity = await authenticatePublic(request);
   } catch (error) {
@@ -343,6 +354,7 @@ export async function dispatchPublicApi(request: HostRequest): Promise<HostResul
         params[key] = decodeURIComponent(match[index + 1] ?? "");
       });
       const scoped = { ...request, params, path };
+      auditTarget = `${method} ${path}`;
       const result = await route.handler(scoped, identity);
       const envelope =
         result.type === "json" ? ((result.body as { error?: { code?: string } } | null)?.error?.code ?? "ok") : "ok";
@@ -367,7 +379,9 @@ export async function dispatchPublicApi(request: HostRequest): Promise<HostResul
         actorKind: "api_key",
         actorId: key.id,
         targetKind: "public_api",
-        targetId: `${method} ${path}`,
+        // An unmatched path is caller-controlled bytes: the audit records the verb and the
+        // refusal, never the literal target.
+        targetId: auditTarget,
         outcome: outcome.status < 400 ? "ok" : outcome.status === 401 || outcome.status === 403 ? "denied" : "failed",
         channel: "public_api",
       });

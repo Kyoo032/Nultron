@@ -7,7 +7,7 @@
  * table. The two audiences are disjoint by construction.
  *
  * The identity a key resolves to is a **service identity** — `userId` is `apikey-<id>`,
- * role `member`, never an owner identity — so a run it starts cannot approve F3 actions
+ * role `admin` (desk-scoped, never an owner identity) — so a run it starts cannot approve F3 actions
  * and the audit trail names `actor_kind: 'api_key'` with the key id, per spec S-rules.
  */
 import { ApiError, type TenantContext } from "@agentforge/core";
@@ -71,16 +71,23 @@ export async function authenticatePublic(request: {
   if (desks.length === 0) {
     throw new ApiError("workspace_not_found", "Workspace not found", 404);
   }
-  const home = desks.find((desk) => desk.slug === "home") ?? desks[0];
+  // The desk the key was minted on, or the home desk for a key minted before desks were
+  // recorded (and for a desk that no longer exists). A key never silently hops desks.
+  const desk =
+    desks.find((desk) => desk.id === key.workspace_id) ?? desks.find((desk) => desk.slug === "home") ?? desks[0];
   touchApiKey(key.id);
   return {
     key,
     tenant: {
       tenantId: tenant.id,
       organizationId: org.id,
-      workspaceId: home.id,
+      workspaceId: desk.id,
       userId: `apikey-${key.id}`,
-      role: "member",
+      // `admin` only widens agent visibility (canView/requireOwned in AgentService), so a
+      // desk's private agents — the default Chat agent included — are callable by key.
+      // It cannot open a session route by construction and F3 approvals are session-only,
+      // so the key still cannot approve an action. Threads stay `eq(threads.userId)`-scoped.
+      role: "admin",
     },
   };
 }
