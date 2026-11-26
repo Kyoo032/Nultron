@@ -2,6 +2,8 @@
 
 Product: both Â· Instance: main :3000
 
+Last verified: 2026-11-26 on `devin/1795703673-data-sources` (F1, DFIND-173), for the `query_data_source` rows only: it is the 18th key of `DEFAULT_CHAT_TOOLS` (`packages/core/src/agents/default-chat.ts:90`), named in the prompt router line, capped at 8 calls a turn (`packages/core/src/harness/modes/chat.ts:47`), and bound onto existing desks by `ensureStarterBindings`. Nothing else on the page was re-read.
+
 Last verified: 2026-11-26 on `devin/dfind-166-run-code-memory`, for the memory caps only (DFIND-166: Python wasm 256 MB, JavaScript wasm 128 MB and heap 64 MB, child old space 128 MB, hosted keeps one warm child and one run, so a sandboxed run fits inside a 768 MiB desk; `packages/host/src/code-runner/limits.ts`, `pool.test.ts` "hosted keeps one warm child by default"). Before that: 2026-11-24 on `fix/dfind-deploy-ci-formal`, for the QuickJS memory-limit guard and classification only (`packages/host/src/code-runner/child/qjs-child.mjs` `wasmMem.grow` cap + memory-before-deadline interrupt order, and `packages/host/src/code-runner/outcome.ts` classifying `wasm-memory` / OOM before `deadline`; tested against the real QuickJS child in `qjs-child.test.ts`). Nothing else on the page was re-read.
 
 Last verified: 2026-11-06 on `fix/redactor-gaps` (before merge) for the "Redaction of tool input and output" paragraph of § 13 only (the shapes and key names it lists, and the `redact-deep.ts` line numbers). Read against the code and the redactor tests; not driven.
@@ -58,7 +60,7 @@ The specs in the tree at the verified line:
 
 | Mode | Loop | Tools it may bind | Budget (steps / calls / per tool) | `repairRounds` |
 |---|---|---|---|---|
-| `chat` (`modes/chat.ts`) | agent | `DEFAULT_CHAT_TOOLS`, 17 keys: calculator, datetime, web_search, image_generate, video_generate, past_sessions, web_fetch, knowledge_search, the six file tools, run_code and self_check, build_deck | 12 / 40 / write_file 20, edit_file 20, delete_file 10, web_fetch 8, run_code 6, self_check 4, build_deck 4 | 0 |
+| `chat` (`modes/chat.ts`) | agent | `DEFAULT_CHAT_TOOLS`, 18 keys: calculator, datetime, web_search, image_generate, video_generate, past_sessions, web_fetch, knowledge_search, the six file tools, run_code and self_check, build_deck, query_data_source | 12 / 40 / write_file 20, edit_file 20, delete_file 10, web_fetch 8, run_code 6, self_check 4, build_deck 4, query_data_source 8 | 0 |
 | `data` (`modes/data.ts`) | agent | run_sql, calculator, run_code | 6 / 60 / run_sql 8, run_code 4 | 0 |
 | `edit` (`modes/edit.ts`) | agent | every key in `EDIT_TOOLS` | 6 / 60 | 0 |
 | `market` (`modes/market.ts`) | pipeline | the union any desk binds: five market tools, calculator, web_search, web_fetch | 6 / 60 | 1. Not a `runChecked` round: a draft that states a figure the packet lacks is rewritten once from the packet with no tools and announced as `job.round`, then the number guard marks what is left (`repairFlaggedFigures`, `packages/host/src/market-generate.ts:579`, [`market-watch.md`](market-watch.md)). The quiet-source gather retry asks no model and is not a round. |
@@ -310,7 +312,7 @@ Invalid calls, since AI SDK 5 (2026-11-03). The SDK checks a call's arguments an
 
 ### 14. `build_deck`: a PowerPoint deck from Chat
 
-`build_deck` (`buildDeckTool`, `packages/host/src/deck/build-deck-tool.ts:17`) lets Chat make a `.pptx` the person can save. `registerDeckTools` (`:27`) registers it from `ensureToolsRegistered` (`packages/host/src/register-tools.ts:41`), and it is the last of the 17 keys of `DEFAULT_CHAT_TOOLS` (§ 2), capped at 4 calls a turn by `chatHarnessSpec` (`packages/core/src/harness/modes/chat.ts:44`): a deck, then up to three repairs. It is `internal` trust: its answer is a value the host computed (an id, a file name, a count, or a refusal written in `build-deck.ts`), not text a page or a file wrote.
+`build_deck` (`buildDeckTool`, `packages/host/src/deck/build-deck-tool.ts:17`) lets Chat make a `.pptx` the person can save. `registerDeckTools` (`:27`) registers it from `ensureToolsRegistered` (`packages/host/src/register-tools.ts:41`), and it sits in `DEFAULT_CHAT_TOOLS` (§ 2), capped at 4 calls a turn by `chatHarnessSpec` (`packages/core/src/harness/modes/chat.ts:44`): a deck, then up to three repairs. It is `internal` trust: its answer is a value the host computed (an id, a file name, a count, or a refusal written in `build-deck.ts`), not text a page or a file wrote.
 
 **The model writes the outline; no model is called inside the tool.** The arguments are `{ title, slides }` (`buildDeckInputSchema`, `packages/host/src/deck/deck-schema.ts:62`): a title and a list of slides, each with a heading and, optionally, a `kind`, a subhead, bullets, an aside and speaker notes. Shapes and layouts are not model input. **The schema sets no ceiling, on purpose.** The AI SDK checks a call's arguments against it before `execute`, and an argument that fails there ends the whole turn as `run.failed` (the person sees an error and no deck; the model is told nothing). A model cannot count characters, so the limits (up to 14 slides, `DECK_MAX_SLIDES`, which is `MAX_OUTLINE_SLIDES`; a title of 200 characters, a heading 200, a subhead 300, up to 12 bullets of 400, an aside 600, notes 2000) are stated in words in the field descriptions and enforced by the host (below). A slide kind the model invents reads as `bullets`, as in the Presentation mode. What the schema still refuses is a call that is not shaped like a deck at all (no `slides`, a heading missing): that is the usual `invalid_tool_args`. The tool description tells the model to write in the language of the conversation, to use only facts it was given or looked up, and to fix exactly what a refusal names. The Chat prompt carries the one sentence (Â§ 2).
 
@@ -358,7 +360,7 @@ The result is `{ ok: true, artifactId, filename, slideCount }`. `filename` is `a
 | `packages/host/src/folder-root/` | Availability, mount record and checks, the root, proposal store, approve and apply, routes |
 | `apps/desktop/main.cjs`, `preload.cjs`, `apps/web/lib/desktop-bridge.ts` | The native folder picker |
 | `packages/host/src/knowledge-search-tool.ts` | `knowledge_search` |
-| `packages/core/src/agents/default-chat.ts`, `agents/service.ts` | Chat's prompt and its 17 tools, the droppable tool sentences, the read-time soul, the binding backfill |
+| `packages/core/src/agents/default-chat.ts`, `agents/service.ts` | Chat's prompt and its 18 tools, the droppable tool sentences, the read-time soul, the binding backfill |
 | `packages/core/src/runtime/ai-tools.ts`, `tool-error.ts`, `step-tracker.ts` | The tool map the SDK gets (disabled tools included, hidden from the model), the `tool_error` result and the abort rule, the step-limit reader |
 | `packages/core/src/security/redact-deep.ts`, `packages/host/src/chat-tool-events.ts` | Deep redaction of a tool's input and output, and where Chat applies it |
 | `packages/core/src/agents/chat-turn.ts`, `chat-locale.ts` | `settleChatTurn` and the step-limit sentence in both languages |
