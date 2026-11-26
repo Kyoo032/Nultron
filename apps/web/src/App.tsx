@@ -32,6 +32,7 @@ import { ChannelsPage } from "@/components/channels-page";
 import { CustomersPage } from "@/components/customers-page";
 import { ActivityLogPage } from "@/components/activity-log-page";
 import { McpPage } from "@/components/mcp-page";
+import { DataSourcesPage } from "@/components/data-sources-page";
 import { DeskPane } from "@/components/desk-pane";
 import { WorkModeKeepAlive } from "@/components/work-mode-keep-alive";
 import { OnboardingScreen } from "@/components/onboarding-screen";
@@ -517,6 +518,16 @@ export function AppRoutes() {
                 <DeskPane>
                   <SettingsShell>
                     <McpPage />
+                  </SettingsShell>
+                </DeskPane>
+              }
+            />
+            <Route
+              path="/data-sources"
+              element={
+                <DeskPane>
+                  <SettingsShell>
+                    <DataSourcesPage />
                   </SettingsShell>
                 </DeskPane>
               }

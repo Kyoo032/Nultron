@@ -14,7 +14,8 @@
     "eval:models:handoff": "tsx eval/models/handoff.ts",
     "eval:models:probe": "tsx eval/models/probe.ts",
     "eval:models:availability": "tsx eval/models/key-availability.ts",
-    "eval:models:test": "vitest run --root eval/models"
+    "eval:models:test": "vitest run --root eval/models",
+    "allowlist": "tsx scripts/destination-allowlist.ts"
   },
   "dependencies": {
     "@agentforge/core": "workspace:*",
@@ -28,6 +29,7 @@
     "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",
     "pdf-lib": "1.17.1",
+    "pg": "^8.13.1",
     "pptxgenjs": "^4.0.1",
     "ws": "8.22.0",
     "yahoo-finance2": "^4.0.3",

@@ -1,6 +1,6 @@
 {
   "title": "Knowledge Base",
-  "intro": "What Chat and every job mode retrieve from on the {name} desk — soul, pinned memory, indexed sources, and the map between them.",
+  "intro": "What Chat and every job mode retrieve from on the {name} desk \u2014 soul, pinned memory, indexed sources, and the map between them.",
   "tabs": {
     "sources": "Sources",
     "soul": "Soul",
@@ -27,17 +27,18 @@
   },
   "sources": {
     "add": "Add a source",
-    "urlPlaceholder": "https://…",
+    "urlPlaceholder": "https://\u2026",
     "addUrl": "Add URL",
-    "pastePlaceholder": "Paste notes…",
+    "pastePlaceholder": "Paste notes\u2026",
     "indexPaste": "Index paste",
     "uploadFile": "Upload file",
     "uploadHint": "Indexed here: {formats}. Up to 25 MB.",
     "pastedName": "Pasted notes",
-    "chunks": "{count} chunks",
+    "chunks": "chunks",
     "chunksOne": "{count} chunk",
     "remove": "Remove",
-    "embedLocal": "Saved. Live embeddings timed out, so this source is on a local index until the gateway answers."
+    "embedLocal": "Saved. Live embeddings timed out, so this source is on a local index until the gateway answers.",
+    "syncedTitle": "Synced from data sources"
   },
   "status": {
     "Indexed": "Indexed",
@@ -75,11 +76,11 @@
   },
   "map": {
     "label": "Map",
-    "intro": "You get a reviewed map of your sources — which topics they support, where they are weak, and what is still missing.",
+    "intro": "You get a reviewed map of your sources \u2014 which topics they support, where they are weak, and what is still missing.",
     "howItWorks": "How this works",
     "howItWorksBody": "Chat retrieves from this desk memory now, and job modes will use the same retrieval later. Map reads your sources with the embedding, brain, and verifier models above.",
     "run": "Map knowledge",
-    "running": "Mapping…",
+    "running": "Mapping\u2026",
     "ready": "Ready",
     "notReady": "Not ready",
     "gaps": "Gaps",
@@ -97,9 +98,9 @@
     "aria": "Knowledge health",
     "intro": "Every finished piece of work becomes a text card here.",
     "tilesAria": "Knowledge health at a glance",
-    "verifiedLine": "Verified · {label} · {detail}",
+    "verifiedLine": "Verified \u00b7 {label} \u00b7 {detail}",
     "runCheck": "Run self-check",
-    "checking": "Checking…",
+    "checking": "Checking\u2026",
     "workCards": "Work cards",
     "addedByHand": "Added by hand",
     "indexed": "Indexed",
@@ -134,11 +135,11 @@
     "label": "Knowledge map",
     "show": "Show map",
     "hide": "Hide map",
-    "counts": "{nodes} nodes · {edges} edges",
+    "counts": "{nodes} nodes \u00b7 {edges} edges",
     "showAll": "Show all",
     "showAllNodes": "Show all {total}",
     "drawn": "{shown} drawn",
-    "loading": "Loading links…",
+    "loading": "Loading links\u2026",
     "retry": "Try again",
     "empty": "Build map to create topic links.",
     "around": "around {label}",
@@ -164,7 +165,7 @@
       "retrieved": "source was retrieved by a thread",
       "cites": "thread cited a source"
     },
-    "edgeTitle": "{kind} · weight {weight}"
+    "edgeTitle": "{kind} \u00b7 weight {weight}"
   },
   "languageRule": "Write overview, topic titles, topic summaries, gap notes, and verifier notes in English. Keep JSON keys, source ids, and verbatim excerpts unchanged."
 }

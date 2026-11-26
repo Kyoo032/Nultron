@@ -11,6 +11,7 @@ import { registerCodeTools } from "./code-runner";
 import { registerDeckTools } from "./deck";
 import { delegateTool } from "./delegation/delegate-tool";
 import { mcpFetchTool, mcpListSourcesTool } from "./mcp/mcp-tools";
+import { dataSourceQueryTool } from "./data-sources/query-tool";
 import { resolveHostFileRoot } from "./file-roots";
 import { knowledgeSearchTool } from "./knowledge-search-tool";
 import { marketTools } from "./market/tools";
@@ -35,6 +36,8 @@ export function ensureToolsRegistered(): void {
   registerUniversityTools();
   registerTool(pastSessionsTool);
   registerTool(runSqlTool);
+  // F1: read-only queries against the operator's external sources; `run_sql` stays desk-SQLite only.
+  registerTool(dataSourceQueryTool);
   for (const tool of marketTools.all) {
     registerTool(tool);
   }

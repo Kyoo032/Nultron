@@ -252,6 +252,8 @@ export function ensureSchema(sqlite: Database.Database): void {
   ensureCustomerInboxTables(sqlite);
   ensureWorkspaceColumns(sqlite);
   ensureAuditTables(sqlite);
+  ensureDataSourceTables(sqlite);
+  ensureDestinationAllowlistTable(sqlite);
   assertKernelTables(sqlite);
 }
 
@@ -1009,9 +1011,9 @@ function ensureKnowledgeTables(sqlite: Database.Database): void {
  */
 function enableFtsSecureDelete(sqlite: Database.Database, table: string): void {
   try {
-    const existing = sqlite
-      .prepare(`SELECT v FROM ${table}_config WHERE k = 'secure-delete'`)
-      .get() as { v: number } | undefined;
+    const existing = sqlite.prepare(`SELECT v FROM ${table}_config WHERE k = 'secure-delete'`).get() as
+      | { v: number }
+      | undefined;
     if (existing?.v === 1) {
       return;
     }
@@ -1087,6 +1089,66 @@ function ensureAuditTables(sqlite: Database.Database): void {
     BEGIN
       SELECT RAISE(ABORT, 'audit_events rows may only be purged below the retention window');
     END;
+  `);
+}
+
+/**
+ * The F1 data-source tables (drizzle/0027_data_sources.sql), re-created for a database that was
+ * baseline-stamped past the migration without them — the same heal path as `ensureAuditTables`.
+ */
+function ensureDataSourceTables(sqlite: Database.Database): void {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS data_sources (
+      id text PRIMARY KEY NOT NULL,
+      tenant_id text NOT NULL,
+      kind text NOT NULL,
+      name text NOT NULL,
+      config_sealed text NOT NULL,
+      secret_sealed text NOT NULL,
+      secret_last4 text,
+      status text NOT NULL,
+      table_allowlist_sealed text,
+      last_sync_at integer,
+      last_sync_result text,
+      created_by text,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL,
+      CONSTRAINT data_sources_kind_check CHECK(kind IN ('s3','azure_blob','postgres','mysql')),
+      CONSTRAINT data_sources_status_check CHECK(status IN ('active','disabled'))
+    );
+    CREATE INDEX IF NOT EXISTS data_sources_tenant_idx ON data_sources (tenant_id);
+    CREATE TABLE IF NOT EXISTS data_source_sync_runs (
+      id text PRIMARY KEY NOT NULL,
+      tenant_id text NOT NULL,
+      data_source_id text NOT NULL,
+      started_at integer,
+      finished_at integer,
+      files_ok integer,
+      files_failed integer,
+      error_code text
+    );
+    CREATE INDEX IF NOT EXISTS data_source_sync_runs_source_idx ON data_source_sync_runs (data_source_id, started_at);
+  `);
+}
+
+/**
+ * The F1 operator allowlist (drizzle/0028_destination_allowlist.sql). `mac` is verified row by row
+ * at read time, so a heal here changes nothing about tamper evidence.
+ */
+function ensureDestinationAllowlistTable(sqlite: Database.Database): void {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS destination_allowlist (
+      id text PRIMARY KEY NOT NULL,
+      tenant_id text NOT NULL,
+      host text NOT NULL,
+      port integer NOT NULL,
+      allow_private integer NOT NULL DEFAULT 0,
+      mac text NOT NULL,
+      created_at integer NOT NULL,
+      CONSTRAINT destination_allowlist_port_check CHECK(port BETWEEN 1 AND 65535),
+      CONSTRAINT destination_allowlist_allow_private_check CHECK(allow_private IN (0,1))
+    );
+    CREATE INDEX IF NOT EXISTS destination_allowlist_tenant_host_port_idx ON destination_allowlist (tenant_id, host, port);
   `);
 }
 

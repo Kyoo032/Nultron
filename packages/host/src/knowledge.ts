@@ -44,8 +44,8 @@ export type KnowledgeMemory = {
   createdAt: number;
 };
 
-/** Where a work card came from. `thread` = Chat, `media` = Images / Videos / Edit, `artifact` = job outputs. */
-export type SourceOriginKind = "thread" | "media" | "artifact";
+/** Where a work card came from. `thread` = Chat, `media` = Images / Videos / Edit, `artifact` = job outputs, `data_source` = an F1 connector sync. */
+export type SourceOriginKind = "thread" | "media" | "artifact" | "data_source";
 
 export type SourceOrigin = { kind: SourceOriginKind; id: string };
 
@@ -456,11 +456,7 @@ export async function indexKnowledgeSource(tenant: TenantContext, raw: IndexSour
 }
 
 /** Record a source that could not be indexed. The work that produced it still succeeded. */
-export function markSourceFailed(
-  tenant: TenantContext,
-  raw: FailedSourceInput,
-  reason: string,
-): KnowledgeSource {
+export function markSourceFailed(tenant: TenantContext, raw: FailedSourceInput, reason: string): KnowledgeSource {
   const input = withSafeName(raw);
   const createdAt = nextCreatedAt();
   replaceSourceRows(tenant, input, [], reason, createdAt);
@@ -747,6 +743,8 @@ const ORIGIN_OWNERS: Readonly<Record<SourceOriginKind, { select: string; param: 
     thread: { select: "SELECT id FROM threads WHERE workspace_id = ?", param: (tenant) => tenant.workspaceId },
     artifact: { select: "SELECT id FROM artifacts WHERE workspace_id = ?", param: (tenant) => tenant.workspaceId },
     media: { select: "SELECT id FROM media WHERE organization_id = ?", param: (tenant) => tenant.organizationId },
+    // A deleted or disabled connector's cards die with it in the same sweep.
+    data_source: { select: "SELECT id FROM data_sources WHERE tenant_id = ?", param: (tenant) => tenant.tenantId },
   };
 
 type OrphanRow = { id: string; external_id: string | null };

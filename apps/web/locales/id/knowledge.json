@@ -27,17 +27,18 @@
   },
   "sources": {
     "add": "Tambah sumber",
-    "urlPlaceholder": "https://…",
+    "urlPlaceholder": "https://\u2026",
     "addUrl": "Tambah URL",
-    "pastePlaceholder": "Tempel catatan…",
+    "pastePlaceholder": "Tempel catatan\u2026",
     "indexPaste": "Indeks teks tempelan",
     "uploadFile": "Unggah file",
     "uploadHint": "Format yang didukung: {formats}. Maksimal 25 MB.",
     "pastedName": "Catatan tempelan",
-    "chunks": "{count} potongan",
+    "chunks": "potongan",
     "chunksOne": "{count} potongan",
     "remove": "Hapus",
-    "embedLocal": "Tersimpan. Embedding langsung kehabisan waktu, jadi sumber ini memakai indeks lokal sampai gateway merespons."
+    "embedLocal": "Tersimpan. Embedding langsung kehabisan waktu, jadi sumber ini memakai indeks lokal sampai gateway merespons.",
+    "syncedTitle": "Tersinkron dari sumber data"
   },
   "status": {
     "Indexed": "Terindeks",
@@ -79,7 +80,7 @@
     "howItWorks": "Cara kerjanya",
     "howItWorksBody": "Saat ini hanya Chat yang merujuk memori meja kerja ini; mode kerja akan menyusul memakai cara yang sama. Peta membaca sumber Anda dengan model embedding, otak, dan verifikator di atas.",
     "run": "Petakan pengetahuan",
-    "running": "Memetakan…",
+    "running": "Memetakan\u2026",
     "ready": "Siap",
     "notReady": "Belum siap",
     "gaps": "Celah",
@@ -97,9 +98,9 @@
     "aria": "Kesehatan pengetahuan",
     "intro": "Setiap pekerjaan yang selesai menjadi kartu teks di sini.",
     "tilesAria": "Ringkasan kesehatan pengetahuan",
-    "verifiedLine": "Terverifikasi · {label} · {detail}",
+    "verifiedLine": "Terverifikasi \u00b7 {label} \u00b7 {detail}",
     "runCheck": "Jalankan pemeriksaan mandiri",
-    "checking": "Memeriksa…",
+    "checking": "Memeriksa\u2026",
     "workCards": "Kartu kerja",
     "addedByHand": "Ditambah manual",
     "indexed": "Terindeks",
@@ -134,11 +135,11 @@
     "label": "Peta pengetahuan",
     "show": "Tampilkan peta",
     "hide": "Sembunyikan peta",
-    "counts": "{nodes} simpul · {edges} sisi",
+    "counts": "{nodes} simpul \u00b7 {edges} sisi",
     "showAll": "Tampilkan semua",
     "showAllNodes": "Tampilkan semua {total}",
     "drawn": "{shown} ditampilkan",
-    "loading": "Memuat link…",
+    "loading": "Memuat link\u2026",
     "retry": "Coba lagi",
     "empty": "Petakan pengetahuan untuk membuat link antartopik.",
     "around": "sekitar {label}",
@@ -164,7 +165,7 @@
       "retrieved": "sumber diambil oleh sebuah obrolan",
       "cites": "obrolan mengutip sumber"
     },
-    "edgeTitle": "{kind} · bobot {weight}"
+    "edgeTitle": "{kind} \u00b7 bobot {weight}"
   },
   "languageRule": "Tulis overview, judul topik, ringkasan, catatan celah, dan catatan verifier dalam Bahasa Indonesia profesional. Pertahankan kunci JSON, id sumber, dan kutipan verbatim."
 }

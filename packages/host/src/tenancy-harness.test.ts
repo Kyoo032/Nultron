@@ -125,6 +125,7 @@ type Seeds = {
   conversationId: string;
   meetingId: string;
   proposalId: string;
+  dataSourceId: string;
 };
 
 /**
@@ -586,6 +587,34 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     why: FOLDER_PROPOSAL_WHY,
   },
 
+  // --- data sources (F1) --------------------------------------------------------------------
+  // Every by-id route opens with `getDataSource(tenant, id)` (handlers/data-sources.ts), which
+  // scopes on `tenant_id` — A's row is indistinguishable from one nobody wrote to tenant B, and
+  // the network/test/sync work only ever happens after that lookup.
+  {
+    method: "POST",
+    path: "/api/v1/data-sources/:id/test",
+    params: { id: "dataSourceId" },
+    body: {},
+  },
+  {
+    method: "POST",
+    path: "/api/v1/data-sources/:id/sync",
+    params: { id: "dataSourceId" },
+    body: {},
+  },
+  {
+    method: "POST",
+    path: "/api/v1/data-sources/:id/disable",
+    params: { id: "dataSourceId" },
+    body: {},
+  },
+  {
+    method: "DELETE",
+    path: "/api/v1/data-sources/:id/credentials",
+    params: { id: "dataSourceId" },
+  },
+
   // --- mcp connectors ---------------------------------------------------------------------------
   // `:connectorId` is not a row id — it is one of a fixed catalogue of connector names
   // (`MCP_CONNECTOR_IDS` in packages/core/src/mcp/index.ts, checked by `parseConnectorId` in
@@ -895,6 +924,21 @@ async function seedTenantA(): Promise<Seeds> {
     saveMedia(tenantA, new File([png], `${LEAK_MARKER}.png`, { type: "image/png" })),
   );
 
+  // F1: a sealed data-source row of A's, so the by-id connector routes have something to refuse.
+  const dataSource = await step("data source", async () => {
+    const { insertDataSource } = await import("./data-sources/store");
+    return insertDataSource({
+      tenantId: tenantA.tenantId,
+      kind: "postgres",
+      name: LEAK_MARKER,
+      config: { kind: "postgres", host: "db.example.com", port: 5432, database: "app", user: "reader" },
+      secret: { kind: "postgres", secret: LEAK_MARKER },
+      secretLast4: null,
+      tableAllowlist: ["orders"],
+      createdBy: tenantA.userId,
+    });
+  });
+
   return {
     projectId: project.id,
     cardId: card.id,
@@ -921,6 +965,7 @@ async function seedTenantA(): Promise<Seeds> {
     conversationId,
     meetingId: meeting.id,
     proposalId,
+    dataSourceId: dataSource.id,
   };
 }
 

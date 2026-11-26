@@ -159,14 +159,27 @@ export {
   SAFE_FETCH_DEFAULT_MAX_BYTES,
   SAFE_FETCH_DEFAULT_TIMEOUT_MS,
   SAFE_FETCH_MAX_HOPS,
+  assertAllowedDestination,
   assertPublicHttpsUrl,
   assertResolvesPublic,
+  currentDestinationAllowlist,
   fetchPublicHttps,
+  installDestinationAllowlist,
   nextHopUrl,
   pinnedAgent,
+  pinnedLookup,
   resolvePublicAddresses,
 } from "./security/safe-fetch";
-export type { HostLookup, ResolvedAddress, SafeFetchOptions, SafeFetchResult } from "./security/safe-fetch";
+export type {
+  DestinationAllowlist,
+  DestinationRule,
+  HostLookup,
+  ResolvedAddress,
+  SafeFetchOptions,
+  SafeFetchResult,
+} from "./security/safe-fetch";
+export { resolvePinnedDestination } from "./security/tcp-pin";
+export type { PinnedDestination } from "./security/tcp-pin";
 export {
   OUTBOUND_REFUSALS_MAX,
   OutboundRefusedError,
