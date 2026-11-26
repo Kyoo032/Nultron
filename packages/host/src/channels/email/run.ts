@@ -104,12 +104,14 @@ export async function runEmailReply(input: {
         locale,
       });
       const rows = await listMessages(tenant, threadId);
-      // Exclude this mail's own stored turn by id, not by position: a same-batch mail can land
-      // between the insert and the read, making it the last row instead of ours.
+      // Keep only the turns that existed when this mail was stored: a same-batch mail can land
+      // between the insert and the read, and must not answer into the first mail's prompt.
       const history = await prepareChatImageHistory(
         tenant,
         [
-          ...chatHistoryFromRows(rows.filter((row) => row.id !== storedUser?.id)),
+          ...chatHistoryFromRows(
+            rows.filter((row) => row.id !== storedUser?.id && row.createdAt <= (storedUser?.createdAt ?? 0)),
+          ),
           { role: "user" as const, parts: prepared.userParts },
         ],
         { model: prepared.version.model, locale },
