@@ -69,10 +69,15 @@ export function runEmailReply(input: {
   const previous =
     threadReplyQueues.get(input.threadId) ?? Promise.resolve({ kind: "refused", reason: "failed" } as EmailRunResult);
   const next = previous.then(() => runEmailReplyInner(input));
-  threadReplyQueues.set(
-    input.threadId,
-    next.catch(() => ({ kind: "refused", reason: "failed" }) as EmailRunResult),
-  );
+  const tail = next.catch(() => ({ kind: "refused", reason: "failed" }) as EmailRunResult);
+  threadReplyQueues.set(input.threadId, tail);
+  void tail.finally(() => {
+    // Drop the settled tail so the map grows only while replies are in flight; a newer mail's
+    // tail is a different promise and stays.
+    if (threadReplyQueues.get(input.threadId) === tail) {
+      threadReplyQueues.delete(input.threadId);
+    }
+  });
   return next;
 }
 
