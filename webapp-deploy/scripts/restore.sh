@@ -149,7 +149,7 @@ if [ -n "$META_DESK" ]; then
 	fi
 fi
 
-if [ -n "$PINNED_PROJECT" ] && [ "$DESK" != "$PINNED_PROJECT" ]; then
+if [ -n "$PINNED_PROJECT" ] && [ -n "$DESK" ] && [ "$DESK" != "$PINNED_PROJECT" ]; then
 	echo "error: this run is pinned to desk '$PINNED_PROJECT' (COMPOSE_PROJECT_NAME/-p)," >&2
 	echo "       and the archive resolves to '$DESK' - refusing to restore outside the pin." >&2
 	exit 1

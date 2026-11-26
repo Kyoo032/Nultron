@@ -190,20 +190,23 @@ INNER
 	# into the encryptor and report success. tar's real exit code is written to stderr (which
 	# docker exec forwards untouched) as a marker this side greps for.
 	_tarlog="$(mktemp "${TMPDIR:-/tmp}/nultron-backup-tar.XXXXXX")"
+	# The live agentforge.sqlite and its -wal/-shm are excluded, the same way the k8s
+	# archiver does it: the consistent copy in .backup-staging/ replaces them on restore,
+	# and a half-read WAL beside a snapshot is exactly what restore discards anyway.
+	# With them excluded, every remaining tar exit 1 means a non-database file changed
+	# mid-read (a truncated deck, a rewritten settings file) - damaged input, not WAL
+	# churn - so the strict check below accepts only exit 0.
 	if ! docker exec "$_cid" sh -c '
 		tar -czf - -C "${AGENTFORGE_DATA_DIR:-/data}" \
 			--exclude=./components --exclude=./logs \
-			--exclude=./.master-key .
+			--exclude=./.master-key \
+			--exclude=./agentforge.sqlite --exclude=./agentforge.sqlite-wal \
+			--exclude=./agentforge.sqlite-shm .
 		echo "tar_exit=$?" >&2
 	' 2>"$_tarlog" | node "$AEAD_CRYPT" encrypt --out "$_out" ||
-		! grep -Eq 'tar_exit=[01]' "$_tarlog"; then
+		! grep -q 'tar_exit=0' "$_tarlog"; then
 		rm -f "$_out" "$_tarlog"
 		fail_desk "$_desk" "$_cid" "the archive or encryption step failed"; return
-	fi
-	# GNU tar exits 1 on "file changed as we read it" (a live WAL is expected); the database
-	# in the archive is the consistent sqlite snapshot staged above, so 1 is a warn, not a fail.
-	if grep -q 'tar_exit=1' "$_tarlog"; then
-		echo "warn[$_desk]: tar reported files changed mid-archive; the consistent sqlite snapshot stands" >&2
 	fi
 	rm -f "$_tarlog"
 
