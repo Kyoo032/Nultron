@@ -247,6 +247,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-211](#sr-211) | High | A live voice session could leak the desk's gateway key to the browser | `fixed-unverified`, not hosted (2026-11-10, `tester`; rewritten from the code 2026-11-11): `createVoiceModels` reads the key on the host and puts it only in the `Authorization` header of the two gateway calls; H1 answers `{ sessionId, threadId, model, streamPath, endsAt }`; the test "keeps the gateway key out of every log line, frame, response, saved row and ledger row" (`packages/host/src/voice/relay.test.ts:1466-1595`) fails if it shows up anywhere else; built on `tester`, not merged to `main`, never run on the hosted server | Merge of voice from `tester` to `main` |
 | [SR-212](#sr-212) | Medium | A spoken, or misheard, request could make the voice thinker write a file, send something, spend money or start long work | `fixed-unverified`, not hosted (2026-11-10, `tester`; rewritten from the code 2026-11-11): the thinker is offered only the tools on `VOICE_READ_TOOLS` and `VOICE_DELEGATE_TOOLS` plus `request_tap`; a `request_tap` call stops the run and returns a card, and the tap ends voice and sends a normal Chat turn. `web_search` and `web_fetch` are on the list, behind the same outbound guard as Chat; whether voice may reach the web is Rizky's open decision V12. Since 2026-11-20 `delegate` itself runs from voice because the run it starts is already fenced — no picture or clip tools, the desk's files only and never the owner's folder, a tainted egress guard, its own budget and the worker ceiling — while every generalist worker stays tap-only. Built on `tester`, not merged to `main`, never run on the hosted server | Merge of voice from `tester` to `main`; V12 |
 | [SR-213](#sr-213) | Low | An aborted talker stream reports no usage, so the host writes no row for it, and audio has no list price, so its seconds rows are unpriced | Open, accepted for week one (2026-11-10, `tester`; rewritten from the code 2026-11-11): voice writes token rows and seconds rows under mode `voice` and the thinker's tokens under mode `chat`; a cut or abandoned talker reply, the short-speech check and the acknowledgement call write nothing; seconds rows carry `no_list_price` | An audio list price in `media-pricing.ts` and a rule for aborted calls, before any allowance or bill counts voice |
+| [SR-215](#sr-215) | Medium | A bucket writer could re-offer one desk's valid archive under another desk's name and `restore.sh` would overwrite the named desk with it | Fixed in PR #285 (2026-11-26): `backup.sh` embeds `backup-meta.json` (`{"desk","createdAt"}`) in every archive before tarring, and `restore.sh` reads the desk id from that member and refuses a mismatch with `--desk` or the filename; a run pinned by `COMPOSE_PROJECT_NAME`/`-p` refuses any desk outside the pin. Unit-tested (`webapp-deploy/scripts/backup-restore.test.mjs`), not driven on a real server | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -7273,6 +7274,21 @@ Gate: none for week one (voice is Rizky's only); before customer voice or any al
 
 ### SR-215 {#sr-215}
 
+**A bucket writer could re-offer one desk's valid archive under another desk's name, and restore.sh would overwrite the named desk with it.**
+Raised 2026-11-26 by an independent review of PR #285 (the per-desk F12 backup change). Medium. Status: fixed in the same PR.
+
+Evidence: `webapp-deploy/scripts/restore.sh` resolved the desk id from `--desk` or the archive filename (`nultron-data-<desk>-<stamp>.tar.gz.enc`); nothing inside the archive bound it to its desk. AEAD (NAEAD001) proves the archive is authentic and untampered only up to the bucket — anyone who can write the bucket can copy desk A's `*.enc` to desk B's filename without the wrap key, and restore would decrypt it cleanly and replace desk B's volume with desk A's data.
+
+Fix: `backup.sh` writes `backup-meta.json` (`{"desk","createdAt"}`) into the desk's `/data` before tarring, so the desk id is inside the encrypted archive (`webapp-deploy/scripts/backup.sh` `write_desk_meta`). `restore.sh` extracts that member, refuses a mismatch against `--desk`/the filename, and — because a run pinned by `COMPOSE_PROJECT_NAME` or `-p`/`--project-name` in `DC_ARGS` must not widen — refuses any resolved desk outside the pin. Archives without the member (older backups) keep the name-based behaviour.
+
+Proof: `webapp-deploy/scripts/backup-restore.test.mjs` "refuses an archive whose embedded desk id does not match --desk". Not driven on a real server or against a real COS bucket.
+
+Residual: a bucket writer can still swap an archive for an older valid archive of the *same* desk (rollback, not cross-desk substitution) — accepted; the wrap key stays the confidentiality boundary. Old archives carry no meta and are trusted by name, as before.
+
+Gate: none; the fix ships with the per-desk backup change it protects.
+
+### SR-216 {#sr-216}
+
 **A per-user assigned gateway endpoint was sent the company key.** DFIND-155 (Ethan). High.
 Status: `fixed-unverified`, not hosted.
 
@@ -7316,7 +7332,7 @@ file is applied. Voice (`packages/host/src/voice/ask.ts`, `upgrade.ts`) and deta
 
 Gate: Marcus review before merge (secrets and migration paths touched).
 
-### SR-216 {#sr-216}
+### SR-217 {#sr-217}
 
 **`auth_sessions.gateway_endpoint` was unauthenticated plaintext, and a future `portal_checked_at`
 could freeze the portal re-check.** DFIND-160 (Marcus). High. Status: `fixed-unverified`, not hosted.
@@ -7350,6 +7366,7 @@ Residual: a writer who has both the SQLite file and the vault key can re-MAC a f
 vault key is the boundary every sealed value in the product already stands on.
 
 Gate: Marcus review before merge (secrets and migration paths touched).
+
 ## Must be true before the Tencent Cloud deploy
 
 Each line names the row that owns it. A line that cannot be ticked is a reason not to hand out the

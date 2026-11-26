@@ -82,9 +82,12 @@ cos_upload() {
 	_prefix="$(setting COS_BACKUP_PREFIX hourly/)"
 	_region="$(setting TENCENT_REGION ap-jakarta)"
 	_key="$_prefix$(basename "$_file")"
+	# A skipped upload is a failed backup (DFIND-168): callers get a non-zero status and
+	# decide whether BACKUP_REQUIRE_OFFSITE lets it pass (local tests) or not (default).
 	if [ -z "$_bucket" ]; then
 		echo "warning: COS_BACKUP_BUCKET is unset - $(basename "$_file") stays on this server only." >&2
 		echo "         One disk failure loses it. Set the bucket in .env." >&2
+		return 1
 	elif command -v coscli >/dev/null 2>&1; then
 		echo "==> uploading to cos://$_bucket/$_key (coscli)"
 		coscli cp "$_file" "cos://$_bucket/$_key"
@@ -96,6 +99,7 @@ cos_upload() {
 	else
 		echo "warning: neither coscli nor tccli is installed - $(basename "$_file") stays on this" >&2
 		echo "         server only, in $(dirname "$_file"). Install coscli before taking traffic." >&2
+		return 1
 	fi
 }
 

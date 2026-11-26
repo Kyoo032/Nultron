@@ -114,7 +114,7 @@ describe("GET /api/v1/health through the router", () => {
     const result = await dispatch(request(), { serverMode: true, sessionStore: store, now: () => T0 });
     expect(json(result).status).toBe(200);
     expect(body(result).mode).toBe("server");
-    expect(checks(result).map((row) => row.name)).toEqual(["database", "storage", "components"]);
+    expect(checks(result).map((row) => row.name)).toEqual(["database", "storage", "components", "backup"]);
     // The real database, through the real seam `router.ts` installs.
     expect(check(result, "database").ok).toBe(true);
   });
@@ -230,6 +230,32 @@ describe("what readiness reports", () => {
     // A version here would tell a signed-in caller which build of a native library to look up, and
     // a path would tell them the layout of the disk. `GET /api/v1/components` is where both live.
     expect(check(result, "components").items).toEqual([{ id: "anydoc", state: "ready" }]);
+  });
+
+  it("reports the last backup heartbeat the host job left in the data dir", async () => {
+    const result = await handleGetHealth(request(), {
+      ...HEALTHY,
+      backup: () => ({ result: "ok", finishedAt: "2026-11-26T09:00:00Z" }),
+    });
+    expect(check(result, "backup")).toMatchObject({ ok: true, detail: "ok at 2026-11-26T09:00:00Z" });
+    // A backup check never carries content, sizes or prices — only result and a timestamp (R12.9).
+    expect(JSON.stringify(check(result, "backup"))).not.toMatch(/[$€£]|usd|idr/i);
+  });
+
+  it("flags a failed backup without taking readiness down", async () => {
+    const result = await handleGetHealth(request(), {
+      ...HEALTHY,
+      backup: () => ({ result: "failed", finishedAt: "2026-11-26T09:00:00Z" }),
+    });
+    // `ready` still tracks the serving dependencies: the desk serves traffic while its backup
+    // is broken; the loud path is the external heartbeat monitor, not this flag.
+    expect(body(result).ready).toBe(true);
+    expect(check(result, "backup")).toMatchObject({ ok: false, detail: "failed at 2026-11-26T09:00:00Z" });
+  });
+
+  it("shows the backup as pending when no heartbeat has been written yet", async () => {
+    const result = await handleGetHealth(request(), { ...HEALTHY, backup: () => null });
+    expect(check(result, "backup")).toMatchObject({ ok: true, detail: "pending — none recorded" });
   });
 
   it("says which mode the box is in, because half the rules follow from it", async () => {

@@ -1,0 +1,14 @@
+# Hourly timer for the Nultron per-desk backup (RPO one hour, placement doc section 5).
+# Runs on the HOST, not inside a desk container. Persistent=true catches up a run the
+# box was off for, and the external heartbeat check (README "Backup alert") raises the
+# operator alarm when pings stop arriving — the timer stopping IS the alert input, so a
+# dead or disabled unit alarms within the monitor's period + grace window.
+[Unit]
+Description=Hourly Nultron per-desk backup
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
