@@ -420,10 +420,12 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
     };
     // F2: read the state the write is about to replace, so each audit row can carry the hashes of
     // before and after — the field's name and proof a change happened, never a value (spec S2).
-    const auditedFields = [
-      ...(body.locale !== undefined ? ["locale"] : []),
-      ...Object.keys(patch).filter((field) => (patch as Record<string, unknown>)[field] !== undefined),
-    ];
+    // `locale` is not listed: it is the one personal field (a member's own UI language), stored
+    // outside the desk settings snapshot `loadSettings` reads, so hashing it here would stamp the
+    // same empty before/after digests on every save.
+    const auditedFields = Object.keys(patch).filter(
+      (field) => (patch as Record<string, unknown>)[field] !== undefined,
+    );
     const settingsBefore = auditedFields.length > 0 ? loadSettings(tenant) : null;
     const saved = saveSettings(patch, tenant);
     if (settingsBefore) {

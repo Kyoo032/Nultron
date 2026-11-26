@@ -35,19 +35,22 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
   budget?: ToolBudget,
   egress?: EgressGuard,
   permission?: MediaPermission,
+  agentId?: string,
 ): Promise<unknown> {
-  // F2: one `tool.call` audit event per outcome — tool key, outcome and duration only. The strict
-  // event schema is what keeps arguments and output out of the log.
-  const auditCall = (outcome: "ok" | "denied" | "failed", durationMs?: number) =>
+  // F2: one `tool.call` audit event per outcome — tool key, agent, outcome and duration only. The
+  // strict event schema is what keeps arguments and output out of the log.
+  const auditCall = (outcome: "ok" | "denied" | "failed", durationMs?: number, rule?: string) =>
     reportAuditEvent({
       tenantId: tenant.tenantId,
       event: "tool.call",
       actorKind: "user",
       actorId: tenant.userId || null,
+      agentId,
       targetKind: "tool",
       targetId: tool.key,
       outcome,
       ...(durationMs === undefined ? {} : { durationMs }),
+      ...(rule === undefined ? {} : { rule }),
     });
 
   const refusal = budget?.admit(tool.key);
@@ -106,16 +109,20 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
   egress?.afterCall(tool, full);
   let thin = thinToolOutput(tool.key, full);
 
+  let outputBlocked = false;
   if (!getInjectionGuardBypass() && tool.trust !== "internal") {
     const outputHit = scanJson(thin);
     if (outputHit) {
       thin = blockedInjectionOutput(outputHit);
+      outputBlocked = true;
     }
   }
 
   thin = maskPiiInJson(thin);
   reportToolIo({ toolKey: tool.key, input: args, full, thin });
   const success = (full as { success?: unknown } | null | undefined)?.success;
-  auditCall(success === false ? "failed" : "ok", Date.now() - started);
+  // The outcome records what the model was given: a call whose result was withheld by the output
+  // scan is a denial to the model even though the tool itself ran clean.
+  auditCall(outputBlocked ? "denied" : success === false ? "failed" : "ok", Date.now() - started, outputBlocked ? "injection_output" : undefined);
   return thin;
 }

@@ -35,8 +35,17 @@ export function purgeAuditEvents(db: Database.Database, maxSeq: number): { purge
 /** Rows older than `retentionDays` go. The number itself is Rizky's decision (section 6), read from env by the caller. */
 export function purgeAuditByAge(db: Database.Database, retentionDays: number, now = Date.now()): { purged: number } {
   const cutoff = now - retentionDays * 86_400_000;
-  const tail = db.prepare("SELECT seq FROM audit_events WHERE at <= ? ORDER BY seq DESC LIMIT 1").get(cutoff) as
-    | { seq: number }
+  // Only the contiguous expired prefix may go. `at` is client-controlled — a row written with a
+  // backdated timestamp at a high seq must not pull still-valid rows below it into the delete.
+  const kept = db.prepare("SELECT MIN(seq) AS seq FROM audit_events WHERE at > ?").get(cutoff) as
+    | { seq: number | null }
     | undefined;
-  return tail ? purgeAuditEvents(db, tail.seq) : { purged: 0 };
+  const maxSeq =
+    kept?.seq != null
+      ? kept.seq - 1
+      : (db.prepare("SELECT MAX(seq) AS seq FROM audit_events").get() as { seq: number | null } | undefined)?.seq;
+  if (maxSeq == null || maxSeq < 1) {
+    return { purged: 0 };
+  }
+  return purgeAuditEvents(db, maxSeq);
 }

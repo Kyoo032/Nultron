@@ -500,6 +500,7 @@ export class AiSdkRuntime implements AgentRuntime {
       egress: egressGuard,
       permission: mediaPermission,
       disabled,
+      agentId: input.version.agentId,
     });
     // A run whose every bound tool is disabled sends the model no tool list at all, as it always has.
     const tools = built.offered.length > 0 ? built : undefined;

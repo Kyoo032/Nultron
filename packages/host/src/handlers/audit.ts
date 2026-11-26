@@ -68,7 +68,7 @@ export async function handleGetAuditEvents(request: HostRequest): Promise<HostRe
 export async function handlePostAuditVerify(request: HostRequest): Promise<HostResult> {
   try {
     const tenant = await getTenant(request);
-    const result = verifyAuditChain(sql, tenant.tenantId);
+    const result = verifyAuditChain(sql);
     reportAuditEvent({
       ...auditActor(request, tenant.tenantId),
       event: "audit.read",
@@ -116,7 +116,9 @@ export async function handleGetAuditExport(request: HostRequest): Promise<HostRe
       contentType: format === "csv" ? "text/csv" : "application/x-ndjson",
       filename: `audit-export.${format}`,
       // The manifest rides on the file it proves: SHA-256 of exactly these bytes (AC-2.5).
-      headers: { "x-audit-manifest-sha256": exported.manifest.fileSha256 },
+      // no-store keeps the bytes result path's default `private, max-age=3600` (applied before
+      // these headers) from caching an export the desk's owner may not want replayed later.
+      headers: { "cache-control": "no-store", "x-audit-manifest-sha256": exported.manifest.fileSha256 },
     };
   } catch (error) {
     return jsonError(error);

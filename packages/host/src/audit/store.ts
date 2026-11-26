@@ -96,7 +96,14 @@ const INSERT_ROW = `INSERT INTO audit_events
 export function appendAuditEvent(db: Database.Database, event: AuditEventInput): number {
   return db.transaction((): number => {
     const last = db.prepare(LAST_ROW).get() as { seq: number; row_hash: string } | undefined;
-    const seq = (last?.seq ?? 0) + 1;
+    // A full retention purge leaves no tail to chain from: the next row continues above the
+    // checkpoint's own seq and links to its hash, never restarting at 1 inside the purged range.
+    const anchor =
+      last ??
+      (db
+        .prepare("SELECT seq, row_hash FROM audit_checkpoints ORDER BY seq DESC LIMIT 1")
+        .get() as { seq: number; row_hash: string } | undefined);
+    const seq = (anchor?.seq ?? 0) + 1;
     const base: Omit<AuditRow, "row_hash"> = {
       seq,
       id: randomUUID(),
@@ -114,7 +121,7 @@ export function appendAuditEvent(db: Database.Database, event: AuditEventInput):
       ref_hash: event.refHash ?? null,
       channel: event.channel ?? null,
       rule: event.rule ?? null,
-      prev_hash: last?.row_hash ?? AUDIT_GENESIS_HASH,
+      prev_hash: anchor?.row_hash ?? AUDIT_GENESIS_HASH,
     };
     const row_hash = auditRowHash(base);
     db.prepare(INSERT_ROW).run(

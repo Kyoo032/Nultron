@@ -25,11 +25,11 @@ describe("audit verify (AC-2.4, AC-2.8)", () => {
   });
 
   it("reports ok on an empty desk and on a chain of valid rows", () => {
-    expect(verifyAuditChain(db, "t1").ok).toBe(true);
+    expect(verifyAuditChain(db).ok).toBe(true);
     appendAuditEvent(db, EVENT);
     appendAuditEvent(db, EVENT);
     appendAuditEvent(db, EVENT);
-    const result = verifyAuditChain(db, "t1");
+    const result = verifyAuditChain(db);
     expect(result).toEqual({ ok: true, checked: 3 });
   });
 
@@ -40,7 +40,7 @@ describe("audit verify (AC-2.4, AC-2.8)", () => {
     // an attacker who can drop the trigger still cannot hide, because the re-walked hash disagrees.
     db.exec("DROP TRIGGER audit_events_no_update");
     db.prepare("UPDATE audit_events SET event = 'auth.sign_in' WHERE seq = 1").run();
-    const result = verifyAuditChain(db, "t1");
+    const result = verifyAuditChain(db);
     expect(result.ok).toBe(false);
     expect(result.firstBadSeq).toBe(1);
   });
@@ -50,11 +50,11 @@ describe("audit verify (AC-2.4, AC-2.8)", () => {
       appendAuditEvent(db, EVENT);
     }
     expect(purgeAuditEvents(db, 3)).toEqual({ purged: 3 });
-    const result = verifyAuditChain(db, "t1");
+    const result = verifyAuditChain(db);
     expect(result).toEqual({ ok: true, checked: 2 });
     // A tail that was re-pointed after the purge still fails loudly.
     db.exec("DROP TRIGGER audit_events_no_update");
     db.prepare("UPDATE audit_events SET prev_hash = '0' WHERE seq = 4").run();
-    expect(verifyAuditChain(db, "t1").firstBadSeq).toBe(4);
+    expect(verifyAuditChain(db).firstBadSeq).toBe(4);
   });
 });
