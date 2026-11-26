@@ -173,10 +173,7 @@ test("backup.sh never reads the heartbeat URL from .env", async () => {
   hits = [];
   const deployDir = join(sandbox, "deploy-copy");
   const scriptsCopy = join(deployDir, "scripts");
-  mkdirSync(scriptsCopy, { recursive: true });
-  for (const file of ["backup.sh", "_common.sh", "_heartbeat.sh"]) {
-    cpSync(join(scriptsDir, file), join(scriptsCopy, file));
-  }
+  cpSync(scriptsDir, scriptsCopy, { recursive: true });
   writeFileSync(join(deployDir, ".env"), `BACKUP_HEARTBEAT_URL=${base}\n`);
   const result = await runBackup("dotenv-url", {
     appRunning: true,
