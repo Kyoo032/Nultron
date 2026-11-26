@@ -43,16 +43,15 @@ export function UsersRolesPage() {
     ? null
     : passwordMode
       ? [
-          "pnpm --filter @agentforge/portal account -- create",
+          "docker compose exec -T portal sh /app/webapp-deploy/portal-entry.sh node dist/scripts/account.mjs create",
           `--username ${shellQuote(trimmedUsername)}`,
           `--email ${shellQuote(trimmedEmail)}`,
           "--role auditor",
-          tenant.trim() ? `--tenant ${shellQuote(tenant.trim().toLowerCase())}` : null,
         ]
           .filter(Boolean)
           .join(" ")
       : [
-          "pnpm --filter @agentforge/portal invite --",
+          "docker compose exec -T portal sh /app/webapp-deploy/portal-entry.sh node dist/scripts/invite.mjs",
           `--email ${shellQuote(trimmedEmail)}`,
           "--role auditor",
           tenant.trim() ? `--tenant ${shellQuote(tenant.trim().toLowerCase())}` : null,

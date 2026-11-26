@@ -249,6 +249,14 @@ export function KnowledgePage() {
     guardRef.current = createSubmitGuard<KnowledgeAction>(setInFlight);
   }
   const guard = guardRef.current;
+  // Saved model ids an allowlist-filtered catalog cannot display, and the substitutes each picker
+  // was seeded with. See `reload` and `persistModels`.
+  const hiddenSavedModelsRef = useRef<Partial<KnowledgeModels>>({});
+  const seededModelsRef = useRef<Record<keyof KnowledgeModels, string>>({
+    embeddingModel: "",
+    brainModel: "",
+    verifierModel: "",
+  });
 
   async function reload() {
     const [knowledgeRes, modelsRes] = await Promise.all([apiFetch("/api/v1/knowledge"), apiFetch("/api/v1/models")]);
@@ -279,9 +287,26 @@ export function KnowledgePage() {
 
     const saved =
       payload.models && typeof payload.models === "object" ? (payload.models as Partial<KnowledgeModels>) : {};
-    setEmbeddingModel(seedModel(embeddingList, asString(saved.embeddingModel), asString(defaults?.embedding)));
-    setBrainModel(seedModel(chatList, asString(saved.brainModel), asString(defaults?.knowledgeBrain)));
-    setVerifierModel(seedModel(chatList, asString(saved.verifierModel), asString(defaults?.knowledgeVerifier)));
+    // A tenant model allowlist can hide a saved model from its list; seedModel then shows a
+    // substitute. Remember the saved id and what the picker was seeded with, so a save that only
+    // edits a *different* picker puts the saved id back instead of overwriting it (review BUG-0001).
+    const seeds: Record<keyof KnowledgeModels, string> = {
+      embeddingModel: seedModel(embeddingList, asString(saved.embeddingModel), asString(defaults?.embedding)),
+      brainModel: seedModel(chatList, asString(saved.brainModel), asString(defaults?.knowledgeBrain)),
+      verifierModel: seedModel(chatList, asString(saved.verifierModel), asString(defaults?.knowledgeVerifier)),
+    };
+    hiddenSavedModelsRef.current = {};
+    for (const field of ["embeddingModel", "brainModel", "verifierModel"] as const) {
+      const savedId = asString(saved[field]);
+      const list = field === "embeddingModel" ? embeddingList : chatList;
+      if (savedId && savedId !== seeds[field] && !list.some((model) => model.id === savedId)) {
+        hiddenSavedModelsRef.current[field] = savedId;
+      }
+    }
+    seededModelsRef.current = seeds;
+    setEmbeddingModel(seeds.embeddingModel);
+    setBrainModel(seeds.brainModel);
+    setVerifierModel(seeds.verifierModel);
   }
 
   useEffect(() => {
@@ -291,6 +316,15 @@ export function KnowledgePage() {
   }, [workspaceId]);
 
   async function persistModels(next: KnowledgeModels) {
+    // A picker still showing its seeded substitute for a saved model the list hid was not actually
+    // edited: put the saved id back so an unrelated picker change does not overwrite it. A pick the
+    // person really made differs from the seed, so theirs is the one that lands.
+    for (const field of ["embeddingModel", "brainModel", "verifierModel"] as const) {
+      const hidden = hiddenSavedModelsRef.current[field];
+      if (hidden !== undefined && next[field] === seededModelsRef.current[field]) {
+        next[field] = hidden;
+      }
+    }
     setEmbeddingModel(next.embeddingModel);
     setBrainModel(next.brainModel);
     setVerifierModel(next.verifierModel);
