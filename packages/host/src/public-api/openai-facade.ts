@@ -17,6 +17,7 @@ import { requireGatewayAllowedFor } from "../gateway-gate";
 import { admitRun, guardRunStream } from "../run-limits";
 import { startModalityRun } from "../runs";
 import { createThread } from "../threads";
+import { agentService } from "../tenant";
 
 type ChatMessage = { role?: string; content?: unknown };
 
@@ -79,8 +80,15 @@ export async function chatCompletionsHandler(request: HostRequest, identity: Ser
   if (!allowsAgent(identity.key, agentId)) {
     throw new ApiError("forbidden", "This key is not allowed to call that agent", 403);
   }
-  const prompt = promptFrom(body.messages as ChatMessage[] | undefined);
   const tenant = identity.tenant;
+  // The allow-list alone does not prove the agent exists: an unknown id must answer 404
+  // like `requireAgent` on the other routes, never a foreign-key failure inside
+  // `createThread`.
+  const published = await agentService.getPublishedForRun(tenant, agentId);
+  if (!published) {
+    throw new ApiError("not_found", "Agent not found", 404);
+  }
+  const prompt = promptFrom(body.messages as ChatMessage[] | undefined);
   requireGatewayAllowedFor(tenant);
   const thread = await createThread(tenant, agentId, `OpenAI facade ${agentId}`);
   const release = admitRun(tenant);
