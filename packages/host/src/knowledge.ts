@@ -756,6 +756,24 @@ type OrphanRow = { id: string; external_id: string | null };
 function orphansOfKind(tenant: TenantContext, kind: SourceOriginKind): OrphanRow[] | null {
   const owner = ORIGIN_OWNERS[kind];
   try {
+    if (kind === "data_source") {
+      // A synced object's origin is the composite `<source id>/<object key>`, so one connector can
+      // hold many cards. Bare `origin_id NOT IN (SELECT id …)` never matches it, which swept every
+      // synced card as an orphan on the next Knowledge read. The row is owned when the id itself or
+      // the id plus a `/` prefix is a live source — deleting or disabling the connector still
+      // sweeps its cards, as the comment on ORIGIN_OWNERS intends.
+      return sql
+        .prepare(
+          `SELECT ks.id, ks.external_id FROM knowledge_sources ks
+           WHERE ks.workspace_id = ? AND ks.origin_kind = 'data_source'
+             AND NOT EXISTS (
+               SELECT 1 FROM data_sources ds
+               WHERE ds.tenant_id = ?
+                 AND (ks.origin_id = ds.id OR substr(ks.origin_id, 1, length(ds.id) + 1) = ds.id || '/')
+             )`,
+        )
+        .all(workspaceId(tenant), tenant.tenantId) as OrphanRow[];
+    }
     return sql
       .prepare(
         `SELECT id, external_id FROM knowledge_sources

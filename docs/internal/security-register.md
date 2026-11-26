@@ -7690,3 +7690,21 @@ unique-origin index in `knowledge.ts` folds rows sharing `origin_kind`/`origin_i
 row each write.
 
 Fix: each object gets `id: "<row.id>/<object.key>"`, so files coexist in the knowledge base.
+
+### SR-220 {#sr-220}
+
+**The orphan sweep deleted every synced data-source card.** Found by local QA on the F1 data-sources PR
+(2026-11-26): after a successful sync the knowledge rows were present, and one `GET /api/v1/knowledge`
+later they were all gone. Medium (data loss on a security-adjacent feature). **Fixed in this change.**
+
+Evidence: `syncDataSource` stamps each object `origin: "<source id>/<object key>"` (SR-219), but the
+orphan sweep (`packages/host/src/knowledge.ts:756`) matched `origin_id` against bare `data_sources.id`
+values, so a composite origin never matched a live connector and `sweepOrphanSources` — which runs on
+every Knowledge page read — deleted every synced card and its projections.
+
+Fix: the `data_source` arm of `orphansOfKind` owns a row when its origin is the source id or the id plus
+a `/` prefix (`packages/host/src/knowledge.ts:759`); a deleted connector's cards still die in the sweep.
+Regression: `knowledge-cascade.test.ts` ("keeps synced data-source cards whose composite origin a live
+connector owns").
+
+Gate: closed — synced cards survive Knowledge reads; orphaned ones are still swept.

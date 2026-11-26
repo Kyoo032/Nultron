@@ -68,8 +68,11 @@ refused before the handler. A strict schema per kind splits config and secret fi
 
 `data-sources/sync.ts` reads the sealed config, lists objects, extracts text with the same
 `extractFile` path the upload route uses (25 MB per file, magic-byte checked), and indexes
-through `indexKnowledgeSource` with `origin: { kind: "data_source", id }` — which is what the
-Knowledge page's *Synced sources* section (`knowledge-synced-sources`) filters on. Each run is
+through `indexKnowledgeSource` with `origin: { kind: "data_source", id: "<source id>/<object key>" }` —
+which is what the Knowledge page's *Synced sources* section (`knowledge-synced-sources`) filters on.
+The composite origin is why the orphan sweep's `data_source` arm matches on the id-plus-`/` prefix
+(`knowledge.ts` `orphansOfKind`; SR-220: bare-id matching swept every synced card on the next
+Knowledge read). Each run is
 a row in `data_source_sync_runs` with file counts and an error code; `last_sync_*` on the source
 carries the last outcome. There is no scheduler — W1 is manual sync only (the daily job is part
 of the same requirement but lands with the scheduler work, not this page).

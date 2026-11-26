@@ -26,7 +26,8 @@ import { artifactWorkCard, mediaWorkCard } from "./work-cards";
 
 function tenant(): TenantContext {
   return {
-    tenantId: "local-tenant", organizationId: `org-cascade-${crypto.randomUUID()}`,
+    tenantId: "local-tenant",
+    organizationId: `org-cascade-${crypto.randomUUID()}`,
     workspaceId: `ws-cascade-${crypto.randomUUID()}`,
     userId: "user-cascade",
     role: "owner",
@@ -43,8 +44,7 @@ function recordRetrieval(ctx: TenantContext, sourceId: string, threadId: string)
 }
 
 function counts(ctx: TenantContext): { nodes: number; edges: number; retrievals: number } {
-  const one = (statement: string): number =>
-    (sql.prepare(statement).get(ctx.workspaceId) as { n: number }).n;
+  const one = (statement: string): number => (sql.prepare(statement).get(ctx.workspaceId) as { n: number }).n;
   return {
     nodes: one("SELECT count(*) AS n FROM knowledge_graph_nodes WHERE workspace_id = ?"),
     edges: one("SELECT count(*) AS n FROM knowledge_graph_edges WHERE workspace_id = ?"),
@@ -198,6 +198,46 @@ describe("knowledge delete cascade", () => {
 
     expect(sweepOrphanSources(ctx)).toBe(1);
     expect(listSources(ctx).map((source) => source.origin)).toEqual([{ kind: "artifact", id: liveArtifact }]);
+  });
+
+  it("keeps synced data-source cards whose composite origin a live connector owns, sweeps the rest", async () => {
+    // Regression: sync writes origin `<source id>/<object key>` so one connector can hold many
+    // cards, and the bare `origin_id NOT IN (SELECT id …)` sweep never matched it — every synced
+    // card was dropped as an orphan on the next Knowledge read.
+    const ctx = tenant();
+    const { insertDataSource } = await import("./data-sources/store");
+    const { indexKnowledgeSource } = await import("./knowledge");
+    const live = insertDataSource({
+      tenantId: ctx.tenantId,
+      kind: "s3",
+      name: "Live bucket",
+      config: { endpoint: "https://s3.example.com", region: "us-east-1", bucket: "b" },
+      secret: { s3AccessKeyId: "a", s3SecretAccessKey: "b" },
+      secretLast4: null,
+      tableAllowlist: null,
+      createdBy: null,
+    });
+    await indexKnowledgeSource(ctx, {
+      id: `data-source/${live.id}/notes/a.csv`,
+      name: "notes/a.csv",
+      type: "csv",
+      text: "month,total\n2026-10,42\n",
+      origin: { kind: "data_source", id: `${live.id}/notes/a.csv` },
+    });
+    await indexKnowledgeSource(ctx, {
+      id: "data-source/ds-dead/notes/b.csv",
+      name: "notes/b.csv",
+      type: "csv",
+      text: "month,total\n2026-11,57\n",
+      origin: { kind: "data_source", id: "ds-dead/notes/b.csv" },
+    });
+    expect(listSources(ctx)).toHaveLength(2);
+
+    expect(sweepOrphanSources(ctx)).toBe(1);
+    const left = listSources(ctx);
+    expect(left).toHaveLength(1);
+    expect(left[0]?.origin).toEqual({ kind: "data_source", id: `${live.id}/notes/a.csv` });
+    expect(sweepOrphanSources(ctx)).toBe(0);
   });
 
   it("self-heals graph rows left by builds that had no cascade", async () => {
