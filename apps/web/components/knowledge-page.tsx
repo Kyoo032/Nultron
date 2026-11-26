@@ -233,8 +233,9 @@ export function KnowledgePage() {
   const [ruleDraft, setRuleDraft] = useState("");
   const [memoryDraft, setMemoryDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [chatModels, setChatModels] = useState<PickerModel[]>([]);
-  const [embeddingModels, setEmbeddingModels] = useState<PickerModel[]>([]);
+  const [embeddingPickerModels, setEmbeddingPickerModels] = useState<PickerModel[]>([]);
+  const [brainPickerModels, setBrainPickerModels] = useState<PickerModel[]>([]);
+  const [verifierPickerModels, setVerifierPickerModels] = useState<PickerModel[]>([]);
   const [embeddingModel, setEmbeddingModel] = useState("");
   const [brainModel, setBrainModel] = useState("");
   const [verifierModel, setVerifierModel] = useState("");
@@ -249,14 +250,6 @@ export function KnowledgePage() {
     guardRef.current = createSubmitGuard<KnowledgeAction>(setInFlight);
   }
   const guard = guardRef.current;
-  // Saved model ids an allowlist-filtered catalog cannot display, and the substitutes each picker
-  // was seeded with. See `reload` and `persistModels`.
-  const hiddenSavedModelsRef = useRef<Partial<KnowledgeModels>>({});
-  const seededModelsRef = useRef<Record<keyof KnowledgeModels, string>>({
-    embeddingModel: "",
-    brainModel: "",
-    verifierModel: "",
-  });
 
   async function reload() {
     const [knowledgeRes, modelsRes] = await Promise.all([apiFetch("/api/v1/knowledge"), apiFetch("/api/v1/models")]);
@@ -282,31 +275,26 @@ export function KnowledgePage() {
     // a list of their own. `modelsForMode` is the one place that knows which is which.
     const chatList = asModels(modelsForMode(wire, "chat"));
     const embeddingList = asModels(modelsForMode(wire, "embedding"));
-    setChatModels(chatList);
-    setEmbeddingModels(embeddingList);
+
 
     const saved =
       payload.models && typeof payload.models === "object" ? (payload.models as Partial<KnowledgeModels>) : {};
-    // A tenant model allowlist can hide a saved model from its list; seedModel then shows a
-    // substitute. Remember the saved id and what the picker was seeded with, so a save that only
-    // edits a *different* picker puts the saved id back instead of overwriting it (review BUG-0001).
-    const seeds: Record<keyof KnowledgeModels, string> = {
-      embeddingModel: seedModel(embeddingList, asString(saved.embeddingModel), asString(defaults?.embedding)),
-      brainModel: seedModel(chatList, asString(saved.brainModel), asString(defaults?.knowledgeBrain)),
-      verifierModel: seedModel(chatList, asString(saved.verifierModel), asString(defaults?.knowledgeVerifier)),
-    };
-    hiddenSavedModelsRef.current = {};
-    for (const field of ["embeddingModel", "brainModel", "verifierModel"] as const) {
-      const savedId = asString(saved[field]);
-      const list = field === "embeddingModel" ? embeddingList : chatList;
-      if (savedId && savedId !== seeds[field] && !list.some((model) => model.id === savedId)) {
-        hiddenSavedModelsRef.current[field] = savedId;
-      }
-    }
-    seededModelsRef.current = seeds;
-    setEmbeddingModel(seeds.embeddingModel);
-    setBrainModel(seeds.brainModel);
-    setVerifierModel(seeds.verifierModel);
+    // A tenant model allowlist can hide a saved model from its list. Instead of substituting
+    // silently (which a later unrelated save would then persist), each picker gets its own list
+    // with the hidden saved id appended, so the stored value stays visible and selectable.
+    const withSaved = (list: PickerModel[], savedId: string): PickerModel[] =>
+      savedId && !list.some((model) => model.id === savedId)
+        ? [...list, { id: savedId, label: savedId, inputModalities: [] }]
+        : list;
+    const embeddingPicker = withSaved(embeddingList, asString(saved.embeddingModel));
+    const brainPicker = withSaved(chatList, asString(saved.brainModel));
+    const verifierPicker = withSaved(chatList, asString(saved.verifierModel));
+    setEmbeddingPickerModels(embeddingPicker);
+    setBrainPickerModels(brainPicker);
+    setVerifierPickerModels(verifierPicker);
+    setEmbeddingModel(seedModel(embeddingPicker, asString(saved.embeddingModel), asString(defaults?.embedding)));
+    setBrainModel(seedModel(brainPicker, asString(saved.brainModel), asString(defaults?.knowledgeBrain)));
+    setVerifierModel(seedModel(verifierPicker, asString(saved.verifierModel), asString(defaults?.knowledgeVerifier)));
   }
 
   useEffect(() => {
@@ -316,15 +304,6 @@ export function KnowledgePage() {
   }, [workspaceId]);
 
   async function persistModels(next: KnowledgeModels) {
-    // A picker still showing its seeded substitute for a saved model the list hid was not actually
-    // edited: put the saved id back so an unrelated picker change does not overwrite it. A pick the
-    // person really made differs from the seed, so theirs is the one that lands.
-    for (const field of ["embeddingModel", "brainModel", "verifierModel"] as const) {
-      const hidden = hiddenSavedModelsRef.current[field];
-      if (hidden !== undefined && next[field] === seededModelsRef.current[field]) {
-        next[field] = hidden;
-      }
-    }
     setEmbeddingModel(next.embeddingModel);
     setBrainModel(next.brainModel);
     setVerifierModel(next.verifierModel);
@@ -511,10 +490,10 @@ export function KnowledgePage() {
           <label className="flex min-w-[min(100%,18rem)] flex-1 flex-col gap-1">
             <span className="text-xs text-[var(--text-2)]">{t("knowledge.models.embedding")}</span>
             <ModelSelect
-              models={embeddingModels}
+              models={embeddingPickerModels}
               value={embeddingModel}
               onChange={(id) => void persistModels({ embeddingModel: id, brainModel, verifierModel })}
-              disabled={mapping || embeddingModels.length === 0}
+              disabled={mapping || embeddingPickerModels.length === 0}
               testId="knowledge-model-embedding"
               className="input"
               flat
@@ -523,10 +502,10 @@ export function KnowledgePage() {
           <label className="flex min-w-[min(100%,18rem)] flex-1 flex-col gap-1">
             <span className="text-xs text-[var(--text-2)]">{t("knowledge.models.brain")}</span>
             <ModelSelect
-              models={chatModels}
+              models={brainPickerModels}
               value={brainModel}
               onChange={(id) => void persistModels({ embeddingModel, brainModel: id, verifierModel })}
-              disabled={mapping || chatModels.length === 0}
+              disabled={mapping || brainPickerModels.length === 0}
               testId="knowledge-model-brain"
               className="input"
             />
@@ -534,10 +513,10 @@ export function KnowledgePage() {
           <label className="flex min-w-[min(100%,18rem)] flex-1 flex-col gap-1">
             <span className="text-xs text-[var(--text-2)]">{t("knowledge.models.verifier")}</span>
             <ModelSelect
-              models={chatModels}
+              models={verifierPickerModels}
               value={verifierModel}
               onChange={(id) => void persistModels({ embeddingModel, brainModel, verifierModel: id })}
-              disabled={mapping || chatModels.length === 0}
+              disabled={mapping || verifierPickerModels.length === 0}
               testId="knowledge-model-verifier"
               className="input"
             />

@@ -108,12 +108,14 @@ function hostErrorMessage(body: unknown): string | null {
  */
 export function settingsSaveBody(input: { mayChangeKey: boolean; openaiApiKey: string; editTurnCapUsd: number }): {
   openaiApiKey?: string;
-  editTurnCapUsd: number;
+  editTurnCapUsd?: number;
 } {
   const typed = input.mayChangeKey && input.openaiApiKey.trim().length > 0;
   return {
     ...(typed ? { openaiApiKey: input.openaiApiKey } : {}),
-    editTurnCapUsd: input.editTurnCapUsd,
+    // The cap is a shared company setting: only an owner or admin's body carries it, so a member's
+    // save is not refused for a field it never asked to change (review round 3).
+    ...(input.mayChangeKey ? { editTurnCapUsd: input.editTurnCapUsd } : {}),
   };
 }
 

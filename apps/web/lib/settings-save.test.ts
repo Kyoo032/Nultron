@@ -172,9 +172,9 @@ describe("settingsSaveBody", () => {
     });
   });
 
-  it("never sends a key for someone who may not change it", () => {
-    expect(settingsSaveBody({ mayChangeKey: false, openaiApiKey: "sk-new-key", editTurnCapUsd: 2 })).toEqual({
-      editTurnCapUsd: 2,
-    });
+  it("sends no shared field for someone who may not change it", () => {
+    // A member's body carries only what is theirs: no key, and no edit cap — the host refuses a
+    // member's write to a shared setting, so sending the displayed cap would fail every save.
+    expect(settingsSaveBody({ mayChangeKey: false, openaiApiKey: "sk-new-key", editTurnCapUsd: 2 })).toEqual({});
   });
 });
