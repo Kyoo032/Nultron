@@ -107,11 +107,15 @@ function fakeDocker(dir, appRunning) {
   writeFileSync(
     docker,
     `#!/bin/sh
+# Stub of the per-desk interface backup.sh drives: desks are compose projects with an
+# \`app\` service, found by label filters; snapshots and tars run through docker exec.
 case "$*" in
   *"compose version"*) exit 0 ;;
-  *"ps -q app"*) ${appRunning ? "echo fake-app-id" : "true"} ;;
-  *"ps -q portal-db"*) true ;;
-  *"exec -T app tar"*) tar -czf - -C "${toPosix(data)}" . ;;
+  *"compose ps -q portal-db"*) true ;;
+  *"ps --filter"*) ${appRunning ? "echo nultron-web" : "true"} ;;
+  *"ps -q --filter"*) ${appRunning ? "echo fake-app-id" : "true"} ;;
+  *"exec -i "*" sh -s"*) cat >/dev/null 2>&1 || true ;;
+  *"exec "*" tar -czf"*) tar -czf - -C "${toPosix(data)}" . ;;
   *exec*) cat >/dev/null 2>&1 || true ;;
 esac
 exit 0
@@ -134,6 +138,9 @@ function runBackup(name, { appRunning, heartbeat, scripts = scriptsPosix }) {
       BACKUP_KEY: "test-passphrase",
       BACKUP_HEARTBEAT_URL: heartbeat,
       COS_BACKUP_BUCKET: "",
+      // These tests exercise the heartbeat, not the offsite gate: a skipped upload would
+      // otherwise fail every desk (BACKUP_REQUIRE_OFFSITE=1 is covered in backup-restore.test.mjs).
+      BACKUP_REQUIRE_OFFSITE: "0",
     },
     90_000,
   );
