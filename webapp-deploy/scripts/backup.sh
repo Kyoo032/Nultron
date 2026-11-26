@@ -66,9 +66,27 @@ command -v node >/dev/null 2>&1 || {
 DESK_GLOB="$(setting BACKUP_DESK_GLOB '*')"
 REQUIRE_OFFSITE="$(setting BACKUP_REQUIRE_OFFSITE 1)"
 
+# When the run is pinned to one compose project — COMPOSE_PROJECT_NAME, or `-p <name>` in
+# DC_ARGS the way the local rehearsal (pilot-local.mjs) sets it — that project is the only
+# desk. Without this the label scan below would archive every production desk a rehearsal
+# shares a docker daemon with.
+PINNED_PROJECT="${COMPOSE_PROJECT_NAME:-}"
+_prev=""
+# shellcheck disable=SC2086
+for _arg in ${DC_ARGS:-}; do
+	case "$_prev" in -p | --project-name) PINNED_PROJECT="$_arg" ;; esac
+	case "$_arg" in --project-name=*) PINNED_PROJECT="${_arg#--project-name=}" ;; esac
+	_prev="$_arg"
+done
+
 # The compose projects that own a running `app` service, filtered by BACKUP_DESK_GLOB.
 # One line per desk id (= project name).
 desk_projects() {
+	if [ -n "$PINNED_PROJECT" ]; then
+		# shellcheck disable=SC2254
+		case "$PINNED_PROJECT" in $DESK_GLOB) printf '%s\n' "$PINNED_PROJECT" ;; esac
+		return
+	fi
 	docker ps --filter label=com.docker.compose.service=app \
 		--format '{{.Label "com.docker.compose.project"}}' 2>/dev/null | sort -u |
 		while IFS= read -r _p; do
@@ -76,6 +94,18 @@ desk_projects() {
 			# shellcheck disable=SC2254
 			case "$_p" in $DESK_GLOB) printf '%s\n' "$_p" ;; esac
 		done
+}
+
+# Which desk an archive belongs to travels INSIDE it, never only in its name: a COS writer
+# could otherwise rename one desk's valid archive over another's and have it restored into
+# the wrong desk. restore.sh refuses a meta/desk mismatch.
+write_desk_meta() {
+	_cid="$1"
+	_desk="$2"
+	docker exec "$_cid" sh -c '
+		printf "{\"desk\":\"%s\",\"createdAt\":\"%s\"}\n" "$1" "$2" \
+			> "${AGENTFORGE_DATA_DIR:-/data}/backup-meta.json"
+	' sh "$_desk" "$STAMP"
 }
 
 desk_container() {
@@ -151,15 +181,26 @@ INNER
 		fail_desk "$_desk" "$_cid" "the SQLite snapshot step failed"; return
 	fi
 
+	# Embed the desk's identity in the archive before tarring it up.
+	write_desk_meta "$_cid" "$_desk" 2>/dev/null || true
+
 	echo "==> [$_desk] archiving /data (minus components/ and logs/) and encrypting -> $_out"
 	umask 077
-	if ! docker exec "$_cid" tar -czf - -C /data \
-		--exclude=./components --exclude=./logs \
-		--exclude=./.master-key . |
-		node "$AEAD_CRYPT" encrypt --out "$_out"; then
-		rm -f "$_out"
+	# sh has no pipefail, so a `tar` that dies mid-stream would still feed a truncated archive
+	# into the encryptor and report success. tar's real exit code is written to stderr (which
+	# docker exec forwards untouched) as a marker this side greps for.
+	_tarlog="$(mktemp "${TMPDIR:-/tmp}/nultron-backup-tar.XXXXXX")"
+	if ! docker exec "$_cid" sh -c '
+		tar -czf - -C "${AGENTFORGE_DATA_DIR:-/data}" \
+			--exclude=./components --exclude=./logs \
+			--exclude=./.master-key .
+		echo "tar_exit=$?" >&2
+	' 2>"$_tarlog" | node "$AEAD_CRYPT" encrypt --out "$_out" ||
+		! grep -q 'tar_exit=0' "$_tarlog"; then
+		rm -f "$_out" "$_tarlog"
 		fail_desk "$_desk" "$_cid" "the archive or encryption step failed"; return
 	fi
+	rm -f "$_tarlog"
 
 	if [ ! -s "$_out" ]; then
 		rm -f "$_out"
@@ -168,12 +209,12 @@ INNER
 
 	docker exec "$_cid" sh -c 'rm -rf "${AGENTFORGE_DATA_DIR:-/data}/.backup-staging"' 2>/dev/null || true
 
-	# A backup nobody can open is not a backup. An archive with no entries fails too: if `tar`
-	# died inside the container the stream is empty, an empty stream encrypts, decrypts and
-	# lists without an error, and the size check above passes on ~48 bytes of ciphertext.
+	# A backup nobody can open is not a backup, and one without the embedded desk meta is not
+	# restorable under its name either: an archive truncated at the front would still decrypt
+	# and list a few entries.
 	if [ "$(setting BACKUP_VERIFY 1)" = "1" ]; then
 		echo "==> [$_desk] verifying (decrypt + list)"
-		if ! node "$AEAD_CRYPT" decrypt --in "$_out" | tar -tzf - | grep -q .; then
+		if ! node "$AEAD_CRYPT" decrypt --in "$_out" | tar -tzf - | grep -q 'backup-meta.json'; then
 			fail_desk "$_desk" "$_cid" "the encrypted archive did not decrypt and untar cleanly"; return
 		fi
 	fi

@@ -20,6 +20,11 @@ Requires=docker.service
 [Service]
 Type=oneshot
 WorkingDirectory=/srv/nultron/webapp-deploy
+# systemd's default PATH covers /usr/local/bin, which is where coscli usually lands. When the
+# uploader is user-installed instead (a tccli under a deploy user's ~/.local/bin), this unit
+# would silently skip every offsite upload — add a `PATH=` line to /etc/nultron/backup.env
+# with that bin dir appended (EnvironmentFile wins over this default).
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 EnvironmentFile=-/etc/nultron/backup.env
 ExecStart=/bin/sh /srv/nultron/webapp-deploy/scripts/backup.sh /srv/nultron/backups
 # Backups of every desk can take a while; do not let systemd kill a slow run.

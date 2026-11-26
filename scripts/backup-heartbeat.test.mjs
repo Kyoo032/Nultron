@@ -101,6 +101,8 @@ function fakeDocker(dir, appRunning) {
   const data = join(dir, "data");
   mkdirSync(data, { recursive: true });
   writeFileSync(join(data, "file.txt"), "payload");
+  // backup.sh's verify step requires the embedded desk meta in every archive.
+  writeFileSync(join(data, "backup-meta.json"), '{"desk":"nultron-web","createdAt":"stub"}\n');
   const bin = join(dir, "bin");
   mkdirSync(bin, { recursive: true });
   const docker = join(bin, "docker");
@@ -115,7 +117,7 @@ case "$*" in
   *"ps --filter"*) ${appRunning ? "echo nultron-web" : "true"} ;;
   *"ps -q --filter"*) ${appRunning ? "echo fake-app-id" : "true"} ;;
   *"exec -i "*" sh -s"*) cat >/dev/null 2>&1 || true ;;
-  *"exec "*" tar -czf"*) tar -czf - -C "${toPosix(data)}" . ;;
+  *"tar -czf"*) tar -czf - -C "${toPosix(data)}" . ; echo "tar_exit=0" >&2 ;;
   *exec*) cat >/dev/null 2>&1 || true ;;
 esac
 exit 0

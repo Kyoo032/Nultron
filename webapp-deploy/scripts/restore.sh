@@ -117,6 +117,26 @@ tar -tzf "$PLAIN" >/dev/null || {
 	exit 1
 }
 
+# The desk id inside the archive beats the one in its name: backup.sh writes backup-meta.json
+# into /data before tarring, so a bucket-level rename (a valid archive of desk A re-offered as
+# desk B's) is caught here instead of overwriting the wrong desk. Old archives carry no meta
+# and keep the name-based behaviour.
+META_MEMBER="$(tar -tzf "$PLAIN" 2>/dev/null | grep -m1 'backup-meta.json' || true)"
+META_DESK=""
+if [ -n "$META_MEMBER" ]; then
+	META_DESK="$(tar -xzf "$PLAIN" -O "$META_MEMBER" 2>/dev/null |
+		sed -n 's/.*"desk"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+fi
+if [ -n "$META_DESK" ]; then
+	if [ -z "$DESK" ]; then
+		DESK="$META_DESK"
+	elif [ "$META_DESK" != "$DESK" ]; then
+		echo "error: this archive belongs to desk '$META_DESK', not '$DESK' - refusing to restore" >&2
+		echo "       the wrong desk's data over it. If that is really what you mean, unpack by hand." >&2
+		exit 1
+	fi
+fi
+
 if [ "$CONFIRM" != "--yes" ]; then
 	if [ -n "$DESK" ]; then
 		echo "This REPLACES everything in the $DESK desk's data volume with $TARBALL."
@@ -136,18 +156,21 @@ if [ -n "$DESK" ]; then
 	# this folder's compose file. Stop every container in the project (the proxy shares the
 	# app's network namespace and dies with it anyway), unpack over the app's /data mount in
 	# a throwaway container on the desk's own image, and bring the project back.
-	APP_CID="$(docker ps -q --filter "label=com.docker.compose.project=$DESK" \
+	# ps -aq, not -q: a desk that is down is exactly the desk whose restore is being run
+	# (scratch-recovery drills stop it first), and --volumes-from mounts a stopped container's
+	# volumes the same as a running one's.
+	APP_CID="$(docker ps -aq --filter "label=com.docker.compose.project=$DESK" \
 		--filter "label=com.docker.compose.service=app" | head -n 1)"
 	[ -n "$APP_CID" ] || {
-		echo "error: no running app container in compose project '$DESK'" >&2
+		echo "error: no app container in compose project '$DESK' (running or stopped)" >&2
 		exit 1
 	}
 	APP_IMAGE="$(docker inspect --format '{{.Config.Image}}' "$APP_CID")"
-	PROJECT_CIDS="$(docker ps -q --filter "label=com.docker.compose.project=$DESK")"
+	PROJECT_CIDS="$(docker ps -aq --filter "label=com.docker.compose.project=$DESK")"
 
 	echo "==> stopping the '$DESK' desk"
 	# shellcheck disable=SC2086
-	docker stop $PROJECT_CIDS >/dev/null
+	docker stop $PROJECT_CIDS >/dev/null 2>&1 || true
 
 	echo "==> emptying and unpacking $DESK's /data"
 	# cap_drop: ALL takes CHOWN away even from root, and both tar -x and the chown below

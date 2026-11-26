@@ -83,11 +83,15 @@ function runCapture(command, args, options = {}) {
 }
 
 /** A tiny gzipped tar with real content, built with the system tar, plus its listing for assertions. */
-function makeTarFixture(dir) {
+function makeTarFixture(dir, { meta } = {}) {
   const data = join(dir, "data");
   mkdirSync(join(data, "sub"), { recursive: true });
   writeFileSync(join(data, "hello.txt"), "hello nultron backup\n");
   writeFileSync(join(data, "sub", "second.txt"), "second file\n");
+  // backup.sh's verify step requires the embedded desk meta in every archive it produces.
+  if (meta) {
+    writeFileSync(join(data, "backup-meta.json"), `${JSON.stringify({ desk: meta.desk ?? "stub", createdAt: "stub" })}\n`);
+  }
   const tarPath = join(dir, "fixture.tar.gz");
   const tar = runCapture("tar", ["-czf", posixPath(tarPath), "-C", posixPath(data), "."]);
   assert.equal(tar.status, 0, tar.output);
@@ -160,6 +164,7 @@ function installBackupDockerStub(dir, { desks = [], tarPath }) {
   const log = join(dir, "docker-stub.log");
   const desksFile = join(dir, "desks.txt");
   writeFileSync(desksFile, desks.join("\n"));
+
   writeFileSync(
     join(bin, "docker"),
     [
@@ -176,7 +181,7 @@ function installBackupDockerStub(dir, { desks = [], tarPath }) {
       'if [ "$1" = "inspect" ]; then echo "nultron-web:stub"; exit 0; fi',
       'if [ "$1" = "exec" ]; then',
       '  case "$*" in',
-      '    *"tar -czf"*) cat "$STUB_TAR" ;;',
+      '    *"tar -czf"*) cat "$STUB_TAR"; echo "tar_exit=0" >&2 ;;',
       "    *) cat >/dev/null 2>&1 || true ;;",
       "  esac",
       "  exit 0",
@@ -380,7 +385,7 @@ describe("backup/restore shell wiring", () => {
 
   it("backup.sh exits non-zero and writes a failed heartbeat when the offsite upload is skipped (DFIND-168)", { skip: SHELL_OPTS.shellSkip }, () => {
     const dir = tempDir("backup-nobucket-");
-    const tarPath = makeTarFixture(dir);
+    const tarPath = makeTarFixture(dir, { meta: { desk: "nultron-web" } });
     const outDir = join(dir, "backups");
     const run = runBackupScript("webapp-deploy/scripts/backup.sh", [outDir], {
       desks: ["nultron-web"],
@@ -397,7 +402,7 @@ describe("backup/restore shell wiring", () => {
 
   it("backup.sh honours BACKUP_REQUIRE_OFFSITE=0 for local tests", { skip: SHELL_OPTS.shellSkip }, () => {
     const dir = tempDir("backup-offsite-off-");
-    const tarPath = makeTarFixture(dir);
+    const tarPath = makeTarFixture(dir, { meta: { desk: "nultron-web" } });
     const outDir = join(dir, "backups");
     const run = runBackupScript("webapp-deploy/scripts/backup.sh", [outDir], {
       desks: ["nultron-web"],
@@ -410,7 +415,7 @@ describe("backup/restore shell wiring", () => {
 
   it("backup.sh archives every desk it discovers, one encrypted archive per desk id (DFIND-169)", { skip: SHELL_OPTS.shellSkip }, () => {
     const dir = tempDir("backup-perdesk-");
-    const tarPath = makeTarFixture(dir);
+    const tarPath = makeTarFixture(dir, { meta: {} });
     const outDir = join(dir, "backups");
     const desks = ["nultron-web", "pusat01", "tester-a"];
     const run = runBackupScript("webapp-deploy/scripts/backup.sh", [outDir], {
@@ -449,7 +454,7 @@ describe("backup/restore shell wiring", () => {
 
   it("backup.sh respects BACKUP_DESK_GLOB when picking desks", { skip: SHELL_OPTS.shellSkip }, () => {
     const dir = tempDir("backup-glob-");
-    const tarPath = makeTarFixture(dir);
+    const tarPath = makeTarFixture(dir, { meta: {} });
     const outDir = join(dir, "backups");
     const run = runBackupScript("webapp-deploy/scripts/backup.sh", [outDir], {
       desks: ["nultron-web", "pusat01", "pusat02"],
@@ -483,6 +488,21 @@ describe("backup/restore shell wiring", () => {
     const run = runBackupScript("webapp-deploy/scripts/restore.sh", [backup, "--yes", "--desk", "tester-b"], { dir });
     assert.equal(run.status, 0, run.output);
     assert.match(run.output, /restored desk 'tester-b'/);
+  });
+
+  it("restore.sh refuses an archive whose embedded desk id does not match --desk", { skip: SHELL_OPTS.shellSkip }, () => {
+    const dir = tempDir("restore-meta-mismatch-");
+    const data = join(dir, "data");
+    mkdirSync(data, { recursive: true });
+    writeFileSync(join(data, "backup-meta.json"), '{"desk":"pusat01","createdAt":"stub"}\n');
+    const tarPath = join(dir, "withmeta.tar.gz");
+    assert.equal(runCapture("tar", ["-czf", posixPath(tarPath), "-C", posixPath(data), "."]).status, 0);
+    // The name claims pusat02; the embedded meta says pusat01. The embedded id wins.
+    const backup = encryptGcm(tarPath, join(dir, "nultron-data-pusat02-20261126T120000Z.tar.gz.enc"));
+    const run = runBackupScript("webapp-deploy/scripts/restore.sh", [backup, "--yes"], { dir });
+    assert.notEqual(run.status, 0, "a renamed archive must not restore into the wrong desk");
+    assert.match(run.output, /belongs to desk 'pusat01', not 'pusat02'/);
+    assert.doesNotMatch(run.logText, /^stop |^start |--volumes-from/m, "nothing destructive may run after a refused meta");
   });
 
   it("restore.sh still verifies the ciphertext before touching a named desk", { skip: SHELL_OPTS.shellSkip }, () => {
