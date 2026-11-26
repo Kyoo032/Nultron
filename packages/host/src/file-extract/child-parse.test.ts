@@ -3,6 +3,8 @@
  * a job that ignores its deadline is SIGKILLed, a child that blows its heap dies without taking the
  * host with it, and the worker's egress seal holds from outside.
  */
+import { EventEmitter } from "node:events";
+import type { ChildProcess } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import {
   ParseChild,
@@ -11,7 +13,6 @@ import {
   parseChildExecArgv,
   parseFileInChild,
   repoRoot,
-  spawnParseChild,
 } from "./child-parse";
 import { FileExtractError } from "./errors";
 import { extractFile } from "./index";
@@ -53,6 +54,14 @@ describe("parse child flags", () => {
     // The loader's disk cache would demand an fs write grant the child does not have.
     expect(env.TSX_DISABLE_CACHE).toBe("1");
   });
+
+  it("hands the child the host's resolved components root, whatever locators the desk uses", () => {
+    // A desk that locates its data dir via AGENTFORGE_SETTINGS_PATH: the child never sees that
+    // variable, so resolving the components root again there would name a different directory than
+    // the one the fs grant — and the installed converter — lives in.
+    const env = parseChildEnv({ AGENTFORGE_SETTINGS_PATH: "/desk-a/settings.enc" });
+    expect(env.AGENTFORGE_COMPONENTS_DIR).toBe("/desk-a/components");
+  });
 });
 
 describe("parse child behavior", () => {
@@ -88,6 +97,51 @@ describe("parse child behavior", () => {
     const result = await child.probe({ probe: "network" }, BOOT_AND_JOB_MS);
     child.kill();
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("the job deadline bounds the whole wait", () => {
+  it("a boot that never ends fails fast instead of adding the boot budget to the deadline", {
+    timeout: BOOT_AND_JOB_MS,
+  }, async () => {
+    const neverReady = new EventEmitter() as unknown as ChildProcess;
+    Object.assign(neverReady, { stdout: null, stderr: null, exitCode: null, signalCode: null });
+    neverReady.kill = () => true;
+    (neverReady as { send: unknown }).send = (_message: unknown, cb?: (error: Error | null) => void) => {
+      cb?.(null);
+      return true;
+    };
+    const start = Date.now();
+    await expect(
+      parseFileInChild({ bytes: new Uint8Array([1]), filename: "x.csv", timeoutMs: 400 }, () => neverReady),
+    ).rejects.toBeInstanceOf(ParseChildUnavailableError);
+    // Without the deadline bound on boot, BOOT_TIMEOUT_MS alone would already allow a 15 s wait.
+    expect(Date.now() - start).toBeLessThan(5_000);
+  });
+
+  it("charges boot time against the job's deadline", { timeout: BOOT_AND_JOB_MS }, async () => {
+    const sent: Array<{ type?: string; timeoutMs?: number }> = [];
+    const emitter = new EventEmitter();
+    const stub = emitter as unknown as ChildProcess;
+    Object.assign(stub, { stdout: null, stderr: null, exitCode: null, signalCode: null });
+    stub.kill = () => true;
+    (stub as { send: unknown }).send = (
+      message: { type?: string; id?: string; timeoutMs?: number },
+      cb?: (error: Error | null) => void,
+    ) => {
+      sent.push(message);
+      if (message.type === "job") {
+        setTimeout(() => emitter.emit("message", { type: "result", id: message.id, ok: false, code: "malformed" }), 0);
+      }
+      cb?.(null);
+      return true;
+    };
+    setTimeout(() => emitter.emit("message", { type: "ready" }), 300).unref();
+    await expect(
+      parseFileInChild({ bytes: new Uint8Array([1]), filename: "x.csv", timeoutMs: 60_000 }, () => stub),
+    ).rejects.toMatchObject({ code: "malformed" });
+    expect(sent[0]?.timeoutMs).toBeLessThan(60_000);
+    expect(sent[0]?.timeoutMs).toBeGreaterThan(0);
   });
 });
 

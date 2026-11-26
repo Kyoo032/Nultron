@@ -122,15 +122,19 @@ export function parseChildExecArgv(root: string, maxOldSpaceMb: number, componen
 }
 
 /**
- * Never the parent's env. The loader override is set explicitly, and only the three variables the
- * child needs to find the components root — never a secret or a tenant key — pass through.
+ * Never the parent's env. The loader override is set explicitly, the components root is resolved
+ * HERE and passed as the answer — the child would resolve `localDataDir()` again from its own cwd
+ * (the repository root) and without `AGENTFORGE_SETTINGS_PATH`, naming a different directory than
+ * the one the fs grant (and the installed converter) lives in — and only the other two locators the
+ * child needs pass through. Never a secret or a tenant key.
  */
 export function parseChildEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const out: Record<string, string> = {
     TSX_DISABLE_CACHE: "1",
+    AGENTFORGE_COMPONENTS_DIR: componentsRootDir(env),
     ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
   };
-  for (const key of ["AGENTFORGE_COMPONENTS_DIR", "AGENTFORGE_DATA_DIR", "AGENTFORGE_SERVER"] as const) {
+  for (const key of ["AGENTFORGE_DATA_DIR", "AGENTFORGE_SERVER"] as const) {
     const value = env[key];
     if (value !== undefined) {
       out[key] = value;
@@ -382,10 +386,13 @@ const CHILD_DRAIN = EXIT_DRAIN_MS;
  * could even start; every parse failure comes back as `FileExtractError` (or the gate's ApiError).
  */
 export async function parseFileInChild(job: ParseJob, spawn?: SpawnParseChild): Promise<ExtractedFile> {
+  // The deadline covers the whole wait — boot included — so `timeoutMs` bounds what a caller can
+  // ever block on, not just the conversion running inside the child.
+  const deadlineMs = Date.now() + job.timeoutMs;
   const child = new ParseChild(spawn);
   try {
-    await child.ready();
-    return await child.parse(job);
+    await child.ready(Math.min(BOOT_TIMEOUT_MS, Math.max(1, deadlineMs - Date.now())));
+    return await child.parse({ ...job, timeoutMs: Math.max(1, deadlineMs - Date.now()) });
   } finally {
     child.kill();
     // A moment for the OS to reap before the promise settles; callers never wait on this.

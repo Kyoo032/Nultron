@@ -2,6 +2,8 @@
 
 Product: both · Instance: main :3000
 
+Last verified: 2026-11-26 on `devin/1795703634-f7a-exec-limits` (F7a, DFIND-177): the new execution caps in `packages/host/src/runs.ts` — `runExecutionCaps()` from `run-limits.ts` arms a wall-clock timer (`AGENTFORGE_RUN_MAX_SECONDS`, default 1800 s; `0` fails the run before the prompt is stored) and an output ceiling (`AGENTFORGE_RUN_MAX_OUTPUT_BYTES`, default 2 MB counted over `assistant.delta` and `assistant.thinking` text). Either cap calls `failActiveRun`, which emits `run.failed` + `run.completed`, closes the queue, settles the run and aborts the model call — the same shape the stall guard takes. Unit-tested (`runs-execution-caps.test.ts`, `run-limits.test.ts`); not driven on `:3000`. Nothing else on the page was re-read.
+
 Last verified: 2026-11-26 on `devin/1795686920-opc-auditor-allowlist` (F8d): every run's model resolution in `packages/host/src/runs.ts` resolves against `catalogFor(tenant, allowanceFor(tenant))`, so a run body naming a model outside the tenant's `model_allowlist` answers `unknown_model` like any model off the catalog.
 
 Last verified: 2026-11-24 on `main`, for `inChatRun` in `packages/host/src/runs.ts` wrapping execution in `withAssignedGatewayEndpoint` so detached chat runs preserve the signed-in user's operator-assigned gateway endpoint (`gateway-endpoint-scope.ts`). Nothing else on the page was re-read.
