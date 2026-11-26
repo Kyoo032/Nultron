@@ -7262,6 +7262,15 @@ Residual: any allowance or bill that counts `voice` rows undercounts, and no sec
 
 Gate: none for week one (voice is Rizky's only); before customer voice or any allowance counts voice, give audio a list price in `media-pricing.ts` and decide a rule for aborted calls.
 
+### SR-214 {#sr-214}
+
+**The OPC `auditor` role and the tenant model allowlist (F8a/F8d) — built 2026-11-26, branch `devin/1795686920-opc-auditor-allowlist`; in the tree, not deployed.** Informational control entry, not a finding.
+
+- **Role gate in one place.** `routeGate` + `roleDenied` (`packages/host/src/role-policy.ts`), evaluated in `dispatch` (`packages/host/src/router.ts`) before the handler on every non-session-exempt `/api/v1/*` route, server mode only. Classes: `administer` (mutations to agents, data sources, keys, channels, settings — owner/admin), `audit` (owner/auditor), `auditor-read` (the auditor's explicit allowlist), `read`, `agents` (auditor refused). Denials are one `403 forbidden` shape. Pinned by `packages/host/src/role-matrix.test.ts`, which dispatches every registered route as each of the four roles.
+- **Auditor reach.** Auditor reads only ping, auth session/logout/refresh, usage, storage/usage, workspaces, organizations, settings GET, billing plan/plans and health; a thread's messages, any run and any mutation are refused. Provisioned through `ensurePortalOwner`; the portal widens `users_role_chk` and `invites_role_chk` in `migrations/0015_auditor_role.sql` and accepts `auditor` in the `invite`/`account` CLIs.
+- **Model allowlist.** `model_allowlist` travels in the `POST /auth/token` body (`apps/portal/src/flows/token.ts`, from `tenant_config.model_allowlist`); the host holds it per tenant in memory (`packages/host/src/model-allowance.ts`) — no host migration. A `null` body field never clears a list an older token carried. Off-portal, the desk's `modelAllowlist` setting is the fallback (`mergeSecrets`). Empty or absent keeps allow-everything.
+- **Residual.** The gate resolves the tenant through `getTenant` per request; a session whose membership cannot resolve skips the check and the handler answers with its own tenancy error (the pre-gate behaviour, kept so unprovisioned test identities behave as before).
+
 ## Must be true before the Tencent Cloud deploy
 
 Each line names the row that owns it. A line that cannot be ticked is a reason not to hand out the

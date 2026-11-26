@@ -152,6 +152,17 @@ describe("runMigrations", () => {
     ]);
   });
 
+  it("widens users_role_chk to the auditor seat (0015)", async () => {
+    const { rows } = await pool.query<{ check: string }>(
+      `SELECT pg_get_constraintdef(oid) AS check FROM pg_constraint WHERE conname = 'users_role_chk'`,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].check).toContain("'auditor'");
+    for (const role of ["owner", "admin", "member"]) {
+      expect(rows[0].check).toContain(`'${role}'`);
+    }
+  });
+
   it("puts no password in a migration file, as 0001 requires of login roles", async () => {
     for (const file of (await listMigrations()).filter((candidate) => candidate.source === "portal")) {
       const sql = await readFile(file.path, "utf8");

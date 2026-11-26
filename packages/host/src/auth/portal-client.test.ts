@@ -103,6 +103,7 @@ describe("exchangeCode", () => {
       tenantId: "tnt_1",
       role: "member",
       gatewayEndpoint: null,
+      modelAllowlist: null,
     });
   });
 

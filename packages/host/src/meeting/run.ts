@@ -54,7 +54,8 @@ import type { JobEmitter } from "@agentforge/core/jobs";
 import { throwIfJobAborted } from "../job-stream";
 import { loadSettings, type SettingsScope } from "../settings-store";
 import { modelCacheScopeOf } from "../model-cache";
-import { listSelectableModels, modeDefaultsFor } from "../selectable-models";
+import { modeDefaultsFor } from "../selectable-models";
+import { allowanceFor, catalogFor } from "../model-allowance";
 import { localeForRun } from "../run-context";
 import { log } from "../log";
 import { recordTranscriptionUsage } from "../usage-record";
@@ -96,7 +97,7 @@ export function resolveMeetingModel(explicit: string | undefined, tenant: Settin
   const settings = loadSettings(tenant);
   const scope = modelCacheScopeOf(tenant);
   const defaults = modeDefaultsFor(scope);
-  return resolveChatModel(explicit, settings.documentGenModel || defaults.meeting, listSelectableModels(scope));
+  return resolveChatModel(explicit, settings.documentGenModel || defaults.meeting, catalogFor(tenant, allowanceFor(tenant)));
 }
 
 /** Desk-locale copy for a translation that was not the sheet. The model never sees these strings. */

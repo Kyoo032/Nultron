@@ -5,13 +5,14 @@ import { modelCatalogBody, refreshModelCache } from "../selectable-models";
 import { modelAvailabilityBody } from "../model-availability-payload";
 import { probeSummary } from "../model-cache";
 import { loadSettings } from "../settings-store";
+import { tenantAllowedModelIds } from "../model-allowance";
 import { withTierFields } from "../tier-resolve";
 
 export async function handleGetModels(request: HostRequest): Promise<HostResult> {
   try {
     const tenant = await getTenant(request);
     return jsonOk({
-      ...withTierFields(modelCatalogBody(tenant), tenant),
+      ...withTierFields(modelCatalogBody(tenant, tenantAllowedModelIds(tenant) ?? undefined), tenant),
       availability: modelAvailabilityBody(tenant),
     });
   } catch (error) {
@@ -31,7 +32,7 @@ export async function handlePostModels(request: HostRequest): Promise<HostResult
       forgetLessons: true,
     });
     return jsonOk({
-      ...withTierFields(modelCatalogBody(tenant), tenant),
+      ...withTierFields(modelCatalogBody(tenant, tenantAllowedModelIds(tenant) ?? undefined), tenant),
       probe: probeSummary(probe, tenant),
       availability: modelAvailabilityBody(tenant),
     });

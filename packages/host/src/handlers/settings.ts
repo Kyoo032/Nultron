@@ -313,6 +313,29 @@ export function unknownSettingsFields(body: unknown): string[] {
     .map((name) => name.slice(0, MAX_IGNORED_FIELD_NAME_LENGTH));
 }
 
+/**
+ * True when the body carries a field this route would write for the whole company, and the write
+ * would take effect. `locale` is the one personal field — the member's own UI language
+ * (`saveUserLocale`); a body holding only it (and unrecognised extras, which the answer reports as
+ * ignored) is not a shared write. Provider-key fields only count when `keyFieldValue` keeps them —
+ * a blank or non-string is dropped before the patch, so echoing an untouched input is not a write.
+ */
+export function requestsSharedSettingsWrite(body: Record<string, unknown>): boolean {
+  for (const field of Object.keys(body)) {
+    if (field === "locale" || !KNOWN_SETTINGS_FIELDS.has(field)) {
+      continue;
+    }
+    if ((PROVIDER_KEY_FIELDS as readonly string[]).includes(field)) {
+      if (keyFieldValue(body[field]) !== undefined) {
+        return true;
+      }
+    } else if (body[field] !== undefined) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** Throws the 403 for anyone who is not an owner or an admin. Called only in server mode. */
 function assertMayChangeCompanyKey(tenant: TenantContext): void {
   if (!canAdminister(tenant.role)) {
@@ -351,6 +374,14 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
     const serverMode = deps.isServerMode ? deps.isServerMode() : isServerMode();
     if (serverMode && requestsOperatorOnlySettings(body)) {
       throw new ApiError(OPERATOR_ONLY_CODE, OPERATOR_ONLY_MESSAGE, 403);
+    }
+    // F8a: on the hosted server a member still saves what is theirs — `locale` is the only field
+    // this route treats as personal. Anything else it would write is shared with the whole
+    // company, and a non-admin asking for one is refused whole, before any write below. A blank
+    // or non-string provider-key field is not a write: `keyFieldValue` drops it either way, so the
+    // untouched key input the Settings page echoes on every save is not a shared write.
+    if (serverMode && !canAdminister(tenant.role) && requestsSharedSettingsWrite(body)) {
+      throw new ApiError(SETTINGS_KEY_FORBIDDEN_CODE, SETTINGS_KEY_FORBIDDEN_MESSAGE, 403);
     }
     // Before any write below, so a request that mixes a key with a setting the caller may change
     // (their language, say) is refused whole: nothing in it is applied.
