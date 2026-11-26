@@ -18,6 +18,9 @@ import "./health-db";
 // 2026-11-11: installs the sink the generation tools report real calls to, so a model a key was refused
 // stops being offered (`model-availability.ts`). Importing it is the install; it holds no connection.
 import "./model-availability";
+// F2: installs the audit-event sink's database writer — the same import-is-install seam; without
+// it `reportAuditEvent` is a no-op and the desk has no activity log.
+import "./audit/install";
 import { hostAuthRoutes, hostPortalCheck, hostSessionStore, isSessionExemptPath, requireSessionFor } from "./auth";
 import type { PortalSessionCheck, SessionStore } from "./auth";
 import { jsonError, jsonOk } from "./errors";
@@ -84,12 +87,7 @@ import {
 } from "./handlers/billing";
 import { handleGetChat } from "./handlers/chat";
 import { handleGetVirtualAgents } from "./handlers/virtual-agents";
-import {
-  handleGetTeam,
-  handlePostTeamHire,
-  handlePostTeamPropose,
-  handlePostTeamRelease,
-} from "./handlers/team";
+import { handleGetTeam, handlePostTeamHire, handlePostTeamPropose, handlePostTeamRelease } from "./handlers/team";
 import { handlePostChatDocument } from "./chat-documents/handler";
 import { handlePostChatDocumentSave } from "./chat-documents/save-handler";
 import { handleGetHealth } from "./handlers/health";
@@ -236,6 +234,7 @@ import { handleGetModels, handlePostModels } from "./handlers/models";
 import { handleRun } from "./handlers/runs";
 import { handlePostGuide } from "./handlers/guide";
 import { handlePostKeyLater } from "./handlers/key-later";
+import { handleGetAuditEvents, handleGetAuditExport, handlePostAuditVerify } from "./handlers/audit";
 import {
   handleApplyLocale,
   handleCancelReset,
@@ -354,6 +353,11 @@ const routes: Route[] = [
   compile("POST", "/api/v1/settings/reset", handleResetApp),
   compile("DELETE", "/api/v1/settings/reset", handleCancelReset),
   compile("GET", "/api/v1/usage", handleGetUsage),
+  // F2 Activity Log: metadata only, `canAudit` in role-policy (owner or auditor). There is no edit
+  // or delete route and never will be — the SQLite triggers refuse both at the storage layer.
+  compile("GET", "/api/v1/audit/events", handleGetAuditEvents),
+  compile("POST", "/api/v1/audit/verify", handlePostAuditVerify),
+  compile("GET", "/api/v1/audit/export", handleGetAuditExport),
   // Phase 6: what this tenant is holding and what it is allowed to hold.
   compile("GET", "/api/v1/storage/usage", handleGetStorageUsage),
   // Phase 8, readiness. Session-gated like everything else under /api; the UNAUTHENTICATED

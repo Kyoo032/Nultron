@@ -2,6 +2,8 @@
 
 Product: both · Instance: main :3000
 
+Last verified: 2026-11-26 on `devin/1795694018-audit-log` (F2, branch head `5fd2adfe`): `SettingsShell` gains an Activity Log tab at `/settings/activity` (`settings-shell.tsx`, `apps/web/components/activity-log-page.tsx`, `apps/web/lib/audit-client.ts`) with filters, a Verify integrity button, and CSV/JSONL export; `handlePostSettings` (`packages/host/src/handlers/settings.ts`) emits a per-field `settings.change` audit event whose `refHash` is keyed `sha256(before)/sha256(after)` digests — `locale` hashes `loadUserLocale(tenant)`/`body.locale` since it lives outside the `loadSettings` snapshot.
+
 Last verified: 2026-11-26 on `devin/1795686920-opc-auditor-allowlist` (F8a, branch head `b245d86e` + fixes): `SettingsShell` gains a `Users & Roles` tab at `/users` (`settings-shell.tsx`, `apps/web/components/settings-users-roles.tsx` — the four member roles plus an invite form rendering the exact `portal.sh`/`invite.mjs` or `account.mjs` command, POSIX single-quoted, with a copy button); the Edit turn spend cap is editable only for owner/admin (`mayChangeKey`), shown read-only to a member (`settings-page.tsx`), and `settingsSaveBody` drops it from a member's save.
 
 Last verified: 2026-11-25 on working tree over `d9131193` for `apps/web/components/settings-shell.tsx` only: removed the `Team` tab (`/team`) from `SETTINGS_TABS` (moved into `AgentsShell` alongside `/workspaces`), leaving `General`, `Channels`, `Customers`, and `Connectors (MCP)` in Settings.

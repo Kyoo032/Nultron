@@ -1072,6 +1072,55 @@
   ],
   "additionalProperties": false
  },
+ "mcp_fetch": {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+   "connector": {
+    "type": "string",
+    "enum": [
+     "gmail",
+     "google_drive",
+     "onedrive",
+     "notion"
+    ],
+    "description": "Connected MCP source to read from: gmail, google_drive, onedrive, or notion."
+   },
+   "action": {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 80,
+    "description": "Allowlisted read-only action for the connector (e.g. search_messages, get_message, search_files, read_file, search, get_page, query_database). Write/delete/harness actions are strictly blocked."
+   },
+   "query": {
+    "description": "Search query string for search/list actions.",
+    "type": "string",
+    "maxLength": 500
+   },
+   "resourceId": {
+    "description": "Specific message, file, page, or database ID for get/read actions.",
+    "type": "string",
+    "maxLength": 256
+   },
+   "limit": {
+    "description": "Maximum number of items to return (1–25).",
+    "type": "integer",
+    "minimum": 1,
+    "maximum": 25
+   }
+  },
+  "required": [
+   "connector",
+   "action"
+  ],
+  "additionalProperties": false
+ },
+ "mcp_list_sources": {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+ },
  "move_clip": {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",

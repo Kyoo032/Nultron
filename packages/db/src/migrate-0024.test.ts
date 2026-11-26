@@ -29,9 +29,9 @@ function checkReleasedNumber(sqlite: Database.Database) {
 
 describe("0024_inbox_active_endpoint", () => {
   it("follows every existing migration in the forward-only journal", () => {
-    const entry = journal.entries.at(-1)!;
-    expect(entry.tag).toBe("0024_inbox_active_endpoint");
-    for (const previous of journal.entries.slice(0, -1)) expect(entry.when).toBeGreaterThan(previous.when);
+    const index = journal.entries.findIndex((row) => row.tag === "0024_inbox_active_endpoint");
+    const entry = journal.entries[index]!;
+    for (const previous of journal.entries.slice(0, index)) expect(entry.when).toBeGreaterThan(previous.when);
   });
 
   it("upgrades the old index without changing existing endpoint rows", () => {

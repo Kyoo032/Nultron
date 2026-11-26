@@ -5,7 +5,7 @@ import { Link, usePathname } from "@/lib/nav";
 import { t } from "@/lib/i18n";
 
 export type SettingsTab = {
-  readonly id: "general" | "users" | "channels" | "customers" | "mcp";
+  readonly id: "general" | "users" | "channels" | "customers" | "activity" | "mcp";
   readonly href: string;
   readonly labelKey: string;
   readonly testId: string;
@@ -16,6 +16,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { id: "users", href: "/users", labelKey: "settings.tabs.users", testId: "settings-tab-users" },
   { id: "channels", href: "/channels", labelKey: "settings.tabs.channels", testId: "settings-tab-channels" },
   { id: "customers", href: "/customers", labelKey: "settings.tabs.customers", testId: "settings-tab-customers" },
+  { id: "activity", href: "/activity", labelKey: "settings.tabs.activity", testId: "settings-tab-activity" },
   { id: "mcp", href: "/mcp", labelKey: "settings.tabs.mcp", testId: "settings-tab-mcp" },
 ];
 

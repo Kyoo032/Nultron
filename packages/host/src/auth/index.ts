@@ -7,7 +7,7 @@
  * nothing here may open the database or read the portal URL at import time — `portalBaseUrl` throws
  * when the variable is absent, which is correct on a server and wrong everywhere else.
  */
-import { isServerMode } from "@agentforge/core";
+import { isServerMode, reportAuditEvent } from "@agentforge/core";
 import type { PortalRole } from "@agentforge/core";
 import type { PortalIdentity } from "@agentforge/db";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
@@ -249,6 +249,17 @@ async function hostApplyRole(identity: PortalIdentity, role: PortalRole | null):
     // Counts and ids only: the person's id is the portal's opaque one, and the role is one of three
     // fixed words (or `none`, which the host applied as `member`).
     log.info("portal_role_applied", { tenantId: identity.tenantId, role: role ?? "none" });
+    // F2: the change itself is metadata — who, to which of the fixed words — so the word rides in
+    // `rule`, the field the table gives to "what was decided".
+    reportAuditEvent({
+      tenantId: identity.tenantId,
+      event: "role.change",
+      actorKind: "system",
+      targetKind: "membership",
+      targetId: identity.userId,
+      outcome: "ok",
+      rule: role ?? "none",
+    });
   }
 }
 
@@ -278,8 +289,31 @@ export function hostAuthRoutes(): AuthRoutes {
     // import — must not be pulled in statically from here.
     // The identity carries the portal's role (`null` for none); `ensurePortalOwner` writes exactly it.
     provision: async (identity) => {
-      const { db, ensurePortalOwner } = await import("@agentforge/db");
-      return ensurePortalOwner(db, identity);
+      const { db, ensurePortalOwner, organizationMembers } = await import("@agentforge/db");
+      const { eq } = await import("drizzle-orm");
+      // `ensurePortalOwner` writes the portal's role silently; remember the membership's prior
+      // role so a change applied at sign-in still lands in the audit log like `applyRole`.
+      const prior = await db
+        .select({ organizationId: organizationMembers.organizationId, role: organizationMembers.role })
+        .from(organizationMembers)
+        .where(eq(organizationMembers.userId, identity.userId));
+      const provisioned = await ensurePortalOwner(db, identity);
+      if ("organizationId" in provisioned) {
+        const before = prior.find((m) => m.organizationId === provisioned.organizationId)?.role;
+        if (before && before !== provisioned.role) {
+          reportAuditEvent({
+            tenantId: provisioned.tenantId,
+            event: "role.change",
+            actorKind: "system",
+            actorId: "portal",
+            targetKind: "membership",
+            targetId: identity.userId,
+            outcome: "ok",
+            rule: provisioned.role,
+          });
+        }
+      }
+      return provisioned;
     },
     // Phase 5 lane B. Dynamic for the same reason `provision` is: `entitlement-db.ts` imports
     // `@agentforge/db`, which opens SQLite at import, and the desktop imports this module without

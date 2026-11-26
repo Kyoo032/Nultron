@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-11-26 on `devin/1795686920-opc-auditor-allowlist` (F8a): `MEMBERSHIP_ROLES` and `PORTAL_ROLES` each carry a fourth role `auditor`; `canAudit` is `{owner, auditor}`, `canAdminister` stays `{owner, admin}`, `canUseAgents` is false only for `auditor`, and `membershipRoleForPortal` still defaults an unknown portal role to `member` (`packages/core/src/tenancy/types.ts`).
+Last verified: 2026-11-26 on `devin/1795694018-audit-log` (F2): `audit_events` joins the tenant-keyed tables with `tenant_id` on every row (`packages/db/drizzle/0026_audit_events.sql`), alongside `audit_checkpoints` and `audit_purge_window` for the retention purge. Before that: 2026-11-26 on `devin/1795686920-opc-auditor-allowlist` (F8a): `MEMBERSHIP_ROLES` and `PORTAL_ROLES` each carry a fourth role `auditor`; `canAudit` is `{owner, auditor}`, `canAdminister` stays `{owner, admin}`, `canUseAgents` is false only for `auditor`, and `membershipRoleForPortal` still defaults an unknown portal role to `member` (`packages/core/src/tenancy/types.ts`).
 
 Last verified: 2026-11-24 on `main`, for optional `gatewayEndpoint?: string | null` on `TenantContext` (`packages/core/src/tenancy/types.ts`, populated by `resolveFromSession` from the portal-assigned `auth_sessions.gateway_endpoint`). Earlier: 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1).
 

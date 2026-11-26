@@ -17,15 +17,18 @@ import {
   resolveRuntimeMode,
   RESET_CONFIRM_WORD,
   type SecretPatch,
+  reportAuditEvent,
 } from "@agentforge/core";
 import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
 import { getTenant } from "../tenant";
 import {
   clearGatewayKeyEverywhere,
+  getLocalVaultKey,
   loadSettings,
   loadUserGuide,
   loadUserKeyLater,
+  loadUserLocaleChoice,
   localDataDir,
   saveKeysToDesks,
   saveUserLocale,
@@ -47,6 +50,7 @@ import { modelAvailabilityBody } from "../model-availability-payload";
 import { clearThisKeyCache, loadAccountUsage } from "../account-usage";
 import { probeSummary } from "../model-cache";
 import { db, hasPendingDataReset, listLocalWorkspaces, pendingResetPath, requestDataReset } from "@agentforge/db";
+import { createHmac } from "node:crypto";
 import { rmSync } from "node:fs";
 import { resetEmbedCircuit } from "../knowledge-embed";
 import { resetModelReliabilityState } from "../job-model-fallback";
@@ -388,6 +392,13 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
     if (requestsKeyWrite(body, serverMode)) {
       assertMayChangeCompanyKey(tenant);
     }
+    // Read before `saveUserLocale` runs: the audit row's before-hash is this value, which the
+    // `loadSettings` snapshot below does not carry — `locale` lives on the user's record, so a
+    // settings-snapshot hash would be `hash(undefined)/hash(undefined)` on every locale change.
+    // `loadUserLocaleChoice` (not `loadUserLocale`): on a first save there is no choice yet, so
+    // the before-hash must read `hash(null)` rather than hashing the effective-locale fallback,
+    // which would lie about what the person previously picked.
+    const localeBefore = body.locale !== undefined ? loadUserLocaleChoice(tenant) : undefined;
     if (body.locale !== undefined) {
       if (!isAppLocale(body.locale)) {
         throw new ApiError("invalid_request", "locale must be en or id", 400);
@@ -416,7 +427,43 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
       injectionGuardBypass: serverMode ? undefined : readOptionalBoolean(body.injectionGuardBypass),
       editTurnCapUsd: readOptionalNumber(body.editTurnCapUsd),
     };
+    // F2: read the state the write is about to replace, so each audit row can carry the hashes of
+    // before and after — the field's name and proof a change happened, never a value (spec S2).
+    // `locale` is the one personal field (a member's own UI language) stored outside the desk
+    // settings snapshot: its before/after come from `localeBefore`/`body.locale`, not the record.
+    const auditedFields = [
+      ...(body.locale !== undefined ? ["locale"] : []),
+      ...Object.keys(patch).filter((field) => (patch as Record<string, unknown>)[field] !== undefined),
+    ];
+    const settingsBefore = auditedFields.length > 0 ? loadSettings(tenant) : null;
     const saved = saveSettings(patch, tenant);
+    if (settingsBefore) {
+      const values = saved as unknown as Record<string, unknown>;
+      const before = settingsBefore as unknown as Record<string, unknown>;
+      for (const field of auditedFields) {
+        // HMAC under the desk's wrap key, not bare sha256: a digest over a small value space
+        // (locale has two valid values) is a lookup table for any reader of the log, so the
+        // keyed hash keeps "proof of change" without disclosing which value was saved.
+        const auditKey = getLocalVaultKey();
+        const digest = (value: unknown) =>
+          createHmac("sha256", auditKey)
+            .update(JSON.stringify(value ?? null))
+            .digest("hex");
+        reportAuditEvent({
+          tenantId: tenant.tenantId,
+          event: "settings.change",
+          actorKind: "user",
+          actorId: tenant.userId ?? null,
+          targetKind: "settings",
+          targetId: field,
+          outcome: "ok",
+          refHash:
+            field === "locale"
+              ? `${digest(localeBefore)}/${digest(body.locale)}`
+              : `${digest(before[field])}/${digest(values[field])}`,
+        });
+      }
+    }
     // SR-163: on the server the key is the company's, so it reaches every desk of the company.
     if (requestsKeyWrite(body, serverMode)) {
       await mirrorKeysToCompanyDesks(patch, tenant);

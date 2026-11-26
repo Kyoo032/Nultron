@@ -33,6 +33,8 @@ export function buildAiTools(options: {
   /** Absent for a run whose paid media is the person's own click (the studios): every call runs. */
   permission?: MediaPermission | undefined;
   disabled: ReadonlySet<string>;
+  /** The running agent, stamped on each tool.call audit row (F2). */
+  agentId?: string | undefined;
 }): AiToolSet {
   const tools: ToolSet = {};
   const offered: string[] = [];
@@ -48,7 +50,7 @@ export function buildAiTools(options: {
       execute: async (args: unknown, call?: ToolCallOptions) => {
         const input = scrubUnreachableMediaArgs(args);
         try {
-          return await invokeToolGuarded(definition, input, options.tenant, options.budget, options.egress, options.permission);
+          return await invokeToolGuarded(definition, input, options.tenant, options.budget, options.egress, options.permission, options.agentId);
         } catch (error) {
           // A cancel ends the run. Only a failure on a live run goes back to the model to recover from.
           if (isRunAbort(options.signal, call?.abortSignal)) {

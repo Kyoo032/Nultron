@@ -331,6 +331,32 @@ describe("POST /api/v1/settings", () => {
  * `AGENTFORGE_SERVER` in this process would turn on the router's session gate and answer 401 to
  * everything, and would change every other test in the file.
  */
+describe("POST /api/v1/settings audit rows (F2)", () => {
+  it("logs a locale change as keyed hashes of the old and new language, never the values' neighbours", async () => {
+    const { createHmac } = await import("node:crypto");
+    const { sql } = await import("@agentforge/db");
+    const { getLocalVaultKey } = await import("@agentforge/db/vault-key");
+    const digest = (value: unknown) =>
+      createHmac("sha256", getLocalVaultKey()).update(JSON.stringify(value ?? null)).digest("hex");
+
+    await json("POST", "/api/v1/settings", { locale: "en" });
+    const response = await json("POST", "/api/v1/settings", { locale: "id" });
+    expect(response.status).toBe(200);
+
+    const row = sql
+      .prepare(
+        `SELECT ref_hash FROM audit_events
+         WHERE event = 'settings.change' AND target_id = 'locale' ORDER BY seq DESC LIMIT 1`,
+      )
+      .get() as { ref_hash: string };
+    // The before-hash must be the person's previous language — a snapshot of the settings record
+    // (which carries no `locale`) would hash `undefined` twice and read as "no change" (BUG_0006).
+    expect(row.ref_hash).toBe(`${digest("en")}/${digest("id")}`);
+
+    await json("POST", "/api/v1/settings", { locale: "en" });
+  });
+});
+
 describe("POST /api/v1/settings in server mode", () => {
   const HOSTED = { isServerMode: () => true };
   const DESK = { isServerMode: () => false };
@@ -582,6 +608,9 @@ describe("POST /api/v1/settings/reset", () => {
       "legal",
       // Channel lists and stored conversations; the bot token itself is inside settings.enc.
       "channels",
+      // Delegation runs and MCP connector state, both host-written per desk.
+      "delegations",
+      "mcp",
       "models-cache.json",
       "models-dev-cache.json",
       "models-dev-cache.meta.json",

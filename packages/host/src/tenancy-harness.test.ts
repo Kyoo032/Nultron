@@ -233,6 +233,7 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
 
   // --- threads and runs ---------------------------------------------------------------------
   { method: "GET", path: "/api/v1/threads/:threadId", params: { threadId: "threadId" } },
+  { method: "GET", path: "/api/v1/threads/:threadId/subagents", params: { threadId: "threadId" } },
   { method: "DELETE", path: "/api/v1/threads/:threadId", params: { threadId: "threadId" } },
   { method: "POST", path: "/api/v1/voice/sessions/:id/end", params: { id: "unseeded" }, body: {} },
   {
@@ -583,6 +584,46 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     body: {},
     refusal: "indistinguishable",
     why: FOLDER_PROPOSAL_WHY,
+  },
+
+  // --- mcp connectors ---------------------------------------------------------------------------
+  // `:connectorId` is not a row id — it is one of a fixed catalogue of connector names
+  // (`MCP_CONNECTOR_IDS` in packages/core/src/mcp/index.ts, checked by `parseConnectorId` in
+  // handlers/mcp.ts). The tenant-scoped *connection* row lives in the desk's settings under that
+  // key, so a foreign call names B's own connector slot, never A's. Every request below is
+  // refused on the param or the body before the store is touched, identically for A's id and a
+  // ghost: the prover is that an unseeded name gets the same 400 either way.
+  {
+    method: "POST",
+    path: "/api/v1/mcp/connectors/:connectorId",
+    params: { connectorId: "unseeded" },
+    body: {},
+    refusal: "indistinguishable",
+    why:
+      "The param is a catalogue key, not a row id: `parseConnectorId` (handlers/mcp.ts) rejects " +
+      "an unknown name with a 400 before `mcpStore()` is asked anything, and a known name that " +
+      "is not B's own connector gets the identical refusal — the connection itself is scoped " +
+      "inside the tenant's settings.",
+  },
+  {
+    method: "DELETE",
+    path: "/api/v1/mcp/connectors/:connectorId",
+    params: { connectorId: "unseeded" },
+    refusal: "indistinguishable",
+    why:
+      "Same catalogue-key param, and `mcpStore().disconnect` (mcp/store.ts) only ever deletes the " +
+      "row inside the caller's own tenant settings — there is no A-side row to reach.",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/mcp/connectors/:connectorId/test",
+    params: { connectorId: "unseeded" },
+    body: {},
+    refusal: "indistinguishable",
+    why:
+      "Same catalogue-key param; `handlePostMcpConnectorTest` (handlers/mcp.ts) answers 400 " +
+      "`not_connected` for a connector the caller's own tenant never saved, which is every " +
+      "connector name B can send — before any network call.",
   },
 ];
 
