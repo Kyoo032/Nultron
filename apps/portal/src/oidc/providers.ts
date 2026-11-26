@@ -4,6 +4,7 @@
  * e-mail claim is the verified one, and which claims make up the verified e-mail.
  */
 import type { OidcConfig, OidcProviderConfig } from "../config";
+import type { OidcDiscovery } from "./discovery";
 
 export type OidcProviderId = "google" | "microsoft";
 
@@ -21,9 +22,15 @@ export interface OidcProvider {
   /**
    * The claims that settle "this is the e-mail the seat belongs to, and the provider verified it":
    * the e-mail value itself, and whether the provider says it is verified. A provider that proves
-   * an address but does not say it is verified does not sign anyone in.
+   * an address but does not say it is verified does not sign anyone in. `document` is the
+   * provider's own discovery document (fetched from the pinned, HTTPS discovery URL): Entra
+   * resolves a configured tenant *domain* to its directory GUID in `issuer`, which is the only
+   * trustworthy source for it.
    */
-  readonly emailFromClaims: (claims: Readonly<Record<string, unknown>>) => string | null;
+  readonly emailFromClaims: (
+    claims: Readonly<Record<string, unknown>>,
+    document: OidcDiscovery,
+  ) => string | null;
 }
 
 function claimsEmail(claims: Readonly<Record<string, unknown>>): string | null {
@@ -33,6 +40,8 @@ function claimsEmail(claims: Readonly<Record<string, unknown>>): string | null {
 
 const GOOGLE_ISSUER = "https://accounts.google.com";
 const ENTRA_ISSUER = /^https:\/\/login\.microsoftonline\.com\//;
+const ENTRA_GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ENTRA_ISSUER_TID = /^https:\/\/login\.microsoftonline\.com\/([0-9a-f-]{36})\/v2\.0$/i;
 
 function microsoftIssuerOk(iss: string, claims: Readonly<Record<string, unknown>>): boolean {
   const tid = claims.tid;
@@ -101,18 +110,38 @@ function googleEmail(claims: Readonly<Record<string, unknown>>): string | null {
 }
 
 /**
+ * The directory GUID a `preferred_username` may be trusted from: `tenant` itself when the
+ * operator configured the tenant ID, else the GUID the configured discovery endpoint names in
+ * `issuer`. Microsoft resolves a configured tenant *domain* to its directory before serving the
+ * document, and the endpoint is pinned to `login.microsoftonline.com`, so `issuer` is the
+ * directory's own word for its GUID -- the `tid` a token carries is compared against that, never
+ * against the domain string (Entra never puts a domain in `tid`). `common` and the `{tenantid}`
+ * template it answers resolve to nothing: a multi-tenant authority vouches for no single
+ * tenant's UPN, so the fallback stays off there.
+ */
+function trustedTenantId(tenant: string, document: OidcDiscovery): string | null {
+  if (ENTRA_GUID.test(tenant)) {
+    return tenant;
+  }
+  return ENTRA_ISSUER_TID.exec(document.issuer)?.[1] ?? null;
+}
+
+/**
  * Microsoft (Entra): `email_verified` when it is present, and otherwise the tenant-verified
  * `preferred_username` -- a managed account's UPN is an address the tenant asserts, while a plain
  * `email` claim an end user typed is not. The UPN is only trusted from the deployment's own
- * configured tenant (`tid === PORTAL_OIDC_MICROSOFT_TENANT`): in any other Entra tenant an
- * attacker administers the UPN themselves, so it proves nothing about the mailbox it names.
+ * configured tenant (`tid` matches the tenant's GUID, configured or resolved through discovery):
+ * in any other Entra tenant an attacker administers the UPN themselves, so it proves nothing
+ * about the mailbox it names.
  */
 function microsoftEmail(trustedTenant: string) {
-  return (claims: Readonly<Record<string, unknown>>): string | null => {
+  return (claims: Readonly<Record<string, unknown>>, document: OidcDiscovery): string | null => {
     if (claims.email_verified === true) {
       return claimsEmail(claims);
     }
-    if (claims.tid !== trustedTenant) {
+    const tid = trustedTenantId(trustedTenant, document);
+    const claimed = claims.tid;
+    if (tid === null || typeof claimed !== "string" || claimed.toLowerCase() !== tid.toLowerCase()) {
       return null;
     }
     const upn = claims.preferred_username;

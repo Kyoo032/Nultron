@@ -122,7 +122,18 @@ export async function liveWebSessionUser(
       if (user?.status !== "active") {
         return null;
       }
-      return (await mustChangePasswordFirst(runtime, ops, user.id)) ? null : user;
+      if (await mustChangePasswordFirst(runtime, ops, user.id)) {
+        // `orgs.sso_required` gives a non-owner no password door to satisfy a forced change on:
+        // the OIDC callback mints their cookie exempting this read (`mustChangeExempt` in
+        // routes/oidc.ts), and the provider's proof stands in at use too, or the cookie it just
+        // made would be dead on arrival. An owner, or anyone whose org still allows passwords,
+        // is held to the change exactly as before.
+        const org = await ops.orgs.findById(user.orgId);
+        if (!(org?.ssoRequired === true && user.role !== "owner")) {
+          return null;
+        }
+      }
+      return user;
     });
   } catch {
     return null;

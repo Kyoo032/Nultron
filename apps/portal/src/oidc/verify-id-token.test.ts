@@ -7,7 +7,15 @@
 import { createHash, generateKeyPairSync, sign as cryptoSign } from "node:crypto";
 import type { JsonWebKey } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import type { OidcDiscovery } from "./discovery";
 import { oidcProviders, type OidcProvider } from "./providers";
+
+const STUB_DOC: OidcDiscovery = {
+  issuer: "https://accounts.google.com",
+  authorizationEndpoint: "https://idp.test/authorize",
+  tokenEndpoint: "https://idp.test/token",
+  jwksUri: "https://idp.test/jwks",
+};
 import { verifyIdToken } from "./verify-id-token";
 
 const GOOGLE = oidcProviders({
@@ -145,7 +153,7 @@ describe("verifyIdToken", () => {
     const result = await check(unverified, keys);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(GOOGLE.emailFromClaims(result.claims)).toBeNull();
+      expect(GOOGLE.emailFromClaims(result.claims, STUB_DOC)).toBeNull();
     }
   });
 });

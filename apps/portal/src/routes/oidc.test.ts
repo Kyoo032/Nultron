@@ -19,11 +19,17 @@ import { startTestPortal, type PortalHarness } from "../testing/server";
 import type { IdTokenResult } from "../oidc/verify-id-token";
 
 const IDP = "https://idp.test";
+/** The Entra tenant GUID the microsoft stub's discovery document resolves its tenant domain to. */
+const MS_TID = "72f988bf-86f1-41af-91ab-2d7cd011db47";
 const DISCOVERY_DOC = {
   issuer: "https://accounts.google.com",
   authorization_endpoint: `${IDP}/authorize`,
   token_endpoint: `${IDP}/token`,
   jwks_uri: `${IDP}/jwks`,
+};
+const MS_DISCOVERY_DOC = {
+  ...DISCOVERY_DOC,
+  issuer: `https://login.microsoftonline.com/${MS_TID}/v2.0`,
 };
 
 /** What the stub IdP answers; `tokenStatus` flips the exchange to a failure for one test. */
@@ -31,7 +37,15 @@ const idp = { tokenStatus: 200 };
 
 const idpFetch: typeof fetch = (async (input: string | URL | Request) => {
   const url = String(input);
-  if (url.startsWith("https://accounts.google.com/") || url.startsWith("https://login.microsoftonline.com/")) {
+  if (url.startsWith("https://login.microsoftonline.com/")) {
+    // A tenant-scoped Entra discovery document names the directory's real GUID in `issuer`,
+    // whatever the configured tenant string was (id, domain or "common").
+    return new Response(JSON.stringify(MS_DISCOVERY_DOC), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }
+  if (url.startsWith("https://accounts.google.com/")) {
     return new Response(JSON.stringify(DISCOVERY_DOC), {
       status: 200,
       headers: { "content-type": "application/json" },
@@ -86,14 +100,14 @@ async function startRoundTrip(agent: ReturnType<typeof browserAt>, provider = "g
 }
 
 /** The claims the microsoft stub returns next: Entra verified e-mail, or the own-tenant UPN. */
-function verifyAsMicrosoft(email: string | null, subject = "msub-1", tid = "tenant-1"): void {
+function verifyAsMicrosoft(email: string | null, subject = "msub-1", tid = "tenant-1", upn = "upn@pilot.test"): void {
   nextVerify = {
     ok: true,
     claims: {
       sub: subject,
       iss: `https://login.microsoftonline.com/${tid}/v2.0`,
       tid,
-      ...(email === null ? { preferred_username: "upn@pilot.test" } : { email, email_verified: true }),
+      ...(email === null ? { preferred_username: upn } : { email, email_verified: true }),
     },
   };
 }
@@ -224,6 +238,20 @@ describe("OIDC sign-in (F8b)", () => {
     expect(reply.status).toBe(302);
   });
 
+  it("trusts a UPN from the tenant the configured authority resolves to", async () => {
+    // `PORTAL_OIDC_MICROSOFT_TENANT` here is "tenant-1", not a GUID: the UPN check must compare
+    // `tid` against the GUID the discovery document's `issuer` names, or every UPN sign-in is
+    // refused whatever tenant it came from.
+    await addUser(portal.store.store, fixture, "upn@pilot.test");
+    verifyAsMicrosoft(null, "msub-upn", MS_TID);
+    const agent = browserAt(portal);
+    const state = await startRoundTrip(agent, "microsoft");
+    const reply = await agent.get(`/auth/oidc/microsoft/callback?state=${encodeURIComponent(state)}&code=abc`);
+    expect(reply.status).toBe(302);
+    const actions = await auditActions(portal, fixture.tenant.id);
+    expect(actions).toContain("oidc.sign_in:");
+  });
+
   it("does not trust a Microsoft UPN a different tenant asserted", async () => {
     // preferred_username is tenant-verified only inside the deployment's own Entra tenant: a
     // foreign tenant's admin can set any UPN they like, so it matches no seat.
@@ -349,6 +377,47 @@ describe("sso_required under the password sign-in", () => {
       const reply = await postPassword(agent, page, "st-pw", person.username, "Chosen-Password-1");
       expect(reply.status).toBe(403);
       expect(reply.text).toContain("single sign-on");
+    } finally {
+      await pilot.portal.close();
+    }
+  });
+
+  it("keeps an OIDC-minted cookie live for a non-owner still owed a forced change", async () => {
+    const pilot = await startPasswordPilot({
+      config: {
+        oidc: {
+          google: { clientId: "g-client", clientSecret: "g-secret" },
+          microsoft: null,
+        },
+      },
+      routeOptions: { oidcSeams: { fetchImpl: idpFetch, verifyIdTokenImpl: stubVerify } },
+    });
+    try {
+      // No `chosen`: the generated credential still says must_change, the flag every door is
+      // held to -- but under sso_required a non-owner has no password door to satisfy it on.
+      const person = await makePerson(pilot, { role: "member" });
+      await pilot.portal.store.store.tx(pilot.fixture.tenant.id, (ops) =>
+        ops.orgs.setSsoRequired(pilot.fixture.org.id, true),
+      );
+      const device = await pilot.portal.store.store.tx(pilot.fixture.tenant.id, (ops) =>
+        ops.deviceCodes.create({
+          rawDeviceCode: randomToken(),
+          installId: "inst-oidc",
+          tenantId: pilot.fixture.tenant.id,
+        }),
+      );
+      verifyAs(person.email);
+      const agent = browserAt(pilot.portal);
+      const page = await agent.get(`/activate?code=${encodeURIComponent(device.userCode)}`);
+      const start = await agent.get(ssoLink(page.text, "google"));
+      const state = new URL(start.location as string).searchParams.get("state") as string;
+      const callback = await agent.get(`/auth/oidc/google/callback?state=${encodeURIComponent(state)}&code=abc`);
+      expect(callback.status).toBe(302);
+      // The callback's cookie must pass liveWebSessionUser's own must_change read, or the
+      // activate door's sign-in is dead on arrival even though minting exempted it.
+      const landing = await agent.get(callback.location as string);
+      expect(landing.status).toBe(200);
+      expect(landing.text).toContain("Approve");
     } finally {
       await pilot.portal.close();
     }

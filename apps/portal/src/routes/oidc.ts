@@ -317,7 +317,7 @@ async function callbackOidc(
   const claims = verified.claims;
   const subject = claims.sub as string;
   const issuer = claims.iss as string;
-  const email = provider.emailFromClaims(claims);
+  const email = provider.emailFromClaims(claims, document);
 
   // Who the session is for: an existing (issuer, subject) binding first, then the seat the
   // provider's verified e-mail matches. Neither is a sign-in; there is no JIT account creation.
