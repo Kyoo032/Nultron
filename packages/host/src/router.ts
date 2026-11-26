@@ -614,7 +614,11 @@ async function gate(
     // The bearer key for the assigned endpoint lives sealed on the row and is opened per request
     // (DFIND-155); only the MAC-verified endpoint above can reach this line, and the key opens only
     // as that endpoint's — so an endpoint rewritten in sqlite gets neither.
-    const gatewayEndpointKey = session.gatewayEndpoint ? await store.readEndpointKey(session.id) : null;
+    // Bind the key to the endpoint this request uses: a rotation between the two reads never
+    // pairs the session's (older) endpoint with the row's newer key.
+    const gatewayEndpointKey = session.gatewayEndpoint
+      ? await store.readEndpointKey(session.id, session.gatewayEndpoint)
+      : null;
     return {
       ok: true,
       session: {

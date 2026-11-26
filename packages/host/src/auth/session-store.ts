@@ -71,7 +71,7 @@ export interface SessionStore {
    * The per-endpoint bearer key of a live session, opened only when the row's endpoint MAC
    * verifies (DFIND-155/160): null for none, an untrusted endpoint, or a blob that does not open.
    */
-  readEndpointKey(id: string): Promise<string | null>;
+  readEndpointKey(id: string, expectedEndpoint?: string | null): Promise<string | null>;
   /**
    * Drop sessions whose absolute expiry has passed, and wipe the sealed token of every session that
    * has idled out, whose row stays so it can still report itself. Returns how many rows went.
@@ -166,11 +166,13 @@ export function createMemorySessionStore(seed: readonly SessionRecord[] = []): S
       const stored = rows.get(key);
       return stored && stored.revokedAt === null ? (sealed.get(key) ?? null) : null;
     },
-    async readEndpointKey(id) {
+    async readEndpointKey(id, expectedEndpoint) {
       const key = hashSessionId(id);
       const stored = rows.get(key);
       return stored && stored.revokedAt === null && stored.gatewayEndpoint
-        ? (endpointKeys.get(key) ?? null)
+        ? expectedEndpoint === undefined || stored.gatewayEndpoint === expectedEndpoint
+          ? (endpointKeys.get(key) ?? null)
+          : null
         : null;
     },
     async purgeExpired(before) {
@@ -356,7 +358,7 @@ export function createDrizzleSessionStore(database: Database): SessionStore {
         .limit(1);
       return row?.refreshSealed ?? null;
     },
-    async readEndpointKey(id) {
+    async readEndpointKey(id, expectedEndpoint) {
       const authSessions = await table();
       const idHash = hashSessionId(id);
       const [row] = await database
@@ -375,6 +377,11 @@ export function createDrizzleSessionStore(database: Database): SessionStore {
       // blob that does not open as this row and endpoint's key is not a key.
       const key = await wrapKey();
       if (!endpointMacVerify(idHash, row.gatewayEndpoint, row.gatewayEndpointMac, key)) {
+        return null;
+      }
+      // The endpoint the caller uses must be the endpoint this row holds: a rotation that landed
+      // between its two reads never pairs a stale endpoint with a newer key.
+      if (expectedEndpoint !== undefined && row.gatewayEndpoint !== expectedEndpoint) {
         return null;
       }
       return openEndpointKey(idHash, row.endpointKeySealed, row.gatewayEndpoint, key);
@@ -403,8 +410,8 @@ export function createHostSessionStore(): SessionStore {
     return inner;
   };
   return {
-    async create(session, refreshSealed) {
-      return (await resolve()).create(session, refreshSealed);
+    async create(session, refreshSealed, endpointKey) {
+      return (await resolve()).create(session, refreshSealed, endpointKey);
     },
     async find(id) {
       return (await resolve()).find(id);
