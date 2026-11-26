@@ -327,7 +327,18 @@ async function handleEmailWebhookInner(request: HostRequest, deps: EmailWebhookD
         const thread = await openThread({ tenantId: actor.tenant, agentId: channel.agentId, title: subject });
         threadId = thread.id;
         if (threadHeaders.threadKey) {
-          store.createThread(channel.id, threadId, threadHeaders.threadKey, hash);
+          try {
+            store.createThread(channel.id, threadId, threadHeaders.threadKey, hash);
+          } catch {
+            // Two mails of one batch raced to open the same mail thread: the unique key rejects
+            // the second insert, so fall back to the mapping the other mail just wrote.
+            const raced = store.findThread(channel.id, threadHeaders.threadKey, hash);
+            if (raced) {
+              threadId = raced.threadId;
+            } else {
+              throw new Error("email_thread_mapping_failed");
+            }
+          }
         }
       }
       // Failures before the run unmark the dedupe row, so the provider's redelivery retries
