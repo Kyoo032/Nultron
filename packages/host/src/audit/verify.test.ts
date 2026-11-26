@@ -33,6 +33,26 @@ describe("audit verify (AC-2.4, AC-2.8)", () => {
     expect(result).toEqual({ ok: true, checked: 3 });
   });
 
+  it("verifies a chain where tenants interleave the one global sequence", () => {
+    appendAuditEvent(db, EVENT);
+    appendAuditEvent(db, { ...EVENT, tenantId: "t2" });
+    appendAuditEvent(db, EVENT);
+    const result = verifyAuditChain(db);
+    expect(result).toEqual({ ok: true, checked: 3 });
+  });
+
+  it("links the first post-purge row to the checkpoint, keeping seqs monotonic", () => {
+    for (let index = 0; index < 3; index += 1) {
+      appendAuditEvent(db, EVENT);
+    }
+    expect(purgeAuditEvents(db, 3)).toEqual({ purged: 3 });
+    const seq = appendAuditEvent(db, EVENT);
+    // AUTOINCREMENT keeps numbering where the purge left off — the row is seq 4, not a reset 1.
+    expect(seq).toBe(4);
+    const result = verifyAuditChain(db);
+    expect(result).toEqual({ ok: true, checked: 1 });
+  });
+
   it("names the first row whose stored hash no longer matches", () => {
     appendAuditEvent(db, EVENT);
     appendAuditEvent(db, EVENT);

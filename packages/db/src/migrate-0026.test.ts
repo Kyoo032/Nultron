@@ -73,4 +73,27 @@ describe("0026_audit_events", () => {
       sqlite.close();
     }
   });
+
+  it("still has usable tables on a database stamped past 0026 without them", () => {
+    const sqlite = new Database(":memory:");
+    try {
+      ensureSchema(sqlite);
+      // The baseline-stamp case: the journal row is already there, so the runner applies nothing —
+      // only `ensureAuditTables` can put the tables back (BUG_0003).
+      sqlite.exec(
+        "DROP TRIGGER audit_events_no_update; DROP TRIGGER audit_events_no_delete; " +
+          "DROP TABLE audit_events; DROP TABLE audit_checkpoints; DROP TABLE audit_purge_window",
+      );
+      expect(
+        sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'audit_events'").all(),
+      ).toHaveLength(0);
+      ensureSchema(sqlite);
+      insert(sqlite, 1, "evt-healed");
+      expect(() => sqlite.prepare("UPDATE audit_events SET event = 'x' WHERE seq = 1").run()).toThrow();
+      const row = sqlite.prepare("SELECT count(*) AS n FROM audit_purge_window").get() as { n: number };
+      expect(row.n).toBe(1);
+    } finally {
+      sqlite.close();
+    }
+  });
 });

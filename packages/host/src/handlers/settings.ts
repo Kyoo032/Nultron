@@ -27,6 +27,7 @@ import {
   loadSettings,
   loadUserGuide,
   loadUserKeyLater,
+  loadUserLocale,
   localDataDir,
   saveKeysToDesks,
   saveUserLocale,
@@ -390,6 +391,10 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
     if (requestsKeyWrite(body, serverMode)) {
       assertMayChangeCompanyKey(tenant);
     }
+    // Read before `saveUserLocale` runs: the audit row's before-hash is this value, which the
+    // `loadSettings` snapshot below does not carry — `locale` lives on the user's record, so a
+    // settings-snapshot hash would be `hash(undefined)/hash(undefined)` on every locale change.
+    const localeBefore = body.locale !== undefined ? loadUserLocale(tenant) : undefined;
     if (body.locale !== undefined) {
       if (!isAppLocale(body.locale)) {
         throw new ApiError("invalid_request", "locale must be en or id", 400);
@@ -420,12 +425,12 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
     };
     // F2: read the state the write is about to replace, so each audit row can carry the hashes of
     // before and after — the field's name and proof a change happened, never a value (spec S2).
-    // `locale` is not listed: it is the one personal field (a member's own UI language), stored
-    // outside the desk settings snapshot `loadSettings` reads, so hashing it here would stamp the
-    // same empty before/after digests on every save.
-    const auditedFields = Object.keys(patch).filter(
-      (field) => (patch as Record<string, unknown>)[field] !== undefined,
-    );
+    // `locale` is the one personal field (a member's own UI language) stored outside the desk
+    // settings snapshot: its before/after come from `localeBefore`/`body.locale`, not the record.
+    const auditedFields = [
+      ...(body.locale !== undefined ? ["locale"] : []),
+      ...Object.keys(patch).filter((field) => (patch as Record<string, unknown>)[field] !== undefined),
+    ];
     const settingsBefore = auditedFields.length > 0 ? loadSettings(tenant) : null;
     const saved = saveSettings(patch, tenant);
     if (settingsBefore) {
@@ -444,7 +449,10 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
           targetKind: "settings",
           targetId: field,
           outcome: "ok",
-          refHash: `${digest(before[field])}/${digest(values[field])}`,
+          refHash:
+            field === "locale"
+              ? `${digest(localeBefore)}/${digest(body.locale)}`
+              : `${digest(before[field])}/${digest(values[field])}`,
         });
       }
     }
