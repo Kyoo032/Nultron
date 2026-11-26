@@ -34,7 +34,7 @@ proc.binding = (name) => (name === "constants" ? { fs: fs.constants, os: os.cons
 
 // (b) hard cap on wasm linear memory. Pyodide defines its own memory inside the module (not imported), so wrap grow():
 // emscripten_resize_heap catches the throw and returns 0 -> malloc fails -> MemoryError.
-const CAP_PAGES = Math.floor(((cfg.wasmMaxMb ?? 512) * 1048576) / 65536);
+const CAP_PAGES = Math.floor(((cfg.wasmMaxMb ?? 256) * 1048576) / 65536);
 const origGrow = WebAssembly.Memory.prototype.grow;
 WebAssembly.Memory.prototype.grow = function (delta) {
   if (this.buffer.byteLength / 65536 + delta > CAP_PAGES) throw new RangeError("wasm memory cap reached");

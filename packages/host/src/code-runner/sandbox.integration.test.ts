@@ -328,7 +328,7 @@ suite("the real sandbox (Pyodide and QuickJS)", { timeout: LONG }, () => {
       }
     });
 
-    it("stops a Python memory bomb at the 512 MB wasm cap", async () => {
+    it("stops a Python memory bomb at the 256 MB wasm cap", async () => {
       const result = await runner.run(
         request("python", "a = []\nwhile True:\n    a.append(bytearray(10**7))", {}, "bomb-desk"),
       );

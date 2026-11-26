@@ -110,7 +110,7 @@ describe("the tool definition", () => {
       "64 KB",
       "100 KB",
       "30 seconds",
-      "512 MB",
+      "256 MB",
       "about 20 seconds",
       "timeout, memory, syntax, runtime, too_large, busy or unavailable",
     ]) {

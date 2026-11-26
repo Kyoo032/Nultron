@@ -20,7 +20,7 @@ import { Buffer } from "node:buffer";
 const proc = process;
 const send = proc.send.bind(proc);
 const cfg = JSON.parse(proc.argv[2] ?? "{}");
-const WASM_MAX_MB = cfg.wasmMaxMb ?? 256;
+const WASM_MAX_MB = cfg.wasmMaxMb ?? 128;
 const MAX_OUT_FILES = cfg.maxOutFiles ?? 20;
 const MAX_OUT_FILE_BYTES = cfg.maxOutFileBytes ?? 2 * 1024 * 1024;
 const MAX_WORKSPACE_FILES = cfg.maxWorkspaceFiles ?? 500;
@@ -66,7 +66,7 @@ function safeRelative(name) {
 function runJob(job) {
   const deadlineMs = job.deadlineMs ?? 25_000;
   const stackKb = job.stackKb ?? 256;
-  const heapLimitBytes = job.heapLimitBytes ?? 128 * 1024 * 1024;
+  const heapLimitBytes = job.heapLimitBytes ?? 64 * 1024 * 1024;
   const hardWasmCap = (WASM_MAX_MB - 16) * 1024 * 1024;
   const wasmCapBytes =
     job.wasmCapBytes ?? Math.min(hardWasmCap, Math.max(heapLimitBytes, wasmMem.buffer.byteLength + 16 * 1024 * 1024));

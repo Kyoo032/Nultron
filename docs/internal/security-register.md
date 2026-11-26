@@ -4669,8 +4669,8 @@ a wrapper, not an engine limit.** Both products. Raised by the sandbox lane (202
 Evidence: the Python child replaces `process.binding` with a function that answers `constants` from
 `fs.constants` and `os.constants` (`packages/host/src/code-runner/child/py-child.mjs:31-33`), because
 the NODEFS start-up calls it and `--permission` denies it. It also wraps
-`WebAssembly.Memory.prototype.grow` to throw past the cap (`:37-42`; `PY_WASM_MAX_MB` is 512,
-`packages/host/src/code-runner/limits.ts:21`), because Pyodide defines its own memory and Node's
+`WebAssembly.Memory.prototype.grow` to throw past the cap (`:37-42`; `PY_WASM_MAX_MB` is 256,
+`packages/host/src/code-runner/limits.ts:27`), because Pyodide defines its own memory and Node's
 `resourceLimits` do not cover wasm. Both rest on how Emscripten and Pyodide 314.0.7 behave today
 (`vendor/sandbox-runtime/MANIFEST.json`, key `pyodide`). A `memory.grow` instruction executed inside
 wasm never passes through the JavaScript wrapper. I did not look for a route by which a guest can supply
@@ -4718,15 +4718,20 @@ Gate: none.
 **Two busy Python children can take a large share of the hosted app's memory limit, and an out-of-memory
 kill may take the host with them.** Enterprise. Raised by the sandbox lane (2026-10-03). Open.
 
-Evidence: the wasm cap is 512 MB and the child's V8 old space is capped at 256 MB
-(`packages/host/src/code-runner/limits.ts:21`, `:27`); the prototype measured 300 to 700 MB resident for a
-Python child. Hosted allows 2 warm children in all and 2 runs at once, 1 per tenant
-(`HOSTED_WARM_TOTAL`, `HOSTED_MAX_RUNS`, `HOSTED_MAX_RUNS_PER_TENANT`, `limits.ts:50`, `:54-55`;
+Evidence: the wasm cap was 512 MB and the child's V8 old space was capped at 256 MB
+(`packages/host/src/code-runner/limits.ts`); the prototype measured 300 to 700 MB resident for a
+Python child. Hosted allowed 2 warm children in all and 2 runs at once, 1 per tenant
+(`HOSTED_WARM_TOTAL`, `HOSTED_MAX_RUNS`, `HOSTED_MAX_RUNS_PER_TENANT`;
 `createCodeLimiter`, `packages/host/src/code-runner/code-limiter.ts:60-63`), and an operator can raise
-the global caps with `AGENTFORGE_MAX_CODE_RUNS` (`limits.ts:57`). The children share the app container's
+the global caps with `AGENTFORGE_MAX_CODE_RUNS`. The children share the app container's
 memory limit with the host: 6 GB in compose (`webapp-deploy/compose.yml:122`) and 3 GiB in the Kubernetes
 pod (`webapp-deploy/k8s/base/app.yaml:72`). Two children at the top of the measurement take about 1.4 GB
 before the host's own use.
+
+Update 2026-11-26 (DFIND-166): the caps were shrunk so one sandboxed run fits inside a 768 MiB desk —
+Python wasm 256 MB, JavaScript wasm 128 MB and heap 64 MB, child old space 128 MB, hosted keeps 1 warm
+child and 1 run (`limits.ts:27-33`, `:59`, `:63-64`). One Python child is about 430 MB worst case, which
+leaves the host 300+ MB. Raising `AGENTFORGE_MAX_CODE_RUNS` on a 768 MiB desk re-opens this finding.
 
 What goes wrong if ignored: at the limit the kernel's out-of-memory killer picks a process in the
 container. If it picks the host, every tenant's request fails until the container restarts. The default
