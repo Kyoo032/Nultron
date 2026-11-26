@@ -27,6 +27,7 @@ import {
 } from "@/lib/email-channels-client";
 import { fetchVirtualAgents, type VirtualAgentInfo } from "@/lib/virtual-agents";
 import { t } from "@/lib/i18n";
+import { useMayDeleteDesk } from "@/lib/desk-delete-access";
 import { ModeHeader } from "@/components/mode-header";
 
 const NO_BOT: ChannelBotStatus = {
@@ -180,6 +181,8 @@ function EmailCard({
   const [agentId, setAgentId] = useState("");
   const [policy, setPolicy] = useState<"ignore" | "refuse">("ignore");
   const [pattern, setPattern] = useState("");
+  // Mutations are administer-gated host-side; members see the same card with the controls off.
+  const canAdminister = useMayDeleteDesk();
 
   const refresh = useCallback(async () => {
     try {
@@ -257,6 +260,7 @@ function EmailCard({
           aria-label={t("channels.email.addressAria")}
           value={address}
           data-testid="channels-email-address"
+          disabled={!canAdminister}
           onChange={(event) => setAddress(event.target.value)}
         />
         <select
@@ -264,6 +268,7 @@ function EmailCard({
           value={agentId}
           aria-label={t("channels.email.agentAria")}
           data-testid="channels-email-agent"
+          disabled={!canAdminister}
           onChange={(event) => setAgentId(event.target.value)}
         >
           <option value="">{t("channels.email.agentPlaceholder")}</option>
@@ -278,12 +283,18 @@ function EmailCard({
           value={policy}
           aria-label={t("channels.email.policyAria")}
           data-testid="channels-email-policy"
+          disabled={!canAdminister}
           onChange={(event) => setPolicy(event.target.value === "refuse" ? "refuse" : "ignore")}
         >
           <option value="ignore">{t("channels.email.policyIgnore")}</option>
           <option value="refuse">{t("channels.email.policyRefuse")}</option>
         </select>
-        <button type="submit" className="btn" disabled={busy || !agentId} data-testid="channels-email-add">
+        <button
+          type="submit"
+          className="btn"
+          disabled={busy || !agentId || !canAdminister}
+          data-testid="channels-email-add"
+        >
           {t("channels.email.add")}
         </button>
       </form>
@@ -311,7 +322,7 @@ function EmailCard({
               <button
                 type="button"
                 className="btn btn-quiet"
-                disabled={busy}
+                disabled={busy || !canAdminister}
                 data-testid="channels-email-remove"
                 aria-label={t("channels.email.remove")}
                 onClick={() =>
@@ -366,9 +377,15 @@ function EmailCard({
               aria-label={t("channels.email.allowlistAria")}
               value={pattern}
               data-testid="channels-email-pattern"
+              disabled={!canAdminister}
               onChange={(event) => setPattern(event.target.value)}
             />
-            <button type="submit" className="btn" disabled={busy} data-testid="channels-email-allowlist-add">
+            <button
+              type="submit"
+              className="btn"
+              disabled={busy || !canAdminister}
+              data-testid="channels-email-allowlist-add"
+            >
               {t("channels.email.allowlistAdd")}
             </button>
           </form>
@@ -385,7 +402,7 @@ function EmailCard({
                   <button
                     type="button"
                     className="btn btn-quiet"
-                    disabled={busy}
+                    disabled={busy || !canAdminister}
                     data-testid="channels-email-allowlist-remove"
                     aria-label={t("channels.email.allowlistRemove")}
                     onClick={() =>

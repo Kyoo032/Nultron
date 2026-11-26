@@ -64,12 +64,12 @@ function fakeStore(overrides: Partial<EmailStore> = {}): EmailStore & { seen: Se
     },
     removeAllowlistEntry: () => true,
     findThread: () => null,
-    createThread: (channelId: string, threadId: string, rootMessageId: string, userId: string) => ({
+    createThread: (channelId: string, threadId: string, rootMessageId: string, senderKey: string) => ({
       id: "et1",
       channelId,
       threadId,
       rootMessageId,
-      userId,
+      senderKey,
     }),
     removeThread: () => undefined,
     dropWorkspace: () => undefined,

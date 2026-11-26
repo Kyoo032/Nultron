@@ -1186,7 +1186,7 @@ export const emailThreads = sqliteTable(
       .references(() => emailChannels.id, { onDelete: "cascade" }),
     threadId: text("thread_id").notNull(),
     rootMessageId: text("root_message_id").notNull(),
-    userId: text("user_id").notNull(),
+    senderKey: text("sender_key").notNull(),
   },
-  (table) => [uniqueIndex("email_threads_root_unique").on(table.channelId, table.rootMessageId, table.userId)],
+  (table) => [uniqueIndex("email_threads_root_unique").on(table.channelId, table.rootMessageId, table.senderKey)],
 );

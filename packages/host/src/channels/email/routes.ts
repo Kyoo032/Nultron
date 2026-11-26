@@ -64,7 +64,9 @@ export function handleCreateEmailChannel(request: HostRequest, deps: EmailRouteD
     if (!agentId) {
       throw new ApiError("invalid_agent", "An email channel needs an agent.", 400);
     }
-    const domain = fromDomain(deps.env ?? process.env);
+    // Lowercased: domains are case-insensitive, and `readDelivery` lowercases the recipient, so a
+    // stored mixed-case address would silently miss every delivery for it.
+    const domain = fromDomain(deps.env ?? process.env)?.toLowerCase();
     let address = requested;
     if (address) {
       if (!ADDRESS_RE.test(address)) {

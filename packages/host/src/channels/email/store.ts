@@ -39,8 +39,8 @@ export type EmailThreadRow = {
   /** The chat thread the mail thread's replies run in. */
   threadId: string;
   rootMessageId: string;
-  /** The desk user this mail thread belongs to — senders never share a chat thread. */
-  userId: string;
+  /** sha256 of the sender address — senders never share a chat thread. */
+  senderKey: string;
 };
 
 type ChannelDb = {
@@ -85,8 +85,8 @@ export interface EmailStore {
   markInboundSeen(providerMessageId: string, channelId: string, at: number): boolean;
   /** Drops the dedupe mark so a transiently failed delivery can be retried by the provider. */
   unmarkInboundSeen(providerMessageId: string, channelId: string): void;
-  findThread(channelId: string, rootMessageId: string, userId: string): EmailThreadRow | null;
-  createThread(channelId: string, threadId: string, rootMessageId: string, userId: string): EmailThreadRow;
+  findThread(channelId: string, rootMessageId: string, senderKey: string): EmailThreadRow | null;
+  createThread(channelId: string, threadId: string, rootMessageId: string, senderKey: string): EmailThreadRow;
   /** Drops a stale mapping (its chat thread was deleted). */
   removeThread(id: string): void;
   /** Desk delete: the channel rows go, and the keyed tables cascade with them. */
@@ -188,25 +188,25 @@ export function createEmailStore(sql: EmailSql): EmailStore {
         .run(providerMessageId, channelId);
     },
 
-    findThread(channelId, rootMessageId, userId) {
+    findThread(channelId, rootMessageId, senderKey) {
       return (
         (sql
           .prepare(
             `SELECT id, channel_id AS channelId, thread_id AS threadId, root_message_id AS rootMessageId,
-                    user_id AS userId
-             FROM email_threads WHERE channel_id = ? AND root_message_id = ? AND user_id = ?`,
+                    sender_key AS senderKey
+             FROM email_threads WHERE channel_id = ? AND root_message_id = ? AND sender_key = ?`,
           )
-          .get(channelId, rootMessageId, userId) as EmailThreadRow | undefined) ?? null
+          .get(channelId, rootMessageId, senderKey) as EmailThreadRow | undefined) ?? null
       );
     },
 
-    createThread(channelId, threadId, rootMessageId, userId) {
-      const row: EmailThreadRow = { id: randomUUID(), channelId, threadId, rootMessageId, userId };
+    createThread(channelId, threadId, rootMessageId, senderKey) {
+      const row: EmailThreadRow = { id: randomUUID(), channelId, threadId, rootMessageId, senderKey };
       sql
         .prepare(
-          `INSERT INTO email_threads (id, channel_id, thread_id, root_message_id, user_id) VALUES (?, ?, ?, ?, ?)`,
+          `INSERT INTO email_threads (id, channel_id, thread_id, root_message_id, sender_key) VALUES (?, ?, ?, ?, ?)`,
         )
-        .run(row.id, row.channelId, row.threadId, row.rootMessageId, row.userId);
+        .run(row.id, row.channelId, row.threadId, row.rootMessageId, row.senderKey);
       return row;
     },
 

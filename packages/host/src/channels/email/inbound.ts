@@ -135,11 +135,19 @@ export type EmailWebhookTally = {
   duplicates: number;
   unknownAddress: number;
   autoSubmitted: number;
+  bounced: number;
   unknownSender: number;
   capped: number;
   refused: number;
   malformed: number;
 };
+
+// Reply-path daemons and empty envelope paths (MAILER-DAEMON, postmaster, `<>`, a bare `<`):
+// answering one restarts a bounce loop the auto-submitted header guard cannot see.
+const BOUNCE_SENDER = /^(?:mailer-daemon|postmaster|daemon)@|^<+$|^<>@/i;
+function isBounceSender(sender: string): boolean {
+  return BOUNCE_SENDER.test(sender);
+}
 
 /**
  * The audit row for one delivery: `channel.trigger` with the outcome in `outcome` (ok/denied/failed)
@@ -204,6 +212,7 @@ async function handleEmailWebhookInner(request: HostRequest, deps: EmailWebhookD
     duplicates: 0,
     unknownAddress: 0,
     autoSubmitted: 0,
+    bounced: 0,
     unknownSender: 0,
     capped: 0,
     refused: 0,
@@ -236,7 +245,12 @@ async function handleEmailWebhookInner(request: HostRequest, deps: EmailWebhookD
 
     const sender = delivery.envelopeSender ?? senderAddressOf(delivery.headers.from);
     const hash = sender ? senderHash(sender) : "";
-    if (!sender || !cap.admit(channel.id, hash)) {
+    if (!sender || isBounceSender(sender)) {
+      tally.bounced += 1;
+      audit(db, channel, "denied", "bounce", hash);
+      continue;
+    }
+    if (!cap.admit(channel.id, hash)) {
       tally.capped += 1;
       audit(db, channel, "denied", "capped", hash);
       continue;
@@ -291,11 +305,10 @@ async function handleEmailWebhookInner(request: HostRequest, deps: EmailWebhookD
         return;
       }
       // A mail in an already-filed mail thread reuses its chat thread — the mapping is per
-      // user, so two allowlisted senders in one mail conversation never share a chat. A mapping
+      // sender (its hash, never the address), so two allowlisted senders in one mail
+      // conversation never share a chat even when they map to the same desk user. A mapping
       // whose chat thread was deleted is dropped and refiled.
-      const existing = threadHeaders.threadKey
-        ? store.findThread(channel.id, threadHeaders.threadKey, actor.tenant.userId)
-        : null;
+      const existing = threadHeaders.threadKey ? store.findThread(channel.id, threadHeaders.threadKey, hash) : null;
       let threadId = "";
       if (existing) {
         const alive = db.prepare(`SELECT id FROM threads WHERE id = ?`).get(existing.threadId) as
@@ -312,12 +325,19 @@ async function handleEmailWebhookInner(request: HostRequest, deps: EmailWebhookD
         const thread = await openThread({ tenantId: actor.tenant, agentId: channel.agentId, title: subject });
         threadId = thread.id;
         if (threadHeaders.threadKey) {
-          store.createThread(channel.id, threadId, threadHeaders.threadKey, actor.tenant.userId);
+          store.createThread(channel.id, threadId, threadHeaders.threadKey, hash);
         }
       }
-      // Anything transient from here on unmarks the dedupe row, so the provider's redelivery
-      // gets another attempt once capacity or configuration recovers.
+      // Failures before the run unmark the dedupe row, so the provider's redelivery retries
+      // once capacity or configuration recovers. Once turns are saved the mark stays — a
+      // redelivery would rerun the agent and double-post the chat.
       const retry = () => store.unmarkInboundSeen(delivery.providerMessageId, channel.id);
+      const mailer = deps.mailer === undefined ? createMailer(env) : deps.mailer;
+      if (!mailer) {
+        retry();
+        audit(db, channel, "failed", "unconfigured", hash);
+        return;
+      }
       const runReply = deps.runReply ?? runEmailReply;
       const result = await runReply({
         tenant: actor.tenant,
@@ -329,12 +349,6 @@ async function handleEmailWebhookInner(request: HostRequest, deps: EmailWebhookD
           retry();
         }
         audit(db, channel, result.reason === "injection" ? "denied" : "failed", result.reason, hash);
-        return;
-      }
-      const mailer = deps.mailer === undefined ? createMailer(env) : deps.mailer;
-      if (!mailer) {
-        retry();
-        audit(db, channel, "failed", "unconfigured", hash);
         return;
       }
       const headers = replyHeaders({
@@ -357,7 +371,6 @@ async function handleEmailWebhookInner(request: HostRequest, deps: EmailWebhookD
         });
         audit(db, channel, "ok", "replied", hash);
       } catch {
-        retry();
         audit(db, channel, "failed", "send_failed", hash);
       }
     })().catch(() => {
