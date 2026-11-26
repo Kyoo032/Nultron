@@ -38,7 +38,10 @@ never content.
   `pinned.address` with `servername` set to the configured hostname for TLS. The guard is
   `assertReadOnlySelect` (`sql-guard.ts`): one statement, `SELECT`/`WITH` first, no comments,
   no `$`-bodies, and a FORBIDDEN set covering DDL/DML/`INTO`/`FOR`/session and side-effect
-  functions (`set_config`, `nextval`, `pg_advisory_*`, …). Even past it, the runner wraps the
+  functions (`set_config`, `nextval`, `pg_advisory_*`, …). Statement keywords are refused as
+  bare words, but the forbidden functions only when actually called (the word followed by `(`),
+  so a column that shares a function's name — `SELECT http FROM request_logs` — still reads
+  (2026-11-26, QA regression `sql-guard.test.ts`). Even past it, the runner wraps the
   query in `BEGIN READ ONLY` + `SET LOCAL statement_timeout` + a row cap, so a write-capable
   login still cannot write.
 - **MySQL / Azure Blob**: `POST` returns `501 driver_missing` — MySQL waits on Rizky's `mysql2`

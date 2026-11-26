@@ -7627,7 +7627,8 @@ the table allowlist.
 Fix: the guard's FORBIDDEN set now names the server-side read functions (`pg_read_file`,
 `pg_read_binary_file`, `pg_ls_dir`, `pg_stat_file`, `pg_ls_*` catalog variants, `pg_export_snapshot`, the
 `dblink_*` family, replication-slot functions, `pg_logical_slot_*_changes`, and the `http*` extension
-functions). `sql-guard.test.ts` adds a refusal case for each class. Catalog views were already covered by the
+functions — `packages/host/src/data-sources/sql-guard.ts:84`). `sql-guard.test.ts:35` adds a refusal case
+for each class. Catalog views were already covered by the
 FROM/JOIN allowlist.
 
 Gate: closed — the function names are refused before the query reaches Postgres.
@@ -7643,8 +7644,9 @@ connector to reach it.
 
 Fix: `DestinationAllowlist` (`packages/core/src/security/safe-fetch.ts`) and `assertAllowedDestination`
 take the caller's `tenantId` and fail closed without one; the host reader scopes the row lookup by
-`tenant_id`; S3 and Postgres connectors pass their row's tenant. `handlers/data-sources.test.ts` adds a
-cross-tenant refusal case.
+`tenant_id`; S3 and Postgres connectors pass their row's tenant
+(`packages/core/src/security/safe-fetch.ts:229`, `packages/host/src/data-sources/allowlist.ts:53`).
+`handlers/data-sources.test.ts` adds a cross-tenant refusal case.
 
 Gate: closed — a tenant cannot reach another tenant's approved destination.
 
@@ -7656,7 +7658,8 @@ Gate: closed — a tenant cannot reach another tenant's approved destination.
 Evidence before the fix: `packages/host/src/data-sources/store.ts` returned `raw.slice(-4)`, which is the
 entire secret when it is four characters or shorter — the list endpoint then exposed it.
 
-Fix: secrets of ≤4 characters return a fixed `••••` mask; longer ones still show their last four.
+Fix: secrets of ≤4 characters return a fixed `••••` mask; longer ones still show their last four
+(`packages/host/src/data-sources/store.ts:80`).
 
 Gate: closed — no response body can carry a whole stored credential.
 
@@ -7671,7 +7674,8 @@ injection / secret-shaped content) and `maskPii` first — so a hostile or sensi
 connected source bypassed both gates.
 
 Fix: sync runs `injectionRule(tenant, key, text)` per object (a hit counts the file failed with
-`injection_blocked`) and indexes `maskPii(text)`, matching the manual-upload path.
+`injection_blocked`) and indexes `maskPii(text)` (`packages/host/src/data-sources/sync.ts:56` and `:66`),
+matching the manual-upload path.
 
 Gate: closed — synced content gets the same gates as an upload.
 

@@ -1293,7 +1293,7 @@
    "sourceId": {
     "type": "string",
     "minLength": 1,
-    "description": "Data source id (ds-...) to query"
+    "description": "Data source id (ds-...) or exact source name as shown in Settings → Data Sources"
    },
    "sql": {
     "type": "string",

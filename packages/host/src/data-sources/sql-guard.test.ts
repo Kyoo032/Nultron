@@ -66,6 +66,22 @@ describe("assertReadOnlySelect", () => {
     }
   });
 
+  it("reads columns that share a name with a forbidden function, but still refuses the call", () => {
+    // Regression: the guard used to compare every word token to the forbidden-function set, so a
+    // column named `http` on an allowlisted table read as `sql_read_only` instead of rows.
+    expect(assertReadOnlySelect("SELECT http FROM request_logs")).toContain("http");
+    expect(assertReadOnlySelect("SELECT id, set_config, nextval FROM request_logs")).toContain("set_config");
+    for (const sql of [
+      "SELECT set_config('x','y',false)",
+      "SELECT set_config ('x','y',false)", // whitespace before the paren is still a call
+      "SELECT pg_catalog.set_config('x','y',false)", // schema-qualified
+      "SELECT pg_read_file('/etc/passwd')",
+      "SELECT content FROM http_get('https://evil.example.com')",
+    ]) {
+      expect(() => assertReadOnlySelect(sql), sql).toThrow(ApiError);
+    }
+  });
+
   it("keeps semicolons and dashes inside string literals safe", () => {
     expect(assertReadOnlySelect("SELECT * FROM t WHERE note = 'a;b'")).toContain("'a;b'");
     expect(assertReadOnlySelect("SELECT * FROM t WHERE note = 'x''s -- not a comment'")).toContain("not a comment");

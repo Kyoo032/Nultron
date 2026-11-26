@@ -75,7 +75,13 @@ const FORBIDDEN = new Set([
   "import",
   "load",
   "extension",
-  // Functions with side effects a bare SELECT can carry.
+]);
+
+// Functions with side effects (or reads that bypass the table allowlist) a bare SELECT can
+// carry. Unlike the keywords above these are ordinary identifiers, so they are refused only as
+// function calls — the word immediately followed by `(` — not as a column reference: a column
+// named `http` or `set_config` on an allowlisted table must stay readable.
+const FORBIDDEN_FUNCTIONS = new Set([
   "set_config",
   "nextval",
   "setval",
@@ -231,9 +237,8 @@ export function assertReadOnlySelect(sqlText: string): string {
   if (!trimmed) {
     throw REFUSED("Empty query");
   }
-  const words = tokenize(trimmed)
-    .filter((t): t is { word: string } => "word" in t)
-    .map((t) => t.word);
+  const tokens = tokenize(trimmed);
+  const words = tokens.filter((t): t is { word: string } => "word" in t).map((t) => t.word);
   const first = words[0];
   if (first !== "select" && first !== "with") {
     throw REFUSED("Only SELECT queries are allowed");
@@ -241,6 +246,17 @@ export function assertReadOnlySelect(sqlText: string): string {
   for (const word of words) {
     if (FORBIDDEN.has(word)) {
       throw REFUSED(`Only read-only SELECT queries are allowed (saw "${word.toUpperCase()}")`);
+    }
+  }
+  // A forbidden function is refused only when called — the word immediately followed by `(` —
+  // so an ordinary column that happens to share its name (`SELECT http FROM request_logs`)
+  // still reads. Schema qualification (`pg_catalog.set_config(...)`) tokenizes to the same
+  // word-plus-paren shape, and whitespace is not a token, so `set_config (…)` is caught too.
+  for (let t = 0; t < tokens.length - 1; t += 1) {
+    const token = tokens[t]!;
+    const next = tokens[t + 1]!;
+    if ("word" in token && FORBIDDEN_FUNCTIONS.has(token.word) && "other" in next && next.other === "(") {
+      throw REFUSED(`Only read-only SELECT queries are allowed (saw "${token.word.toUpperCase()}")`);
     }
   }
   // WITH is fine only while it still leads to a SELECT — checked by the word scan above, since

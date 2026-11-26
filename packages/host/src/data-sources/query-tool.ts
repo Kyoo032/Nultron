@@ -8,15 +8,39 @@
 import { defineTool, reportAuditEvent } from "@agentforge/core";
 import { z } from "zod";
 import { ApiError } from "@agentforge/core";
-import { getDataSource, publicSource } from "./store";
+import { type DataSourceRow, getDataSource, listDataSources } from "./store";
 import { runSourceQuery } from "./postgres";
 
 const schema = z
   .object({
-    sourceId: z.string().min(1).describe("Data source id (ds-...) to query"),
+    sourceId: z
+      .string()
+      .min(1)
+      .describe("Data source id (ds-...) or exact source name as shown in Settings → Data Sources"),
     sql: z.string().min(1).max(10_000).describe("A single SELECT statement against an allowlisted table"),
   })
   .strict();
+
+/**
+ * The model never sees a source's id — Settings shows names only — so accept the unique source
+ * name (case-insensitive) as well as the id, else `query_data_source` could never be aimed.
+ */
+function resolveSource(tenantId: string, idOrName: string): DataSourceRow {
+  try {
+    return getDataSource(tenantId, idOrName);
+  } catch {
+    // fall through to the name lookup
+  }
+  const matches = listDataSources(tenantId).filter((row) => row.name.toLowerCase() === idOrName.toLowerCase());
+  if (matches.length === 1) {
+    return matches[0]!;
+  }
+  throw new ApiError(
+    "not_found",
+    matches.length > 1 ? `More than one data source is named "${idOrName}"; ask for its id` : "Data source not found",
+    404,
+  );
+}
 
 export const dataSourceQueryTool = defineTool({
   key: "query_data_source",
@@ -27,10 +51,7 @@ export const dataSourceQueryTool = defineTool({
   trust: "user_content",
   execute: async (args, tenant) => {
     const parsed = schema.parse(args);
-    const row = getDataSource(tenant.tenantId, parsed.sourceId);
-    if (!row || row.tenant_id !== tenant.tenantId) {
-      throw new ApiError("not_found", "Data source not found", 404);
-    }
+    const row = resolveSource(tenant.tenantId, parsed.sourceId);
     try {
       const result = await runSourceQuery(row, parsed.sql);
       reportAuditEvent({
