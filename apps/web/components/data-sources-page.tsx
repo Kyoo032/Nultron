@@ -9,6 +9,7 @@ import {
   listDataSources,
   syncDataSource,
   testDataSource,
+  type CreateDataSourceInput,
   type DataSource,
 } from "@/lib/data-sources-client";
 
@@ -36,7 +37,7 @@ const EMPTY_FORM = {
   tableAllowlist: "",
 };
 
-function inputFor(kind: Kind, f: typeof EMPTY_FORM): Record<string, unknown> {
+function inputFor(kind: Kind, f: typeof EMPTY_FORM): CreateDataSourceInput {
   const base = { name: f.name, kind };
   if (kind === "s3") {
     return {

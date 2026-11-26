@@ -1286,6 +1286,28 @@
   ],
   "additionalProperties": false
  },
+ "query_data_source": {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+   "sourceId": {
+    "type": "string",
+    "minLength": 1,
+    "description": "Data source id (ds-...) to query"
+   },
+   "sql": {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 10000,
+    "description": "A single SELECT statement against an allowlisted table"
+   }
+  },
+  "required": [
+   "sourceId",
+   "sql"
+  ],
+  "additionalProperties": false
+ },
  "read_file": {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
