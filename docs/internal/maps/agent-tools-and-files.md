@@ -2,7 +2,7 @@
 
 Product: both Â· Instance: main :3000
 
-Last verified: 2026-11-24 on `fix/dfind-deploy-ci-formal`, for the QuickJS memory-limit guard and classification only (`packages/host/src/code-runner/child/qjs-child.mjs` `wasmMem.grow` cap + memory-before-deadline interrupt order, and `packages/host/src/code-runner/outcome.ts` classifying `wasm-memory` / OOM before `deadline`; tested against the real QuickJS child in `qjs-child.test.ts`). Nothing else on the page was re-read.
+Last verified: 2026-11-26 on `devin/dfind-166-run-code-memory`, for the memory caps only (DFIND-166: Python wasm 256 MB, JavaScript wasm 128 MB and heap 64 MB, child old space 128 MB, hosted keeps one warm child and one run, so a sandboxed run fits inside a 768 MiB desk; `packages/host/src/code-runner/limits.ts`, `pool.test.ts` "hosted keeps one warm child by default"). Before that: 2026-11-24 on `fix/dfind-deploy-ci-formal`, for the QuickJS memory-limit guard and classification only (`packages/host/src/code-runner/child/qjs-child.mjs` `wasmMem.grow` cap + memory-before-deadline interrupt order, and `packages/host/src/code-runner/outcome.ts` classifying `wasm-memory` / OOM before `deadline`; tested against the real QuickJS child in `qjs-child.test.ts`). Nothing else on the page was re-read.
 
 Last verified: 2026-11-06 on `fix/redactor-gaps` (before merge) for the "Redaction of tool input and output" paragraph of § 13 only (the shapes and key names it lists, and the `redact-deep.ts` line numbers). Read against the code and the redactor tests; not driven.
 
@@ -237,7 +237,7 @@ Deleting the desk clears the mount and the proposals. `handleDeleteWorkspace` ca
 
 - `--permission` and `--allow-fs-read=<ship dir>`: the process may read the ship directory and nothing else. It has no write, child-process, worker or addon permission.
 - `--disallow-code-generation-from-strings`: no `eval` or `Function` from a string.
-- `--max-old-space-size=256`: a cap on the glue. The guest's own memory is the wasm instance, capped inside the child.
+- `--max-old-space-size=128`: a cap on the glue. The guest's own memory is the wasm instance, capped inside the child.
 
 Its environment is empty (`childEnv`, `:97`), never the parent's, because the hosted parent holds `AGENTFORGE_SECRETS_KEY` and every tenant's keys. Under Electron the executable is the app itself, so the one variable `ELECTRON_RUN_AS_NODE=1` is set; the plan records that no Electron fuse turns that off today. The fork options are an `ipc` channel with `serialization: "advanced"` so bytes cross as bytes, no stdin, `cwd` the ship directory and `windowsHide` (`:106-115`). `trackChild` (`:116`, `packages/host/src/child-processes.ts:27`) registers the process so the desktop shell's `killTrackedChildren` stops it on quit (`apps/desktop/main.cjs:133-137`, as it does for ffmpeg). The messages are `ready`, `fatal`, `job` and `result`, and the parent checks the shape of everything the child sends (`parseChildMessage`, `packages/host/src/code-runner/protocol.ts:128`).
 
@@ -245,8 +245,8 @@ A cold child must boot (`boot`, `child-process.ts:168`) within 60 s or it is kil
 
 **The engines.** Python is Pyodide (CPython 3.14.2 compiled to wasm) with numpy and pandas and their three dependencies, started by `child/py-child.mjs`. JavaScript is QuickJS (`quickjs-emscripten-core` 0.32.0), started by `child/qjs-child.mjs`. Both run offline from the ship directory.
 
-- *Python.* Before it boots, `py-child.mjs` hashes every Pyodide file against `vendor/pyodide/MANIFEST.json` and sends `fatal` on a mismatch (`:66-76`). It loads a lock file trimmed to the shipped wheels, so a package the guest asks for that is not shipped is not looked up on a CDN (`:106-124`). It wraps `WebAssembly.Memory.grow` to cap linear memory at 512 MB, so a memory bomb becomes a `MemoryError` (`:37-42`). It deletes `process`, `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `require`, `Buffer`, `Worker`, `navigator` and `BroadcastChannel` from the realm before any guest code runs (`:170-190`). Each job gets a fresh globals dict, an emptied `/workspace` and `/tmp` (`:313-314`, `:344`), and runs through a harness that catches `SystemExit`, so `sys.exit` and `os._exit` end the run and not the child (`:146-168`).
-- *JavaScript.* Each job gets a new QuickJS runtime and context (`runJob`, `qjs-child.mjs:59`) with a 128 MB heap, a 256 KB stack and an interrupt handler for the deadline (3 s before the wall clock, `JS_DEADLINE_MARGIN_MS`) and for wasm memory (`:78-88`). A run that hit any limit sets `discard: true` and the parent kills the child (`:157`, `:206`). `console.log`, `info` and `debug` go to stdout; `console.error` and `warn` go to stderr. The value of the last expression is shown after the output. There is no `require`, `import`, Node API or browser API.
+- *Python.* Before it boots, `py-child.mjs` hashes every Pyodide file against `vendor/pyodide/MANIFEST.json` and sends `fatal` on a mismatch (`:66-76`). It loads a lock file trimmed to the shipped wheels, so a package the guest asks for that is not shipped is not looked up on a CDN (`:106-124`). It wraps `WebAssembly.Memory.grow` to cap linear memory at 256 MB, so a memory bomb becomes a `MemoryError` (`:37-42`). It deletes `process`, `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `require`, `Buffer`, `Worker`, `navigator` and `BroadcastChannel` from the realm before any guest code runs (`:170-190`). Each job gets a fresh globals dict, an emptied `/workspace` and `/tmp` (`:313-314`, `:344`), and runs through a harness that catches `SystemExit`, so `sys.exit` and `os._exit` end the run and not the child (`:146-168`).
+- *JavaScript.* Each job gets a new QuickJS runtime and context (`runJob`, `qjs-child.mjs:59`) with a 64 MB heap, a 256 KB stack and an interrupt handler for the deadline (3 s before the wall clock, `JS_DEADLINE_MARGIN_MS`) and for wasm memory (`:78-88`). A run that hit any limit sets `discard: true` and the parent kills the child (`:157`, `:206`). `console.log`, `info` and `debug` go to stdout; `console.error` and `warn` go to stderr. The value of the last expression is shown after the output. There is no `require`, `import`, Node API or browser API.
 
 **Limits.** All of them are in `packages/host/src/code-runner/limits.ts`, and the child reads the output limits from its boot config (`bootConfig`, `child-process.ts:64`), so the two sides cannot disagree.
 
@@ -256,14 +256,14 @@ A cold child must boot (`boot`, `child-process.ts:168`) within 60 s or it is kil
 | Input files | 20 files, 20 MB together | `MAX_INPUT_FILES`, `MAX_INPUT_BYTES` |
 | Boot | 60 s | `BOOT_TIMEOUT_MS` |
 | One run | 30 s wall clock; JavaScript stops its own loop 3 s earlier | `RUN_TIMEOUT_MS`, `JS_DEADLINE_MARGIN_MS` |
-| Memory | Python wasm 512 MB; JavaScript wasm 256 MB, heap 128 MB, stack 256 KB; child old space 256 MB | `PY_WASM_MAX_MB`, `JS_WASM_MAX_MB`, `JS_HEAP_LIMIT_BYTES`, `JS_STACK_KB`, `CHILD_OLD_SPACE_MB` |
+| Memory | Python wasm 256 MB; JavaScript wasm 128 MB, heap 64 MB, stack 256 KB; child old space 128 MB | `PY_WASM_MAX_MB`, `JS_WASM_MAX_MB`, `JS_HEAP_LIMIT_BYTES`, `JS_STACK_KB`, `CHILD_OLD_SPACE_MB` |
 | stdout, stderr | 64 KB each, cut with a note | `MAX_STREAM_BYTES` |
 | Output files | 20 files, 2 MB each | `MAX_OUTPUT_FILES`, `MAX_OUTPUT_FILE_BYTES` |
 | `/workspace` after a run | over 500 files or 64 MB is `too_large` and the child is discarded | `MAX_WORKSPACE_FILES`, `MAX_WORKSPACE_BYTES` |
 | Warm child idle | 5 minutes, then killed | `IDLE_TIMEOUT_MS` |
 | Wait for a slot | 5 s, then `busy` | `QUEUE_WAIT_MS` |
-| Warm children | Personal 1 per language; hosted 2 in all | `PERSONAL_WARM_PER_LANGUAGE`, `HOSTED_WARM_TOTAL` |
-| Concurrent runs | Personal 1; hosted 2 in all and 1 per tenant | `PERSONAL_MAX_RUNS`, `HOSTED_MAX_RUNS`, `HOSTED_MAX_RUNS_PER_TENANT` |
+| Warm children | Personal 1 per language; hosted 1 in all | `PERSONAL_WARM_PER_LANGUAGE`, `HOSTED_WARM_TOTAL` |
+| Concurrent runs | Personal 1; hosted 1 in all and 1 per tenant | `PERSONAL_MAX_RUNS`, `HOSTED_MAX_RUNS`, `HOSTED_MAX_RUNS_PER_TENANT` |
 
 Hosted operators can raise the two run caps with `AGENTFORGE_MAX_CODE_RUNS` and `AGENTFORGE_MAX_CODE_RUNS_PER_TENANT` (`limits.ts:57-58`); Personal is never configurable. The limiter takes the per-tenant slot before the global one, so a tenant waiting for its own slot never holds a global one (`code-limiter.ts:75-99`). Unlike the job limiters, this one caps Personal too, because a Python child with pandas holds hundreds of megabytes.
 
@@ -449,7 +449,7 @@ Unit proof at the verified line, run on 2026-10-03 with `npx vitest run <files>`
 - `packages/host`, first run: 14 files passed and 1 skipped, 188 tests passed and 27 skipped, over `src/code-runner` (the unit suites; the real-engine suite is the skipped file, because it needs `AGENTFORGE_SANDBOX_DIR`), `src/runs-budget.test.ts` (3), `src/runs-cancel.test.ts` (3), `src/runs-tool-run.test.ts` (3), `src/desk-files` and `src/folder-root/purge.test.ts`.
 - `packages/host`, second run: 12 files, 318 tests passed, over `src/harness` (`run-checked.test.ts`), `src/job-regen.test.ts` (the spec cut and `job_tool_outside_spec`), `src/folder-root` (`folder-root.test.ts` 58 and the rest), `src/knowledge-search-tool.test.ts` (12) and `src/desk-files` (`file-store.test.ts` 29: versions, soft delete, caps, desk and tenant boundary, bodies at rest, quota, purge, compare-and-set).
 - `apps/web`: 14 files, 253 tests passed. `lib/files-*.test.ts*` (model, state, api, render, locale parity), `lib/folder-*.test.ts*` (state, actions, api, diff, surface, wiring, locale parity), `lib/tool-labels.test.ts` (20) and `lib/tool-rows.test.tsx` (43).
-- The real engines: `AGENTFORGE_SANDBOX_DIR=C:\Users\rizky\agentforge\vendor\sandbox-runtime npx vitest run src/code-runner/sandbox.integration.test.ts` from `packages/host` passed all 27 tests in 176 s. They cover a cold Python start with a pandas round trip, a fresh namespace in a warm child, `sys.exit`, the 30 s wall-clock kill, the 512 MB memory cap, JavaScript limits, and the 31 escape ids of the prototype matrix. `npx pnpm@9.15.9 sandbox:verify` answered `36 files, 27.49 MiB, manifest verified`.
+- The real engines: `AGENTFORGE_SANDBOX_DIR=C:\Users\rizky\agentforge\vendor\sandbox-runtime npx vitest run src/code-runner/sandbox.integration.test.ts` from `packages/host` passed all 27 tests in 176 s. They cover a cold Python start with a pandas round trip, a fresh namespace in a warm child, `sys.exit`, the 30 s wall-clock kill, the 256 MB memory cap, JavaScript limits, and the 31 escape ids of the prototype matrix. `npx pnpm@9.15.9 sandbox:verify` answered `36 files, 27.49 MiB, manifest verified`.
 
 Chat resilience (Â§ 13), run on 2026-10-06 in the worktree `agentforge-chatfix` over `6105c5c`, tests written first and seen red before the code:
 
