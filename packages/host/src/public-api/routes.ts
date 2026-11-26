@@ -5,7 +5,7 @@
  * Every row declares its own auth (`key`), so `routes.test.ts` can walk the table and
  * prove nothing callable is anonymous: `resolveApiKey` has already run by the time a
  * handler sees the request, `checkApiKeyRate` has counted it, and the handler gets a
- * **service identity** (`userId: apikey-<id>`, role `member`) built in `./auth.ts` —
+ * **service identity** (`userId: apikey-<id>`, role `admin`) built in `./auth.ts` —
  * never an owner session.
  *
  * Reuse rule: no public handler re-implements what the session handlers do. It calls the
@@ -13,10 +13,10 @@
  * `retrieveChunks`, `saveMedia`, `loadRangeUsage`, `admitRun`) with the service tenant,
  * so guardrails, quota and audit behave exactly as on the web (AC-5a.4).
  */
-import { ApiError, parseUsageRange, reportAuditEvent } from "@agentforge/core";
+import { ApiError, parseUsageRange, redactSecrets, reportAuditEvent } from "@agentforge/core";
 import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
-import { requireGatewayAllowedFor } from "../gateway-gate";
+import { isGatewayBlockedError, requireGatewayAllowedFor } from "../gateway-gate";
 import { admitRun, guardRunStream } from "../run-limits";
 import { startModalityRun } from "../runs";
 import { createThread, listMessages, listWorkspaceThreads, getThread } from "../threads";
@@ -364,7 +364,11 @@ export async function dispatchPublicApi(request: HostRequest): Promise<HostResul
     outcome = { status: 404, code: "not_found" };
     return jsonOk({ error: { code: "not_found", message: "Not found" } }, 404);
   } catch (error) {
-    const result = jsonError(error);
+    // A closed gate uses the same public envelope as every other refusal here; `jsonError`'s
+    // flat gateway shape is the renderer's, and a public client reads `error.code`.
+    const result = isGatewayBlockedError(error)
+      ? jsonOk({ error: { code: error.code, message: redactSecrets(error.message) } }, error.status)
+      : jsonError(error);
     const envelope = (result.body as { error?: { code?: string } } | null)?.error;
     outcome = { status: result.status, code: envelope?.code ?? "error" };
     return result;

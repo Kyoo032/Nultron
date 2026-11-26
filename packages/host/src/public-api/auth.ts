@@ -71,10 +71,17 @@ export async function authenticatePublic(request: {
   if (desks.length === 0) {
     throw new ApiError("workspace_not_found", "Workspace not found", 404);
   }
-  // The desk the key was minted on, or the home desk for a key minted before desks were
-  // recorded (and for a desk that no longer exists). A key never silently hops desks.
+  // The desk the key was minted on. `null` means a key minted before desks were recorded,
+  // which still lands on the home desk; a recorded desk that no longer resolves is a
+  // refusal — a key must never silently hop to another desk (possibly another company's
+  // under the same partner) and inherit its private agents.
   const desk =
-    desks.find((desk) => desk.id === key.workspace_id) ?? desks.find((desk) => desk.slug === "home") ?? desks[0];
+    key.workspace_id === null
+      ? (desks.find((desk) => desk.slug === "home") ?? desks[0])
+      : desks.find((desk) => desk.id === key.workspace_id);
+  if (!desk) {
+    throw new ApiError("workspace_not_found", "The desk this key belongs to no longer exists.", 403);
+  }
   touchApiKey(key.id);
   return {
     key,

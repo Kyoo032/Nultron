@@ -555,7 +555,10 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
   // The public API table (`/api/public/v1/*`, already inside API_PREFIX, and the bare
   // `/v1/chat/completions` facade) is dispatched by this adapter too: its callers are
   // bearer-key integrations, never the page server.
-  const isPublic = rawPath !== null && isPublicApiPath(rawPath);
+  // The public test runs on the NORMALISED path: `/v1/chat/completions/` and a doubled slash
+  // inside `/api/public/v1/*` spell the same public route and must get the same bearer-key rules
+  // as their canonical form, not the browser checks below.
+  const isPublic = rawPath !== null && isPublicApiPath(normaliseApiPath(rawPath));
   const isApiPath = (rawPath?.startsWith(API_PREFIX) ?? false) || isPublic;
   // One switch decides which rule this process runs: the hosted web rule or the local loopback rule.
   const serverMode = isServerMode();
@@ -718,7 +721,7 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
     headers: {
       // Forwarded only on the public API paths, where `authenticatePublic` reads it;
       // session routes never see an Authorization header from this adapter.
-      ...(isPublic ? { authorization: header(req, "authorization") } : {}),
+      ...(isPublic ? { authorization: header(req, "authorization"), accept: header(req, "accept") } : {}),
       origin: header(req, "origin"),
       referer: header(req, "referer"),
       cookie: header(req, "cookie"),
