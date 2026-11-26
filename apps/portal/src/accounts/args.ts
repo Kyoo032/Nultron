@@ -39,6 +39,7 @@ Commands:
   set-role        Change an active person's role. Refused for the last owner.
                     --username <name> | --email <address>  --role owner|admin|member
   set-endpoint    Assign or clear a person's API gateway endpoint (Nultron admin only).
+                  --key-stdin reads the write-only endpoint key from stdin.
                     --username <name> | --email <address>  (--gateway-endpoint <url> | --clear)
   list            Everyone in the org: username, address, role, status, endpoint, password state, last
                   password seen, whether the account is locked, and how many times it was locked in the
@@ -85,6 +86,8 @@ export type AccountCommand =
       readonly person: PersonRef;
       /** Target gateway base URL, or `null` when `--clear` resets to the default pinned gateway. */
       readonly gatewayEndpoint: string | null;
+      /** `--key-stdin`: read the endpoint's write-only bearer key from stdin (DFIND-155). */
+      readonly keyFromStdin?: boolean;
     })
   | (Common & { readonly command: "list" });
 
@@ -248,6 +251,9 @@ export function parseAccountArgs(argv: readonly string[]): AccountCommand {
         command,
         person: readPerson(values),
         gatewayEndpoint: hasClear ? null : readGatewayEndpoint(values.get("gateway-endpoint")),
+        // The key comes over stdin, never as an argument (`--key-stdin`): an argv string would sit
+        // in the process list and the shell history (F11's same rule).
+        keyFromStdin: flags.has("key-stdin") || undefined,
       });
     }
     case "list":

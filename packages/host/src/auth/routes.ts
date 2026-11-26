@@ -549,7 +549,8 @@ export function createAuthRoutes(deps: AuthRouteDeps): AuthRoutes {
       now,
     });
     // The row and its sealed refresh token in one insert; the access token only in process memory.
-    await deps.store.create(session, sealForSignIn(session, tokens));
+    // The issued endpoint key (DFIND-155) is sealed onto the row in the same insert.
+    await deps.store.create(session, sealForSignIn(session, tokens), tokens.gatewayKey);
     await deps.vault.put(session.id, {
       refreshToken: tokens.refreshToken,
       accessToken: tokens.accessToken,

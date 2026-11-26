@@ -65,6 +65,7 @@ async function startMockGateway(acceptedKey: string, modelId: string): Promise<M
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     const auth = req.headers.authorization;
     hits.push({ path: req.url ?? "", auth });
+
     if (req.url === "/v1/models") {
       if (auth === `Bearer ${acceptedKey}`) {
         res.writeHead(200, { "content-type": "application/json" });
@@ -91,8 +92,10 @@ let gwA: MockGateway;
 let gwB: MockGateway;
 
 beforeAll(async () => {
-  gwA = await startMockGateway("sk-key-for-endpoint-a", "model-alpha");
-  gwB = await startMockGateway("sk-key-for-endpoint-b", "model-beta");
+  // The org keys below are deliberately NOT what the gateways accept: the DFIND-155 rule is that
+  // an assigned endpoint never receives the company key — only the key issued for that endpoint.
+  gwA = await startMockGateway("sk-issued-for-endpoint-a", "model-alpha");
+  gwB = await startMockGateway("sk-issued-for-endpoint-b", "model-beta");
 });
 
 afterAll(async () => {
@@ -129,7 +132,8 @@ describe("per-user admin-assigned API gateway endpoints", () => {
     const provB = await ensurePortalOwner(db, { tenantId, orgId: orgB, userId: userB, role: "owner" });
     const provA2 = await ensurePortalOwner(db, { tenantId, orgId: orgA, userId: userA2, role: "owner" });
 
-    // Save keys for each company/workspace.
+    // The company keys, saved per workspace. Under DFIND-155 these must never reach an assigned
+    // endpoint: each user's session carries only the key the portal issued for that endpoint.
     saveSettings({ openaiApiKey: "sk-key-for-endpoint-a" }, { ...provA, workspaceId: provA.workspaceId });
     saveSettings({ openaiApiKey: "sk-key-for-endpoint-b" }, { ...provB, workspaceId: provB.workspaceId });
 
@@ -141,8 +145,10 @@ describe("per-user admin-assigned API gateway endpoints", () => {
     // but Nultron admin assigned Carol to Endpoint B!
     const sessionA2 = createSession({ tenantId, orgId: orgA, userId: userA2, gatewayEndpoint: gwB.baseUrl, now });
 
-    await sessionStore.create(sessionA);
-    await sessionStore.create(sessionB);
+    // The third argument is the key the portal issued for that user's endpoint — never the org key.
+    // Carol's endpoint has no issued key: her checks must report needs_key, not borrow Org A's key.
+    await sessionStore.create(sessionA, undefined, "sk-issued-for-endpoint-a");
+    await sessionStore.create(sessionB, undefined, "sk-issued-for-endpoint-b");
     await sessionStore.create(sessionA2);
 
     // Verify SQLite round-trip persisted gateway_endpoint cleanly.
@@ -179,7 +185,9 @@ describe("per-user admin-assigned API gateway endpoints", () => {
       expect(body.gateway.endpoint).toBe(gwA.baseUrl);
       expect(body.gateway.endpointLocked).toBe(true);
     }
-    expect(gwA.hits.some((h) => h.path === "/v1/models" && h.auth === "Bearer sk-key-for-endpoint-a")).toBe(true);
+    expect(gwA.hits.some((h) => h.path === "/v1/models" && h.auth === "Bearer sk-issued-for-endpoint-a")).toBe(true);
+    // The endpoint never received the company key.
+    expect(gwA.hits.every((h) => h.auth !== "Bearer sk-key-for-endpoint-a")).toBe(true);
 
     // 2. User B checks gateway -> hits Endpoint B -> OK!
     const checkB = await call(sessionB.id, "POST", "/api/v1/settings/gateway/check");
@@ -191,19 +199,23 @@ describe("per-user admin-assigned API gateway endpoints", () => {
       expect(body.gateway.allowed).toBe(true);
       expect(body.gateway.endpoint).toBe(gwB.baseUrl);
     }
-    expect(gwB.hits.some((h) => h.path === "/v1/models" && h.auth === "Bearer sk-key-for-endpoint-b")).toBe(true);
+    expect(gwB.hits.some((h) => h.path === "/v1/models" && h.auth === "Bearer sk-issued-for-endpoint-b")).toBe(true);
+    expect(gwB.hits.every((h) => h.auth !== "Bearer sk-key-for-endpoint-b")).toBe(true);
 
-    // 3. Carol (same org as Alice, same key `sk-key-for-endpoint-a`, but assigned to Endpoint B)
-    //    must fail with `invalid_key` against Endpoint B AND must NOT clobber Alice's `ok` verdict!
+    // 3. Carol (same org as Alice, assigned to Endpoint B but with NO issued key) reports
+    //    needs_key — Endpoint B never receives Org A's key — and must NOT clobber Alice's verdict!
+    const gwBHitsBefore = gwB.hits.length;
     const checkA2 = await call(sessionA2.id, "POST", "/api/v1/settings/gateway/check");
     expect(checkA2.type).toBe("json");
     if (checkA2.type === "json") {
       expect(checkA2.status).toBe(200);
       const body = checkA2.body as { gateway: { status: string; allowed: boolean; endpoint: string } };
-      expect(body.gateway.status).toBe("invalid_key");
+      expect(body.gateway.status).toBe("needs_key");
       expect(body.gateway.allowed).toBe(false);
       expect(body.gateway.endpoint).toBe(gwB.baseUrl);
     }
+    // No issued key meant no live probe at all: Endpoint B saw nothing from Carol.
+    expect(gwB.hits.length).toBe(gwBHitsBefore);
     // Verify Alice's GET /api/v1/settings still reports `ok` on Endpoint A!
     const settingsA = await call(sessionA.id, "GET", "/api/v1/settings");
     expect(settingsA.type).toBe("json");
@@ -246,7 +258,8 @@ describe("per-user admin-assigned API gateway endpoints", () => {
     }
     expect(loadSettings(provA2).openaiBaseUrl).not.toBe("https://attacker.example/v1");
 
-    // 6. Admin reassigns Alice from Endpoint A to Endpoint B; portal delivers gwB on refresh.
+    // 6. Admin reassigns Alice from Endpoint A to Endpoint B; the portal delivers gwB and the key
+    //    issued for gwB on refresh — never Org A's company key.
     const vault = createMemoryTokenVault();
     await vault.put(sessionA.id, {
       refreshToken: "rt-1",
@@ -260,6 +273,7 @@ describe("per-user admin-assigned API gateway endpoints", () => {
         userId: userA,
         role: "owner",
         gatewayEndpoint: gwB.baseUrl,
+        gatewayKey: "sk-issued-for-endpoint-b",
         refreshToken: "rt-2",
         accessToken: "at-2",
       },
@@ -268,7 +282,7 @@ describe("per-user admin-assigned API gateway endpoints", () => {
     const afterInterval = now + PORTAL_CHECK_INTERVAL_MS + 5_000;
 
     // On the very request that triggers the portal refresh, Alice's session switches to gwB and
-    // checks her key against gwB — where `sk-key-for-endpoint-a` is rejected!
+    // probes it with the key the portal issued for gwB — which Endpoint B accepts.
     const rechecked = await dispatch(
       {
         method: "POST",
@@ -284,10 +298,54 @@ describe("per-user admin-assigned API gateway endpoints", () => {
       expect(rechecked.status).toBe(200);
       const body = rechecked.body as { gateway: { status: string; allowed: boolean; endpoint: string } };
       expect(body.gateway.endpoint).toBe(gwB.baseUrl);
-      expect(body.gateway.status).toBe("invalid_key");
-      expect(body.gateway.allowed).toBe(false);
+      expect(body.gateway.status).toBe("ok");
+      expect(body.gateway.allowed).toBe(true);
     }
+    expect(gwB.hits.some((h) => h.path === "/v1/models" && h.auth === "Bearer sk-issued-for-endpoint-b")).toBe(true);
     // And the persisted SQLite session row now holds Endpoint B!
     expect((await sessionStore.find(sessionA.id))?.gatewayEndpoint).toBe(gwB.baseUrl);
+  });
+
+  it("refuses a gateway_endpoint that carries no MAC, keeps the issued key sealed, and treats a future portal_checked_at as due", async () => {
+    const { authSessions } = await import("@agentforge/db");
+    const { eq } = await import("drizzle-orm");
+    const { hashSessionId, portalCheckDue } = await import("./auth");
+    const sessionStore = createDrizzleSessionStore(db);
+    const now = 1_700_000_000_000;
+
+    const tenantId = "tnt_nultron_main";
+    const session = createSession({
+      tenantId,
+      orgId: "org_mac",
+      userId: "usr_mac",
+      gatewayEndpoint: "https://gw.real.example/v1",
+      now,
+    });
+    await sessionStore.create(session, undefined, "sk-issued-for-real");
+    const stored = await sessionStore.find(session.id);
+    expect(stored?.gatewayEndpoint).toBe("https://gw.real.example/v1");
+    // The issued key is sealed at rest and opens only through the session id it was sealed for.
+    expect(await sessionStore.readEndpointKey(session.id)).toBe("sk-issued-for-real");
+
+    // A writer that knows SQLite but not the vault key rewrites the endpoint without the MAC.
+    await db
+      .update(authSessions)
+      .set({ gatewayEndpoint: "https://attacker.example/v1" })
+      .where(eq(authSessions.id, hashSessionId(session.id)));
+
+    // The tampered endpoint is refused, not trusted: the record falls back to no assigned endpoint
+    // (the pinned gateway), and the issued key cannot be read for it.
+    const tampered = await sessionStore.find(session.id);
+    // The endpoint field is dropped from the record entirely: nothing downstream can read it.
+    expect(tampered?.gatewayEndpoint).toBeUndefined();
+    expect(await sessionStore.readEndpointKey(session.id)).toBeNull();
+
+    // A future portal_checked_at can never freeze the portal re-check: the row itself resets it.
+    await db
+      .update(authSessions)
+      .set({ portalCheckedAt: now + 60_000_000 })
+      .where(eq(authSessions.id, hashSessionId(session.id)));
+    const futureStamped = await sessionStore.find(session.id);
+    expect(futureStamped && portalCheckDue(futureStamped, now)).toBe(true);
   });
 });

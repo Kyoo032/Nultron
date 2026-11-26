@@ -25,7 +25,7 @@ import {
   type StoredSecrets,
   type TenantContext,
 } from "@agentforge/core";
-import { assignedEndpointSlotTag, currentAssignedGatewayEndpoint } from "./gateway-endpoint-scope";
+import { assignedEndpointSlotTag, currentAssignedGatewayEndpoint, currentAssignedGatewayKey } from "./gateway-endpoint-scope";
 import {
   companyStateKey,
   TENANT_STATE_FILENAMES,
@@ -535,7 +535,20 @@ export async function checkGatewayLive(input: {
  * rule `resolveProviderKeys` now enforces on the call path, applied here so the gate's verdict and
  * the call agree about whether this tenant has a key at all.
  */
-function keyFor(settings: StoredSecrets, envRuntime: string | undefined, env: EnvLike = process.env): string | undefined {
+function keyFor(
+  settings: StoredSecrets,
+  envRuntime: string | undefined,
+  env: EnvLike = process.env,
+  assignedEndpoint: string | null = null,
+): string | undefined {
+  // DFIND-155: an assigned endpoint gets the bearer key issued for it — never the company key. The
+  // key is trusted only when the live request scope binds the same endpoint, so a stored endpoint
+  // cannot borrow another scope's key. No issued key means no key: the verdict reads needs_key.
+  if (assignedEndpoint) {
+    return assignedEndpoint === currentAssignedGatewayEndpoint()
+      ? currentAssignedGatewayKey() ?? undefined
+      : undefined;
+  }
   const saved = settings.openaiApiKey?.trim();
   if (saved) {
     return saved;
@@ -550,8 +563,8 @@ function keyFor(settings: StoredSecrets, envRuntime: string | undefined, env: En
 /** The current gate for this desk, derived from the saved verdict. No network, no throw. */
 export function reportGatewayGate(settings: StoredSecrets, opts: GatewayGateOptions = {}): GatewayGatePayload {
   const envRuntime = opts.envRuntime ?? process.env.AGENTFORGE_RUNTIME;
-  const key = keyFor(settings, envRuntime, opts.env);
   const owner = ownerOf(opts);
+  const key = keyFor(settings, envRuntime, opts.env, owner.assignedEndpoint ?? null);
   const fingerprint = keyFingerprintOrNull(key);
   return deriveGatewayGate({
     envRuntime,
@@ -651,13 +664,14 @@ export async function runGatewayCheck(
   opts: GatewayGateOptions = {},
 ): Promise<GatewayGatePayload> {
   const envRuntime = opts.envRuntime ?? process.env.AGENTFORGE_RUNTIME;
-  const key = keyFor(settings, envRuntime, opts.env);
+  const owner = ownerOf(opts);
+  const key = keyFor(settings, envRuntime, opts.env, owner.assignedEndpoint ?? null);
   // Stub runtime and "no key saved" are decided without asking anyone.
   if (envRuntime === "stub" || !key) {
     return reportGatewayGate(settings, opts);
   }
 
-  const owner = ownerOf(opts);
+
   const { tenantId, companyId, assignedEndpoint } = owner;
   const fingerprint = keyFingerprintOrNull(key);
   const endpoint = gatewayEndpointFor(settings, opts.tenant);
@@ -748,7 +762,7 @@ export function maybeRefreshGateway(settings: StoredSecrets, opts: MaybeRefreshG
   if (envRuntime === "stub") {
     return false;
   }
-  const key = keyFor(settings, envRuntime, opts.env);
+  const key = keyFor(settings, envRuntime, opts.env, assignedEndpointOf(opts.tenant));
   if (!key) {
     return false;
   }

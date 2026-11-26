@@ -1,0 +1,24 @@
+-- Two additions to `auth_sessions.gateway_endpoint` (DFIND-160 / DFIND-155):
+--
+-- 1. `gateway_endpoint_mac`: AUTHENTICATION FOR THE ASSIGNED ENDPOINT. The column holds the
+--    operator-assigned API gateway base URL as plaintext; a sqlite writer without the wrap key
+--    could rewrite it and send the tenant's bearer key to an endpoint of their choosing. From
+--    this migration on the host writes `hmac1:<hex>` = HMAC-SHA256(session id digest, endpoint)
+--    under a key derived from the wrap key with HKDF-SHA256, info
+--    `auth-session-endpoint-mac-v1` (packages/host/src/auth/session-secrets.ts). A row whose MAC
+--    is missing or wrong is refused, not trusted: the store drops the endpoint and the session
+--    falls back to the pinned gateway until the portal's own answer rewrites it.
+--
+-- 2. `endpoint_key_sealed`: THE PER-ENDPOINT BEARER KEY, SEALED (DFIND-155). An assigned endpoint
+--    must never receive the company key, so the portal delivers a write-only key per assigned
+--    endpoint, stored sealed here — AES-256-GCM through `encryptJson` under a key derived from
+--    the wrap key with HKDF-SHA256, info `auth-session-endpoint-key-v1`. The payload carries the
+--    row's id digest and endpoint, so a blob moved to another row or endpoint does not open.
+--    NULL means none: the endpoint uses the pinned gateway's own credentials floor, and the gate
+--    reports needs_key rather than sending the company key.
+--
+-- Existing rows keep working: a NULL MAC means "not yet authenticated", which the portal's next
+-- rotation answer (which writes endpoint and MAC together) repairs.
+ALTER TABLE `auth_sessions` ADD `gateway_endpoint_mac` text;
+--> statement-breakpoint
+ALTER TABLE `auth_sessions` ADD `endpoint_key_sealed` text;

@@ -1,5 +1,5 @@
 import { guessDialectFromKey } from "./models/probe";
-import { resolvedGatewayBaseUrl } from "./gateway";
+import { assignedGatewayEndpoint, assignedGatewayKey, resolvedGatewayBaseUrl } from "./gateway";
 import { keyFingerprintOrNull } from "./security/fingerprint";
 import { maskToolKeys } from "./tools/credentials";
 import { providerBaseUrl } from "./providers/registry";
@@ -357,7 +357,12 @@ export function resolveProviderKeys(
 } {
   // In server mode nothing here may come from the process environment; see the note above.
   const fallback = providerEnv(env);
-  const openai = settings.openaiApiKey || fallback.OPENAI_API_KEY || undefined;
+  // DFIND-155: inside a scope bound to an operator-assigned endpoint, the bearer is the sealed
+  // per-endpoint key the portal issued — never the company key. No key issued means `undefined`,
+  // which the gate reports as needs_key instead of falling back to settings.
+  const openai = assignedGatewayEndpoint()
+    ? assignedGatewayKey() || undefined
+    : settings.openaiApiKey || fallback.OPENAI_API_KEY || undefined;
   // Pinned endpoint: neither the stored value nor OPENAI_BASE_URL can re-point the gateway.
   const openaiBaseUrl = resolvedGatewayBaseUrl();
   const openaiKeyDialect = openai ? guessDialectFromKey(openai) : undefined;

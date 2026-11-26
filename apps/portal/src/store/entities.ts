@@ -110,6 +110,8 @@ export interface User {
   readonly role: UserRole;
   /** Operator-assigned API gateway base URL for this user, or `null` for the default pinned gateway. */
   readonly gatewayEndpoint: string | null;
+  /** Sealed write-only bearer key for `gatewayEndpoint` (DFIND-155); the raw key is never a column. */
+  readonly gatewayKeySealed: string | null;
   readonly createdAt: Iso;
   readonly updatedAt: Iso;
   readonly deactivatedAt: Iso | null;

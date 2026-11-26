@@ -36,6 +36,8 @@ export type HostSession = {
   readonly userId: string;
   /** Operator-assigned API gateway base URL for this user, or `null` / omitted for default. */
   readonly gatewayEndpoint?: string | null;
+  /** In-memory bearer key the portal issued for `gatewayEndpoint` (DFIND-155); never persisted raw. */
+  readonly gatewayEndpointKey?: string | null;
 };
 
 export type HostRequest = {

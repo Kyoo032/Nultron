@@ -117,6 +117,23 @@ export function assignedGatewayEndpoint(): string | null {
 }
 
 /**
+ * The per-endpoint bearer key for the request/run scope above (DFIND-155). Registered by
+ * `@agentforge/host` beside the endpoint reader. `null` when there is no assigned endpoint or the
+ * portal issued no key for it: the caller then reports needs_key, never the company key. Only
+ * trusted inside the scope where `assignedGatewayEndpoint()` is also live — a key without its
+ * endpoint is meaningless and must never travel to another host.
+ */
+let assignedKeyReader: (() => string | null) | null = null;
+
+export function registerAssignedGatewayKeyReader(reader: (() => string | null) | null): void {
+  assignedKeyReader = reader;
+}
+
+export function assignedGatewayKey(): string | null {
+  return assignedKeyReader?.() ?? null;
+}
+
+/**
  * The one gateway URL this process may use instead of `PINNED_GATEWAY_BASE_URL`, or `null` for the
  * pinned one. Two channels, never mixed:
  *

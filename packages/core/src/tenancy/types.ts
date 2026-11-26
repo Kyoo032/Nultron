@@ -46,6 +46,8 @@ export type TenantContext = {
   role: MembershipRole;
   /** Operator-assigned API gateway base URL for this signed-in user, or `null`/omitted for default. */
   gatewayEndpoint?: string | null;
+  /** In-memory bearer key the portal issued for `gatewayEndpoint` (DFIND-155). Never persisted raw. */
+  gatewayEndpointKey?: string | null;
 };
 
 export function requireTenant(tenant: TenantContext | null | undefined): TenantContext {

@@ -215,16 +215,24 @@ async function accept(
       return;
     }
     try {
-      withAssignedGatewayEndpoint(tenant.gatewayEndpoint ?? null, () => requireGatewayAllowedFor(tenant));
+      withAssignedGatewayEndpoint(
+        tenant.gatewayEndpoint ?? null,
+        () => requireGatewayAllowedFor(tenant),
+        tenant.gatewayEndpointKey ?? null,
+      );
     } catch {
       refuse(socket, { status: 403, code: "gateway_blocked" }, context);
       return;
     }
     sockets.handleUpgrade(req, socket, head, (ws) => {
-      withAssignedGatewayEndpoint(tenant.gatewayEndpoint ?? null, () => {
-        const relay = new VoiceRelay(ws, voice);
-        void relay.start();
-      });
+      withAssignedGatewayEndpoint(
+        tenant.gatewayEndpoint ?? null,
+        () => {
+          const relay = new VoiceRelay(ws, voice);
+          void relay.start();
+        },
+        tenant.gatewayEndpointKey ?? null,
+      );
     });
   } catch {
     refuse(socket, { status: 401, code: "session_invalid" }, context);

@@ -318,6 +318,7 @@ export function createPortalSessionCheck(options: PortalSessionCheckOptions): Po
     let rotated: PortalTokenSet & { readonly accessToken: string };
     let role: PortalRole | null;
     let gatewayEndpoint: string | null;
+    let gatewayKey: string | null;
     try {
       const client = clientCredentials();
       const answer = await options.portal.refresh({
@@ -327,6 +328,7 @@ export function createPortalSessionCheck(options: PortalSessionCheckOptions): Po
       });
       role = answer.role;
       gatewayEndpoint = answer.gatewayEndpoint ?? null;
+      gatewayKey = answer.gatewayKey ?? null;
       rotated = {
         refreshToken: answer.refreshToken,
         accessToken: answer.accessToken,
@@ -367,7 +369,7 @@ export function createPortalSessionCheck(options: PortalSessionCheckOptions): Po
     try {
       // One write: the sealed token, assigned gateway endpoint, and stamp can never disagree about
       // which rotation they belong to, and a row revoked meanwhile keeps neither token.
-      await context.store.recordRotation(session.id, clock(), sealRotated(session, rotated), gatewayEndpoint);
+      await context.store.recordRotation(session.id, clock(), sealRotated(session, rotated), gatewayEndpoint, gatewayKey);
     } catch (error) {
       // The pair is safe in the vault until a restart. The row still holds the token just spent,
       // so a restart before the next rotation ends this session at the portal as a replay.

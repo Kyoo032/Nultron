@@ -96,6 +96,12 @@ export type PortalTokens = {
    * Never writable by regular users; refreshed on every token rotation.
    */
   readonly gatewayEndpoint: string | null;
+  /**
+   * The write-only bearer key the operator set for `gatewayEndpoint`, delivered sealed-at-rest by
+   * the portal (DFIND-155). `null`/absent when the endpoint has none: callers fail closed to
+   * needs_key, never to the company key. Never logged or echoed.
+   */
+  readonly gatewayKey?: string | null;
 };
 
 /**
@@ -217,6 +223,12 @@ function asString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+/** An issued endpoint key: any non-empty string within a sane cap, otherwise absent. */
+const MAX_GATEWAY_KEY_LENGTH = 8192;
+function asEndpointKey(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 && value.length <= MAX_GATEWAY_KEY_LENGTH ? value : null;
+}
+
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -292,6 +304,8 @@ function toTokens(body: unknown): PortalTokens {
     role: parsePortalRole(record.role),
     // Operator-assigned per-user gateway endpoint; invalid or absent values fall back to default (`null`).
     gatewayEndpoint: normalizeAssignedGatewayEndpoint(record.gateway_endpoint),
+    // The bearer key the portal issued for that endpoint (DFIND-155). Opaque; only length-checked.
+    gatewayKey: asEndpointKey(record.gateway_key),
   };
 }
 
@@ -404,6 +418,7 @@ const FAKE_TOKENS: PortalTokens = {
   // an admin says so (`createFakePortalClient({ tokens: { role: "owner" } })`).
   role: "member",
   gatewayEndpoint: null,
+  gatewayKey: null,
 };
 
 /**

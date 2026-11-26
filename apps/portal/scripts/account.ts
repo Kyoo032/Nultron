@@ -21,6 +21,7 @@
  * mode should change because somebody ran the wrong command.
  */
 import { mkdir } from "node:fs/promises";
+import { createInterface } from "node:readline";
 import {
   ACCOUNT_USAGE,
   AccountArgsError,
@@ -48,6 +49,8 @@ import {
 import { migrateAsOwner } from "../src/boot";
 import { loadConfig, PortalConfigError } from "../src/config";
 import { createPasswordHasher } from "../src/password";
+import { keyFromSeed } from "../src/jwt/keys";
+import { sealGatewayKey } from "../src/gateway-key";
 import { openStore } from "../src/store";
 
 interface Refusal {
@@ -139,6 +142,10 @@ const ENDPOINT_REFUSALS: Readonly<Record<SetEndpointRefusal, Refusal>> = {
     code: 2,
     message: "--gateway-endpoint must be a valid HTTPS URL without credentials, query string, or fragment.",
   },
+  key_wrap_unavailable: {
+    code: 3,
+    message: "This portal cannot seal an endpoint key: PORTAL_SIGNING_KEY is not set.",
+  },
 };
 
 function say(text: string): void {
@@ -201,7 +208,9 @@ async function run(command: AccountCommand, deps: AccountDeps): Promise<void> {
       return;
     }
     case "set-endpoint": {
-      const result = await setAccountEndpoint(deps, command);
+      // The key comes over stdin only: never an argv string, never a URL (F11's rule, applied here).
+      const gatewayKey = command.keyFromStdin ? await readStdinKey() : undefined;
+      const result = await setAccountEndpoint(deps, { ...command, gatewayKey });
       if (result.ok) {
         say(
           `${result.username} (${result.email}): endpoint ${result.from ?? "default"} -> ${result.to ?? "default"}. ` +
@@ -249,7 +258,18 @@ async function main(): Promise<void> {
   await migrateAsOwner(config);
   const store = openStore(config);
   try {
-    await run(command, { store, passwords: createPasswordHasher(), clock: store.clock });
+    await run(command, {
+      store,
+      passwords: createPasswordHasher(),
+      clock: store.clock,
+      // Seals under the same signing key the server opens with; an unconfigured dev portal (ephemeral
+      // key) has no stable key to seal under, so the script refuses to seal rather than strand it.
+      sealEndpointKey: config.signingKey
+        ? (raw) => sealGatewayKey(raw, keyFromSeed(config.signingKey as Buffer))
+        : (raw) => {
+            throw new PortalConfigError(["PORTAL_SIGNING_KEY is unset: there is no stable key to seal the endpoint key under."]);
+          },
+    });
   } finally {
     await store.close();
   }
@@ -263,3 +283,20 @@ main().catch((error: unknown) => {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 });
+
+/**
+ * `--key-stdin`: the key arrives on stdin and nowhere else — never an argument, a URL or a log line.
+ * Trimmed once; anything empty or multi-line is refused, because a pasted block is not a key.
+ */
+async function readStdinKey(): Promise<string> {
+  const rl = createInterface({ input: process.stdin, terminal: false });
+  let text = "";
+  for await (const line of rl) {
+    text += `${line}\n`;
+  }
+  const key = text.trim();
+  if (!key || key.includes("\n") || key.includes("\r")) {
+    refuse({ code: 3, message: "Pass exactly one line on stdin: the endpoint's bearer key." });
+  }
+  return key;
+}

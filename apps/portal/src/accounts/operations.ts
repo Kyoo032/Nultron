@@ -36,6 +36,11 @@ export interface AccountDeps {
   readonly store: PortalStore;
   readonly passwords: PasswordHasher;
   readonly clock: Clock;
+  /**
+   * Seals a raw endpoint key for `users.gateway_key_sealed` (DFIND-155). Required only when
+   * `setAccountEndpoint` is given a key; the CLI wires it to the signing key.
+   */
+  readonly sealEndpointKey?: (raw: string) => string;
 }
 
 type Refusal<R extends string> = { readonly ok: false; readonly reason: R };
@@ -487,7 +492,8 @@ export type SetEndpointRefusal =
   | PersonRefusal
   | "user_disabled"
   | "same_endpoint"
-  | "invalid_gateway_endpoint";
+  | "invalid_gateway_endpoint"
+  | "key_wrap_unavailable";
 
 export interface EndpointChanged {
   readonly ok: true;
@@ -505,7 +511,7 @@ export interface EndpointChanged {
  */
 export async function setAccountEndpoint(
   deps: AccountDeps,
-  input: PersonInput & { readonly gatewayEndpoint: string | null },
+  input: PersonInput & { readonly gatewayEndpoint: string | null; readonly gatewayKey?: string | null },
 ): Promise<EndpointChanged | Refusal<SetEndpointRefusal>> {
   const tenantId = await deps.store.resolve.bySlug(input.tenantSlug);
   if (!tenantId) {
@@ -531,10 +537,17 @@ export async function setAccountEndpoint(
     if (user.status === "disabled") {
       throw new RollBack("user_disabled");
     }
-    if (user.gatewayEndpoint === target) {
+    if (user.gatewayEndpoint === target && input.gatewayKey === undefined) {
       throw new RollBack("same_endpoint");
     }
-    await ops.users.setGatewayEndpoint(user.id, target);
+    // The key is sealed here, at the door: the raw value crosses one argument boundary and is in
+    // no column, log line or audit row. `--clear` and an endpoint set with no key both write NULL.
+    const sealed =
+      input.gatewayKey && deps.sealEndpointKey ? deps.sealEndpointKey(input.gatewayKey) : null;
+    if (input.gatewayKey && !deps.sealEndpointKey) {
+      throw new RollBack("key_wrap_unavailable" as SetEndpointRefusal);
+    }
+    await ops.users.setGatewayEndpoint(user.id, target, sealed);
     await audit(
       ops,
       user,

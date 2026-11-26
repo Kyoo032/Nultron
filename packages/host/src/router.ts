@@ -605,11 +605,16 @@ async function gate(
     return { ok: true };
   }
   try {
+    const store = options.sessionStore ?? hostSessionStore();
     const session = await requireSessionFor(request, {
-      store: options.sessionStore ?? hostSessionStore(),
+      store,
       now: options.now,
       portalCheck: options.portalCheck ?? hostPortalCheck(),
     });
+    // The bearer key for the assigned endpoint lives sealed on the row and is opened per request
+    // (DFIND-155); only the MAC-verified endpoint above can reach this line, and the key opens only
+    // as that endpoint's — so an endpoint rewritten in sqlite gets neither.
+    const gatewayEndpointKey = session.gatewayEndpoint ? await store.readEndpointKey(session.id) : null;
     return {
       ok: true,
       session: {
@@ -617,7 +622,9 @@ async function gate(
         tenantId: session.tenantId,
         orgId: session.orgId,
         userId: session.userId,
-        ...(session.gatewayEndpoint ? { gatewayEndpoint: session.gatewayEndpoint } : {}),
+        ...(session.gatewayEndpoint
+          ? { gatewayEndpoint: session.gatewayEndpoint, gatewayEndpointKey }
+          : {}),
       },
     };
   } catch (error) {
@@ -672,16 +679,20 @@ export async function dispatch(request: HostRequest, options: DispatchOptions = 
     // And the same scope carries the person's own language (Phase 4), so `localeForRun()` answers
     // in it in every mode rather than only in Chat. Read lazily, from the session's tenant and user
     // only; off server mode nothing is set and the boot locale stands (./run-context.ts).
-    const { tenantId, userId, gatewayEndpoint } = session;
+    const { tenantId, userId, gatewayEndpoint, gatewayEndpointKey } = session;
     const result = await withLogContext({ tenantId, route: route.path }, () =>
       withRequestSession(session, () =>
-        withAssignedGatewayEndpoint(gatewayEndpoint ?? null, () =>
-          withRequestLocale(
-            // The browser's own language joins the person's stored choice, for someone who never chose
-            // (`./locale-boot.ts`). Forwarded by the HTTP adapter on the hosted server only.
-            () => sessionLocale({ tenantId, userId }, request.headers["accept-language"]),
-            () => route.handler(scoped),
-          ),
+        withAssignedGatewayEndpoint(
+          gatewayEndpoint ?? null,
+          () =>
+            withRequestLocale(
+              // The browser's own language joins the person's stored choice, for someone who never chose
+              // (`./locale-boot.ts`). Forwarded by the HTTP adapter on the hosted server only.
+              () => sessionLocale({ tenantId, userId }, request.headers["accept-language"]),
+              () => route.handler(scoped),
+            ),
+          // The issued key binds with its endpoint in one scope (DFIND-155).
+          gatewayEndpointKey ?? null,
         ),
       ),
     );
