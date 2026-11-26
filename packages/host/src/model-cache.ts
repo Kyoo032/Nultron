@@ -4,6 +4,7 @@ import { localDataDir } from "@agentforge/db/vault-key";
 import {
   ApiError,
   isServerMode,
+  keyFingerprintOrNull,
   mediaKind,
   normalizeAssignedGatewayEndpoint,
   parseAvailabilityStore,
@@ -14,7 +15,7 @@ import {
   type PricingHints,
   type PublishedMediaMap,
 } from "@agentforge/core";
-import { assignedEndpointSlotTag, currentAssignedGatewayEndpoint } from "./gateway-endpoint-scope";
+import { assignedEndpointSlotTag, currentAssignedGatewayEndpoint, currentAssignedGatewayKey } from "./gateway-endpoint-scope";
 import { assertTenantId } from "./tenant-paths";
 import { currentRequestSession } from "./tenant-scope";
 import { companyStateKey, dbTenantStateBackend, type TenantStateSlot } from "./tenant-state-store";
@@ -69,7 +70,7 @@ export type ModelCache = {
  * partner's row.
  */
 export type ModelCacheScope =
-  | Readonly<{ tenantId: string; organizationId?: string; gatewayEndpoint?: string | null }>
+  | Readonly<{ tenantId: string; organizationId?: string; gatewayEndpoint?: string | null; gatewayEndpointKey?: string | null }>
   | null
   | undefined;
 
@@ -78,7 +79,11 @@ export type ModelCacheScope =
  * tenant, which is right on a desk (one cache) and is refused on the hosted server.
  */
 export function modelCacheScopeOf(
-  scope: Readonly<{ tenantId: string; organizationId?: string; gatewayEndpoint?: string | null }> | string | null | undefined,
+  scope:
+    | Readonly<{ tenantId: string; organizationId?: string; gatewayEndpoint?: string | null; gatewayEndpointKey?: string | null }>
+    | string
+    | null
+    | undefined,
 ): ModelCacheScope {
   return typeof scope === "object" && scope !== null ? scope : undefined;
 }
@@ -91,6 +96,12 @@ export type ModelCacheOwner = {
   readonly tenantId: string;
   readonly companyId: string;
   readonly assignedEndpoint?: string | null;
+  /**
+   * Non-secret hash handle of the issued key the endpoint's cache was probed with. Two coworkers
+   * may share one assigned endpoint while holding different issued keys; neither may read the
+   * other's catalogue.
+   */
+  readonly keyFingerprint?: string | null;
 };
 
 /**
@@ -123,16 +134,23 @@ export function modelCacheOwner(scope: ModelCacheScope): ModelCacheOwner {
     normalizeAssignedGatewayEndpoint(scope?.gatewayEndpoint) ??
     (session && session.tenantId === tenantId ? normalizeAssignedGatewayEndpoint(session.gatewayEndpoint) : null) ??
     currentAssignedGatewayEndpoint();
+  const keyFingerprint = assignedEndpoint
+    ? keyFingerprintOrNull(scope?.gatewayEndpointKey ?? undefined) ??
+      (session && session.tenantId === tenantId ? keyFingerprintOrNull(session.gatewayEndpointKey ?? undefined) : null) ??
+      keyFingerprintOrNull(currentAssignedGatewayKey() ?? undefined)
+    : null;
   return assignedEndpoint
-    ? { tenantId: assertTenantId(tenantId), companyId, assignedEndpoint }
+    ? { tenantId: assertTenantId(tenantId), companyId, assignedEndpoint, keyFingerprint }
     : { tenantId: assertTenantId(tenantId), companyId };
 }
 
-/** The stored slot for one company's cache (isolated per operator-assigned endpoint when set). */
+/** The stored slot for one company's cache (isolated per operator-assigned endpoint and, under it, per issued key). */
 function companySlot(owner: ModelCacheOwner): TenantStateSlot {
-  return owner.assignedEndpoint
-    ? companyStateKey(MODEL_CACHE_KEY, `${owner.companyId}:ep:${assignedEndpointSlotTag(owner.assignedEndpoint)}`)
-    : companyStateKey(MODEL_CACHE_KEY, owner.companyId);
+  if (!owner.assignedEndpoint) {
+    return companyStateKey(MODEL_CACHE_KEY, owner.companyId);
+  }
+  const fingerprintTag = owner.keyFingerprint ? `:${owner.keyFingerprint.replace("sha256:", "")}` : "";
+  return companyStateKey(MODEL_CACHE_KEY, `${owner.companyId}:ep:${assignedEndpointSlotTag(owner.assignedEndpoint)}${fingerprintTag}`);
 }
 
 /**
@@ -147,7 +165,7 @@ export function modelCacheSlot(scope?: ModelCacheScope): string {
   const owner = modelCacheOwner(scope);
   // JSON, not a joined string: two (partner, company, endpoint) tuples never spell the same key.
   return owner.assignedEndpoint
-    ? JSON.stringify([owner.tenantId, owner.companyId, owner.assignedEndpoint])
+    ? JSON.stringify([owner.tenantId, owner.companyId, owner.assignedEndpoint, owner.keyFingerprint ?? null])
     : JSON.stringify([owner.tenantId, owner.companyId]);
 }
 
