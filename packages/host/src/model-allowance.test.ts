@@ -8,16 +8,20 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
 const dataDir = mkdtempSync(join(tmpdir(), "agentforge-model-allowance-"));
 process.env.AGENTFORGE_DATA_DIR = dataDir;
 delete process.env.DATABASE_URL;
 
-import type { TenantContext } from "@agentforge/core";
+import type { PricingCatalog, PricingModel, TenantContext } from "@agentforge/core";
 import {
+  PRICE_BAND_1_MAX_USD_PER_MILLION_INPUT,
+  PRICE_BAND_2_MAX_USD_PER_MILLION_INPUT,
   allowanceFor,
   clearTenantModelAllowlist,
+  priceBandFor,
+  priceInfoFromCatalog,
   recordTenantModelAllowlist,
   tenantAllowedModelIds,
   tenantModelAllowlist,
@@ -96,5 +100,84 @@ describe("tenantAllowedModelIds", () => {
     recordTenantModelAllowlist(tenant.tenantId, ["  One-Model "]);
     expect(tenantAllowedModelIds(tenant)).toEqual(new Set(["one-model"]));
     expect(tenantAllowedModelIds(tenant)?.has("unlisted")).toBe(false);
+  });
+});
+
+function token(modelName: string, modelRatio: number, overrides: Partial<PricingModel> = {}): PricingModel {
+  return { modelName, quotaType: 0, modelRatio, completionRatio: 1, modelPrice: 0, ...overrides };
+}
+
+function catalogOf(...models: PricingModel[]): PricingCatalog {
+  return { models, groupRatio: {} };
+}
+
+describe("priceInfoFromCatalog bands input prices per million tokens", () => {
+  const catalog = catalogOf(
+    token("at-one-dollar", 0.5),
+    token("over-one-dollar", 0.5000001),
+    token("at-five-dollars", 2.5),
+    token("over-five-dollars", 2.5000001),
+    token("completion-priced", 0.5, { completionRatio: 4 }),
+    token("tiered-model", 0.5, { billingMode: "tiered_expr" }),
+    token("zero-ratio", 0),
+    { modelName: "per-call", quotaType: 1, modelRatio: 0.5, completionRatio: 1, modelPrice: 0.02 },
+  );
+
+  it("uses the named cut points: $1 and $5 per million input tokens", () => {
+    expect(PRICE_BAND_1_MAX_USD_PER_MILLION_INPUT).toBe(1);
+    expect(PRICE_BAND_2_MAX_USD_PER_MILLION_INPUT).toBe(5);
+  });
+
+  it("keeps exactly $1 in band 1 and anything above it in band 2", () => {
+    expect(priceInfoFromCatalog(catalog, "at-one-dollar")).toEqual({
+      band: 1,
+      usdPerMillionInput: 1,
+      usdPerMillionOutput: 1,
+    });
+    expect(priceInfoFromCatalog(catalog, "over-one-dollar")?.band).toBe(2);
+  });
+
+  it("keeps exactly $5 in band 2 and anything above it in band 3", () => {
+    expect(priceInfoFromCatalog(catalog, "at-five-dollars")?.band).toBe(2);
+    expect(priceInfoFromCatalog(catalog, "over-five-dollars")?.band).toBe(3);
+  });
+
+  it("bands on the input price and reports the output price beside it", () => {
+    expect(priceInfoFromCatalog(catalog, "completion-priced")).toEqual({
+      band: 1,
+      usdPerMillionInput: 1,
+      usdPerMillionOutput: 4,
+    });
+  });
+
+  it("matches the id without regard to case or surrounding spaces", () => {
+    expect(priceInfoFromCatalog(catalog, "  AT-FIVE-DOLLARS ")?.band).toBe(2);
+  });
+
+  it("has no band for an id the catalogue does not carry", () => {
+    expect(priceInfoFromCatalog(catalog, "not-in-catalog")).toBeNull();
+  });
+
+  it("has no band for a per-call model, a tiered model or a model with no positive ratio", () => {
+    expect(priceInfoFromCatalog(catalog, "per-call")).toBeNull();
+    expect(priceInfoFromCatalog(catalog, "tiered-model")).toBeNull();
+    expect(priceInfoFromCatalog(catalog, "zero-ratio")).toBeNull();
+  });
+
+  it("has no band without a catalogue", () => {
+    expect(priceInfoFromCatalog(null, "at-one-dollar")).toBeNull();
+  });
+});
+
+describe("priceBandFor reads cached pricing only", () => {
+  it("is null for an id with no cached price, and never fetches one", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    try {
+      expect(priceBandFor("gpt-5.6-luna")).toBeNull();
+      expect(priceBandFor("no-such-model")).toBeNull();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });

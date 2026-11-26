@@ -145,4 +145,31 @@ describe("the role × action matrix", () => {
       }
     }
   }, 120_000);
+
+  /**
+   * A few cells pinned by hand, not derived from `routeGate`/`roleDenied`: the loop above proves
+   * the gate enforces its own classification, these prove the classification itself names the
+   * right routes (a route filed under the wrong class still passes the loop).
+   */
+  it("pins named routes to the denial the spec gives them", async () => {
+    const cases: Array<{ role: MembershipRole; method: string; path: string; denied: boolean }> = [
+      { role: "auditor", method: "GET", path: "/api/v1/threads", denied: true },
+      { role: "auditor", method: "POST", path: "/api/v1/settings", denied: true },
+      { role: "auditor", method: "GET", path: "/api/v1/settings", denied: false },
+      { role: "member", method: "POST", path: "/api/v1/billing/top-up", denied: true },
+      { role: "admin", method: "POST", path: "/api/v1/billing/top-up", denied: false },
+      { role: "owner", method: "GET", path: "/api/v1/threads", denied: false },
+    ];
+    for (const entry of cases) {
+      const result = await dispatch(
+        requestFor({ method: entry.method, path: entry.path } as Parameters<typeof requestFor>[0], entry.role),
+        { serverMode: true, sessionStore: store },
+      );
+      const gate = routeGate(entry.method, entry.path);
+      expect(
+        isRoleDenial(result, entry.role, gate),
+        `${entry.role} ${entry.method} ${entry.path}`,
+      ).toBe(entry.denied);
+    }
+  });
 });

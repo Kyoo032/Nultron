@@ -510,7 +510,7 @@ export function SettingsPage() {
             </p>
           )}
 
-          {hasOpenai ? (
+          {hasOpenai && mayChangeKey ? (
             <label className="block text-xs font-medium text-[var(--text-2)]">
               {t("settings.editCapLabel")}
               <input
@@ -530,6 +530,11 @@ export function SettingsPage() {
                 data-testid="settings-edit-turn-cap"
               />
             </label>
+          ) : null}
+          {hasOpenai && !mayChangeKey ? (
+            <p className="text-xs text-[var(--text-2)]" data-testid="settings-edit-turn-cap-readonly">
+              {t("settings.editCapLabel")}: ${editTurnCapUsd}
+            </p>
           ) : null}
 
           {hasOpenai && openaiKeyFingerprint ? (

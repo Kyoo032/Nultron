@@ -2,6 +2,8 @@
 
 Product: both Â· Instance: main :3000
 
+Last verified: 2026-11-26 on `devin/1795686920-opc-auditor-allowlist` (F8a): `App.tsx` adds the `/users` route inside `SettingsShell`, `SessionRole` includes `auditor` (`apps/web/lib/session.tsx`), and `dispatch` (`packages/host/src/router.ts`) applies the `role-policy.ts` route gate before the handler on every non-exempt `/api/v1/*` route.
+
 Last verified: 2026-11-25 on working tree over `main` for the Agents hub, Dashboard studio hub, Team padding, and specialist role names (`apps/web/components/agents-shell.tsx`, `apps/web/components/settings-shell.tsx`, `apps/web/components/dashboard-page.tsx`, `apps/web/components/dashboard-page.css`, `apps/web/components/agent-rail.tsx`, `apps/web/components/mode-icons.tsx`, `apps/web/components/team-page.tsx`, `apps/web/components/team-page.css`, `apps/web/components/virtual-agents-page.tsx`, `apps/web/lib/virtual-agents.ts`, `apps/web/src/App.tsx`, `apps/web/app/globals.css`, `packages/core/src/agents/product-modes.ts`):
 - `AgentRail`'s `ACCOUNT_LINKS` opens with **Dashboard** (`dashboard-link` → `/dashboard`, icon `dashboard`, highlighted across `/dashboard` and `/dashboard/*`), followed by Knowledge Base, Agents (`workspaces-link`, highlighted across `/workspaces` and `/team` via `isAgentsHubPath`), Usage, and Settings (`settings-link`, highlighted across `/settings`, `/channels`, `/customers`, `/mcp` via `isSettingsHubPath`).
 - `AgentsShell` (`apps/web/components/agents-shell.tsx`) hosts `/workspaces` (`VirtualAgentsPage`) and `/team` (`TeamPage`) under two tabs (`agents-tab-agents` and `agents-tab-team`), moving Team out of `SettingsShell`. `team-page.css` now pads `.team-page` (`2rem 16px 3rem`, `24px` at `>=640px`) and `.team-brief` (`20px 22px`).
