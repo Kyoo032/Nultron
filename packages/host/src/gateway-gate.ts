@@ -124,6 +124,7 @@ export type GateScope =
   | (Pick<TenantContext, "tenantId" | "workspaceId"> & {
       organizationId?: string;
       gatewayEndpoint?: string | null;
+      gatewayEndpointKey?: string | null;
     });
 
 export type GatewayGateOptions = {
@@ -159,7 +160,13 @@ export type MaybeRefreshGatewayOptions = GatewayGateOptions & {
  * Whose verdict a call reads and writes: the tenant, and on the hosted server the company inside it.
  * `companyId` is null on a desk, which is how every desk path stays exactly what it was.
  */
-export type GateOwner = { tenantId: string; companyId: string | null; assignedEndpoint?: string | null };
+export type GateOwner = {
+  tenantId: string;
+  companyId: string | null;
+  assignedEndpoint?: string | null;
+  /** Non-secret hash handle of the issued key the verdict under this owner was judged on. */
+  keyFingerprint?: string | null;
+};
 
 /** What a hosted gate call that names no company is refused with (a bug in the caller, never a user's doing). */
 export const COMPANY_REQUIRED_CODE = "company_required";
@@ -205,7 +212,15 @@ function ownerOf(opts: GatewayGateOptions): GateOwner {
       500,
     );
   }
-  return { tenantId, companyId: organizationId, assignedEndpoint };
+  // The key this owner's verdict is about: the session's issued key when the scope carries it,
+  // else the one the live request scope binds. Without it "forget my key" could not reach the
+  // fingerprinted slot the verdict was saved under.
+  const scopeKey =
+    scope !== null && typeof scope === "object" && "gatewayEndpointKey" in scope
+      ? (scope.gatewayEndpointKey ?? null)
+      : null;
+  const keyFingerprint = assignedEndpoint ? (keyFingerprintOrNull(scopeKey ?? undefined) ?? keyFingerprintOrNull(currentAssignedGatewayKey() ?? undefined)) : null;
+  return { tenantId, companyId: organizationId, assignedEndpoint, keyFingerprint };
 }
 
 /**
@@ -354,7 +369,12 @@ export function saveGateState(
 export function clearGateState(scope?: GateScope): void {
   try {
     const owner = ownerOf({ tenant: scope });
-    tenantStateBackend().remove(owner.tenantId, gateSlot(owner.companyId, owner.assignedEndpoint));
+    // Drop both spellings: the per-key slot today's writes land on and the shared endpoint slot
+    // older writes (and a no-key verdict) may still sit under.
+    tenantStateBackend().remove(owner.tenantId, gateSlot(owner.companyId, owner.assignedEndpoint, owner.keyFingerprint));
+    if (owner.keyFingerprint) {
+      tenantStateBackend().remove(owner.tenantId, gateSlot(owner.companyId, owner.assignedEndpoint));
+    }
   } catch (error) {
     // A hosted scope with no company is a bug in the caller, so it is not swallowed as "nothing to clear".
     if (error instanceof ApiError && error.code === COMPANY_REQUIRED_CODE) {
