@@ -2,6 +2,8 @@
 
 Product: both Â· Instance: main :3000
 
+Last verified: 2026-11-26 on `devin/1795694018-audit-log` (F2, branch head `5fd2adfe`): `App.tsx` adds the `/settings/activity` route inside `SettingsShell` rendering `ActivityLogPage`; `packages/core/src/index.ts` re-exports the audit vocabulary (`AUDIT_EVENTS`, `AUDIT_ACTOR_KINDS`, `AUDIT_OUTCOMES`, `auditEventInput`, `reportAuditEvent`, `installAuditWriter`) so `packages/host` and `packages/core/src/runtime/invoke-guarded.ts` share one event surface; `router.ts` mounts `/api/v1/audit/events|verify|export` behind the `role-policy.ts` `canAudit` gate (`AUDIT_ROUTES`, owner + auditor).
+
 Last verified: 2026-11-26 on `devin/1795686920-opc-auditor-allowlist` (F8a): `App.tsx` adds the `/users` route inside `SettingsShell`, `SessionRole` includes `auditor` (`apps/web/lib/session.tsx`), and `dispatch` (`packages/host/src/router.ts`) applies the `role-policy.ts` route gate before the handler on every non-exempt `/api/v1/*` route.
 
 Last verified: 2026-11-25 on working tree over `main` for the Agents hub, Dashboard studio hub, Team padding, and specialist role names (`apps/web/components/agents-shell.tsx`, `apps/web/components/settings-shell.tsx`, `apps/web/components/dashboard-page.tsx`, `apps/web/components/dashboard-page.css`, `apps/web/components/agent-rail.tsx`, `apps/web/components/mode-icons.tsx`, `apps/web/components/team-page.tsx`, `apps/web/components/team-page.css`, `apps/web/components/virtual-agents-page.tsx`, `apps/web/lib/virtual-agents.ts`, `apps/web/src/App.tsx`, `apps/web/app/globals.css`, `packages/core/src/agents/product-modes.ts`):
