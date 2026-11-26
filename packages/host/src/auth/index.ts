@@ -7,7 +7,7 @@
  * nothing here may open the database or read the portal URL at import time — `portalBaseUrl` throws
  * when the variable is absent, which is correct on a server and wrong everywhere else.
  */
-import { isServerMode } from "@agentforge/core";
+import { isServerMode, reportAuditEvent } from "@agentforge/core";
 import type { PortalRole } from "@agentforge/core";
 import type { PortalIdentity } from "@agentforge/db";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
@@ -249,6 +249,17 @@ async function hostApplyRole(identity: PortalIdentity, role: PortalRole | null):
     // Counts and ids only: the person's id is the portal's opaque one, and the role is one of three
     // fixed words (or `none`, which the host applied as `member`).
     log.info("portal_role_applied", { tenantId: identity.tenantId, role: role ?? "none" });
+    // F2: the change itself is metadata — who, to which of the fixed words — so the word rides in
+    // `rule`, the field the table gives to "what was decided".
+    reportAuditEvent({
+      tenantId: identity.tenantId,
+      event: "role.change",
+      actorKind: "system",
+      targetKind: "membership",
+      targetId: identity.userId,
+      outcome: "ok",
+      rule: role ?? "none",
+    });
   }
 }
 

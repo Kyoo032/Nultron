@@ -582,6 +582,9 @@ describe("POST /api/v1/settings/reset", () => {
       "legal",
       // Channel lists and stored conversations; the bot token itself is inside settings.enc.
       "channels",
+      // Delegation runs and MCP connector state, both host-written per desk.
+      "delegations",
+      "mcp",
       "models-cache.json",
       "models-dev-cache.json",
       "models-dev-cache.meta.json",

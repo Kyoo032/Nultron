@@ -5,6 +5,8 @@ import { runWithToolSecrets } from "../tools/secret-scope";
 import { invokeToolGuarded } from "./invoke-guarded";
 import type { TenantContext } from "../tenancy/types";
 import { runWithToolIoSink, takeLastToolIo } from "./tool-io";
+import { installAuditWriter } from "../audit/sink";
+import type { AuditEventInput } from "../audit/events";
 
 const tenant: TenantContext = {
   tenantId: "local-tenant",
@@ -191,6 +193,67 @@ describe("invokeToolGuarded", () => {
           snippet: "Contact alex.rivera@example.com or Kirim ke Rina Wijaya di 081234567890",
         },
       ],
+    });
+  });
+
+  describe("audit emission (F2)", () => {
+    function withAudit(run: () => Promise<unknown>): Promise<AuditEventInput[]> {
+      const events: AuditEventInput[] = [];
+      installAuditWriter((event) => events.push(event));
+      return run()
+        .then(() => events)
+        .finally(() => installAuditWriter(null));
+    }
+
+    it("emits one tool.call ok event with the tool's key and the call's duration", async () => {
+      const tool = defineTool({
+        key: "echo",
+        name: "Echo",
+        description: "echo",
+        schema: z.object({ text: z.string() }),
+        execute: async () => ({ success: true }),
+      });
+      const events = await withAudit(() => invokeToolGuarded(tool, { text: "hi" }, tenant));
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        tenantId: tenant.tenantId,
+        event: "tool.call",
+        targetId: "echo",
+        outcome: "ok",
+      });
+      expect(events[0]!.durationMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it("emits tool.call denied when a guard refuses the call", async () => {
+      const tool = defineTool({
+        key: "calculator",
+        name: "Calculator",
+        description: "calc",
+        schema: z.object({ expression: z.string() }),
+        execute: async () => ({ result: 5 }),
+      });
+      const events = await withAudit(() =>
+        runWithToolSecrets({ secrets: {}, backends: {}, disabledTools: ["calculator"] }, () =>
+          invokeToolGuarded(tool, { expression: "2+3" }, tenant),
+        ),
+      );
+      expect(events.map((event) => event.outcome)).toEqual(["denied"]);
+    });
+
+    it("emits tool.call failed when execute throws", async () => {
+      const tool = defineTool({
+        key: "flaky",
+        name: "Flaky",
+        description: "throws",
+        schema: z.object({}),
+        execute: async () => {
+          throw new Error("boom");
+        },
+      });
+      const events = await withAudit(() => invokeToolGuarded(tool, {}, tenant).catch(() => undefined));
+      expect(events.map((event) => event.outcome)).toEqual(["failed"]);
+      // The metadata carries the fact of a failure and how long it took — never the error's text.
+      expect(JSON.stringify(events)).not.toContain("boom");
     });
   });
 });

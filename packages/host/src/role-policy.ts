@@ -107,8 +107,16 @@ export const ADMINISTER_ROUTES: ReadonlySet<string> = new Set([
   "POST /api/v1/models",
 ]);
 
-/** The audit-only surface. Empty until the Activity Log and audit export routes land (F2). */
-export const AUDIT_ROUTES: ReadonlySet<string> = new Set([]);
+/**
+ * The audit-only surface (F2): the Activity Log's read, integrity-check and export routes.
+ * `canAudit` — owner and auditor. An admin is refused here: the seat design keeps even
+ * administration off the evidence trail's read side until Rizky decides otherwise (section 6).
+ */
+export const AUDIT_ROUTES: ReadonlySet<string> = new Set([
+  "GET /api/v1/audit/events",
+  "POST /api/v1/audit/verify",
+  "GET /api/v1/audit/export",
+]);
 
 /**
  * The gate one registered route needs, keyed by the same `method`/`route.path` the route table

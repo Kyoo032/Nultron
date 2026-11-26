@@ -208,8 +208,11 @@ describe("0015_tenants on a fresh database", () => {
     // a tenant is holding is a property of the tenant, and the quota it feeds is per tenant, not
     // per organization. tenant_reset_audit is Phase 8 (0020): it records that a tenant erased its
     // own content, so it has to hang off the thing that survives that act — the tenant — and never
-    // off the organization the reset deletes. Nothing else is allowed to carry a second tenant_id.
+    // off the organization the reset deletes. audit_events is F2: the desk's trail is the tenant's,
+    // and it has to outlive a workspace or an org the way the reset audit does. Nothing else is
+    // allowed to carry a second tenant_id.
     expect(carriers.sort()).toEqual([
+      "audit_events",
       "auth_sessions",
       "billing_events",
       "tenant_plan",

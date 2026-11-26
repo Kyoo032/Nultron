@@ -7,6 +7,7 @@ import { runInToolCall } from "../security/outbound-guard";
 import { maskPiiInJson } from "../security/pii";
 import { thinToolOutput } from "../security/tool-thin";
 import type { EgressGuard } from "./egress-guard";
+import { reportAuditEvent } from "../audit/sink";
 import type { MediaPermission } from "./media-permission";
 import type { ToolBudget } from "./tool-budget";
 import { reportToolIo } from "./tool-io";
@@ -35,15 +36,31 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
   egress?: EgressGuard,
   permission?: MediaPermission,
 ): Promise<unknown> {
+  // F2: one `tool.call` audit event per outcome — tool key, outcome and duration only. The strict
+  // event schema is what keeps arguments and output out of the log.
+  const auditCall = (outcome: "ok" | "denied" | "failed", durationMs?: number) =>
+    reportAuditEvent({
+      tenantId: tenant.tenantId,
+      event: "tool.call",
+      actorKind: "user",
+      actorId: tenant.userId || null,
+      targetKind: "tool",
+      targetId: tool.key,
+      outcome,
+      ...(durationMs === undefined ? {} : { durationMs }),
+    });
+
   const refusal = budget?.admit(tool.key);
   if (refusal) {
     reportToolIo({ toolKey: tool.key, input: rawArgs, full: refusal, thin: refusal });
+    auditCall("denied");
     return refusal;
   }
 
   const permissionRefusal = permission?.beforeCall(tool.key, rawArgs);
   if (permissionRefusal) {
     reportToolIo({ toolKey: tool.key, input: rawArgs, full: permissionRefusal, thin: permissionRefusal });
+    auditCall("denied");
     return permissionRefusal;
   }
 
@@ -53,12 +70,14 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
   const egressRefusal = egress?.beforeCall(tool.key, args);
   if (egressRefusal) {
     reportToolIo({ toolKey: tool.key, input: rawArgs, full: egressRefusal, thin: egressRefusal });
+    auditCall("denied");
     return egressRefusal;
   }
 
   if (getDisabledTools().includes(tool.key)) {
     const blocked = disabledToolOutput(tool.key);
     reportToolIo({ toolKey: tool.key, input: rawArgs, full: blocked, thin: blocked });
+    auditCall("denied");
     return blocked;
   }
 
@@ -67,17 +86,20 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
     if (hit) {
       const blocked = blockedInjectionOutput(hit);
       reportToolIo({ toolKey: tool.key, input: rawArgs, full: blocked, thin: blocked });
+      auditCall("denied");
       return blocked;
     }
   }
 
   let full: unknown;
+  const started = Date.now();
   try {
     // Marked as a model's tool call: a sender it reaches with no outbound guard open refuses (fails closed).
     full = await runInToolCall(() => invokeTool(tool, args, tenant));
   } catch (error) {
     // A tool that read private material and then failed may have quoted it in its error.
     egress?.afterCall(tool, undefined);
+    auditCall("failed", Date.now() - started);
     throw error;
   }
   // Taint on what ran, not on what the model is shown: the scan below may hide the output, the read still happened.
@@ -93,5 +115,7 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
 
   thin = maskPiiInJson(thin);
   reportToolIo({ toolKey: tool.key, input: args, full, thin });
+  const success = (full as { success?: unknown } | null | undefined)?.success;
+  auditCall(success === false ? "failed" : "ok", Date.now() - started);
   return thin;
 }

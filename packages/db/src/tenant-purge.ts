@@ -148,17 +148,24 @@ export const KEPT_TENANT_TABLES: Readonly<Record<string, string>> = Object.freez
   tenant_usage: "the spend ledger the invoice is built from",
   billing_events: "the provider's own record, idempotency keys included",
   tenant_reset_audit: "the record of this act; a reset that erased it would explain nothing",
+  // F2: the Activity Log's trail is the evidence that survives an erase, like `tenant_reset_audit`
+  // beside it — the DELETE trigger would refuse the delete anyway, so kept is also enforced.
+  audit_events: "the desk's metadata-only audit trail; a reset must not be able to hide the trail",
 });
 
 /**
  * Tables that belong to no tenant. Not kept *for* the tenant — there is nothing of theirs in them.
  */
 export const SHARED_TABLES: Readonly<Record<string, string>> = Object.freeze({
+  // F2 audit internals: no tenant_id of their own; they describe the retention mechanism itself.
+  audit_checkpoints: "hash anchor of the last row each retention purge removed",
+  audit_purge_window: "the one row naming how far the purge has gone",
   user: "portal identities, shared across orgs and tenants; an erase deletes only those left in no org and with no session (`deleteOrphanedUsers`)",
   tools: "the tool catalogue; the per-tenant bindings go with the cascade",
   market_cache: "a read-through cache of public market data, keyed by ticker",
   market_news_fts: "the FTS index over that same public cache",
   __drizzle_migrations: "the migration journal",
+  sqlite_sequence: "SQLite's own AUTOINCREMENT counter (F2 audit_events); not a data table",
 });
 
 /** The root delete. Everything in `CASCADED_TABLES` goes with it. */

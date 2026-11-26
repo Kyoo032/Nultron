@@ -260,6 +260,15 @@ export type {
   InputModality,
   TenantContext,
 } from "./tenancy/types";
+export {
+  AUDIT_ACTOR_KINDS,
+  AUDIT_EVENTS,
+  AUDIT_OUTCOMES,
+  auditEventInput,
+} from "./audit/events";
+export type { AuditActorKind, AuditEventInput, AuditEventName, AuditOutcome } from "./audit/events";
+export { installAuditWriter, reportAuditEvent } from "./audit/sink";
+export type { AuditWriter } from "./audit/sink";
 export { TENANT_STATE_KEYS, isTenantStateKey } from "./tenancy/state-keys";
 export type { TenantStateKey } from "./tenancy/state-keys";
 export type {

@@ -17,6 +17,7 @@ import {
   resolveRuntimeMode,
   RESET_CONFIRM_WORD,
   type SecretPatch,
+  reportAuditEvent,
 } from "@agentforge/core";
 import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
@@ -47,6 +48,7 @@ import { modelAvailabilityBody } from "../model-availability-payload";
 import { clearThisKeyCache, loadAccountUsage } from "../account-usage";
 import { probeSummary } from "../model-cache";
 import { db, hasPendingDataReset, listLocalWorkspaces, pendingResetPath, requestDataReset } from "@agentforge/db";
+import { createHash } from "node:crypto";
 import { rmSync } from "node:fs";
 import { resetEmbedCircuit } from "../knowledge-embed";
 import { resetModelReliabilityState } from "../job-model-fallback";
@@ -416,7 +418,34 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
       injectionGuardBypass: serverMode ? undefined : readOptionalBoolean(body.injectionGuardBypass),
       editTurnCapUsd: readOptionalNumber(body.editTurnCapUsd),
     };
+    // F2: read the state the write is about to replace, so each audit row can carry the hashes of
+    // before and after — the field's name and proof a change happened, never a value (spec S2).
+    const auditedFields = [
+      ...(body.locale !== undefined ? ["locale"] : []),
+      ...Object.keys(patch).filter((field) => (patch as Record<string, unknown>)[field] !== undefined),
+    ];
+    const settingsBefore = auditedFields.length > 0 ? loadSettings(tenant) : null;
     const saved = saveSettings(patch, tenant);
+    if (settingsBefore) {
+      const values = saved as unknown as Record<string, unknown>;
+      const before = settingsBefore as unknown as Record<string, unknown>;
+      for (const field of auditedFields) {
+        const digest = (value: unknown) =>
+          createHash("sha256")
+            .update(JSON.stringify(value ?? null))
+            .digest("hex");
+        reportAuditEvent({
+          tenantId: tenant.tenantId,
+          event: "settings.change",
+          actorKind: "user",
+          actorId: tenant.userId ?? null,
+          targetKind: "settings",
+          targetId: field,
+          outcome: "ok",
+          refHash: `${digest(before[field])}/${digest(values[field])}`,
+        });
+      }
+    }
     // SR-163: on the server the key is the company's, so it reaches every desk of the company.
     if (requestsKeyWrite(body, serverMode)) {
       await mirrorKeysToCompanyDesks(patch, tenant);

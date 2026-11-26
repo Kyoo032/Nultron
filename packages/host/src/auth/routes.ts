@@ -20,7 +20,7 @@
  * Reading the cookie: this module reads `request.headers.cookie`, which the HTTP adapter forwards
  * raw (`http-adapter.ts:263`) alongside the cookies it parses for itself.
  */
-import { ApiError, isServerMode } from "@agentforge/core";
+import { ApiError, isServerMode, reportAuditEvent } from "@agentforge/core";
 import type { EnvLike, MembershipRole } from "@agentforge/core";
 import type { PortalIdentity, PortalProvisioning } from "@agentforge/db";
 import { jsonError, jsonOk } from "../errors";
@@ -511,6 +511,14 @@ export function createAuthRoutes(deps: AuthRouteDeps): AuthRoutes {
     try {
       tokens = await deps.portal.exchangeCode({ code, redirectUri, ...credentials });
     } catch (error) {
+      // F2: the portal refused or never answered — the failure itself is audited. The tenant is not
+      // yet known here, so the row carries the unattributable placeholder rather than nothing.
+      reportAuditEvent({
+        tenantId: "unknown",
+        event: "auth.sign_in",
+        actorKind: "user",
+        outcome: "failed",
+      });
       throw fromPortal(error);
     }
     const now = clock();
@@ -531,6 +539,13 @@ export function createAuthRoutes(deps: AuthRouteDeps): AuthRoutes {
       // membership row on each request.
       await deps.provision({ ...identity, role: tokens.role });
     } catch (error) {
+      reportAuditEvent({
+        tenantId: tokens.tenantId,
+        event: "auth.sign_in",
+        actorKind: "user",
+        actorId: tokens.userId,
+        outcome: "failed",
+      });
       throw fromPortal(error);
     }
     // Phase 5 lane B, and in this order deliberately: provisioning writes the tenant row the seat
@@ -540,6 +555,14 @@ export function createAuthRoutes(deps: AuthRouteDeps): AuthRoutes {
     // and no cookie is set, so the browser is exactly as signed out as it was.
     const seat = await deps.claimSeat(identity);
     if (!seat.ok) {
+      reportAuditEvent({
+        tenantId: tokens.tenantId,
+        event: "auth.sign_in",
+        actorKind: "user",
+        actorId: tokens.userId,
+        outcome: "denied",
+        rule: "seat_cap_reached",
+      });
       throw authError("seat_cap_reached", 403);
     }
     const session = createSession({
@@ -558,6 +581,13 @@ export function createAuthRoutes(deps: AuthRouteDeps): AuthRoutes {
       refreshToken: tokens.refreshToken,
       accessToken: tokens.accessToken,
       deviceId: tokens.deviceId,
+    });
+    reportAuditEvent({
+      tenantId: session.tenantId,
+      event: "auth.sign_in",
+      actorKind: "user",
+      actorId: session.userId,
+      outcome: "ok",
     });
     return jsonOk(sessionSummary(session), 200, cookieFor(deps, session));
   });
@@ -619,6 +649,13 @@ export function createAuthRoutes(deps: AuthRouteDeps): AuthRoutes {
       // Whatever the portal said, or failed to say, this deployment's session ends here.
       await endSession(session, clock());
     }
+    reportAuditEvent({
+      tenantId: session.tenantId,
+      event: "auth.sign_out",
+      actorKind: "user",
+      actorId: session.userId,
+      outcome: "ok",
+    });
     return jsonOk(signedOutBody(), 200, clearedCookie(deps));
   });
 
