@@ -116,9 +116,20 @@ case "$*" in
   *"compose ps -q portal-db"*) true ;;
   *"ps --filter"*) ${appRunning ? "echo nultron-web" : "true"} ;;
   *"ps -q --filter"*) ${appRunning ? "echo fake-app-id" : "true"} ;;
-  *"exec -i "*" sh -s"*) cat >/dev/null 2>&1 || true ;;
+  *"exec -i "*" sh -s"*)
+    # Emulate the snapshot step: stage a fake agentforge.sqlite under the per-run dir
+    # named in -e SNAP_DIR=, so the tar below carries a .backup-staging* member and
+    # backup.sh's test -f probe and snapshot-required verify run for real.
+    _snap="$(printf '%s\\n' "$*" | sed -n 's/.*SNAP_DIR=\\([^ ]*\\).*/\\1/p')"
+    mkdir -p "${toPosix(data)}/$_snap" && : > "${toPosix(data)}/$_snap/agentforge.sqlite"
+    cat >/dev/null 2>&1 || true ;;
   *"tar -czf"*) tar -czf - -C "${toPosix(data)}" . ; echo "tar_exit=0" >&2 ;;
-  *exec*) cat >/dev/null 2>&1 || true ;;
+  *exec*)
+    eval "_last=\${$#}"
+    case "$_last" in
+      "test -f"*) AGENTFORGE_DATA_DIR="${toPosix(data)}" eval "$_last" ;;
+      *) cat >/dev/null 2>&1 || true ;;
+    esac ;;
 esac
 exit 0
 `,

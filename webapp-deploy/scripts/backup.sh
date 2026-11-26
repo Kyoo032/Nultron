@@ -45,6 +45,10 @@ trap '_rc=$?; trap - EXIT; heartbeat_ping "$HEARTBEAT_URL" "$_rc"; exit "$_rc"' 
 OUT_DIR="${1:-$DEPLOY_DIR/backups}"
 mkdir -p "$OUT_DIR"
 STAMP="$(date -u '+%Y%m%dT%H%M%SZ')"
+# The staging dir is unique to this run: a second backup overlapping this one must never
+# delete the snapshot the first is about to archive, and restore promotes whichever
+# .backup-staging* member it finds.
+SNAP_DIR=".backup-staging-$STAMP-$$"
 
 BACKUP_KEY="$(setting BACKUP_KEY)"
 if [ -z "$BACKUP_KEY" ]; then
@@ -148,12 +152,11 @@ backup_desk() {
 	write_desk_status "$_cid" "pending" 2>/dev/null || true
 
 	echo "==> [$_desk] consistent SQLite snapshot"
-	if ! docker exec -i "$_cid" sh -s <<'INNER'
+	if ! docker exec -i -e SNAP_DIR="$SNAP_DIR" "$_cid" sh -s <<'INNER'
 set -eu
 root="${AGENTFORGE_DATA_DIR:-/data}"
 src="$root/agentforge.sqlite"
-stage="$root/.backup-staging"
-rm -rf "$stage"
+stage="$root/$SNAP_DIR"
 mkdir -p "$stage"
 if [ ! -f "$src" ]; then
 	echo "no agentforge.sqlite yet - archiving the data dir only"
@@ -171,7 +174,7 @@ const root = process.env.AGENTFORGE_DATA_DIR || "/data";
 // connection. WAL mode lets this second connection read while the app writes.
 const db = new Database(path.join(root, "agentforge.sqlite"));
 db.pragma("busy_timeout = 30000");
-db.prepare("VACUUM INTO ?").run(path.join(root, ".backup-staging", "agentforge.sqlite"));
+db.prepare("VACUUM INTO ?").run(path.join(root, process.env.SNAP_DIR, "agentforge.sqlite"));
 db.close();
 console.log("snapshot ok (VACUUM INTO)");
 '
@@ -179,6 +182,13 @@ fi
 INNER
 	then
 		fail_desk "$_desk" "$_cid" "the SQLite snapshot step failed"; return
+	fi
+
+	# Whether this desk staged a snapshot decides what the archive must contain below.
+	if docker exec "$_cid" sh -c 'test -f "${AGENTFORGE_DATA_DIR:-/data}/'"$SNAP_DIR"'/agentforge.sqlite"'; then
+		_has_snap=1
+	else
+		_has_snap=""
 	fi
 
 	# Embed the desk's identity in the archive before tarring it up.
@@ -215,15 +225,23 @@ INNER
 		fail_desk "$_desk" "$_cid" "the encrypted archive is empty"; return
 	fi
 
-	docker exec "$_cid" sh -c 'rm -rf "${AGENTFORGE_DATA_DIR:-/data}/.backup-staging"' 2>/dev/null || true
+	# Remove only this run's staging dir; an overlapping run's stage belongs to its archive.
+	docker exec "$_cid" sh -c 'rm -rf "${AGENTFORGE_DATA_DIR:-/data}/'"$SNAP_DIR"'"' 2>/dev/null || true
 
 	# A backup nobody can open is not a backup, and one without the embedded desk meta is not
 	# restorable under its name either: an archive truncated at the front would still decrypt
-	# and list a few entries.
+	# and list a few entries. When the desk staged a snapshot the archive must carry it too -
+	# a restored desk without it would replay a stale WAL over nothing.
 	if [ "$(setting BACKUP_VERIFY 1)" = "1" ]; then
 		echo "==> [$_desk] verifying (decrypt + list)"
-		if ! node "$AEAD_CRYPT" decrypt --in "$_out" | tar -tzf - | grep -q 'backup-meta.json'; then
-			fail_desk "$_desk" "$_cid" "the encrypted archive did not decrypt and untar cleanly"; return
+		_listing="$(node "$AEAD_CRYPT" decrypt --in "$_out" | tar -tzf - || true)"
+		_ok=1
+		case "$_listing" in *backup-meta.json*) : ;; *) _ok="" ;; esac
+		if [ -n "$_has_snap" ]; then
+			case "$_listing" in *backup-staging*/agentforge.sqlite*) : ;; *) _ok="" ;; esac
+		fi
+		if [ -z "$_ok" ]; then
+			fail_desk "$_desk" "$_cid" "the encrypted archive did not decrypt and untar cleanly with its meta and snapshot"; return
 		fi
 	fi
 

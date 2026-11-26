@@ -206,12 +206,16 @@ if [ -n "$DESK" ]; then
 set -e
 rm -rf /data/..?* /data/.[!.]* /data/* 2>/dev/null || true
 tar -xzf - -C /data
-if [ -f /data/.backup-staging/agentforge.sqlite ]; then
-  rm -f /data/agentforge.sqlite-wal /data/agentforge.sqlite-shm
-  mv -f /data/.backup-staging/agentforge.sqlite /data/agentforge.sqlite
-  echo "promoted the consistent snapshot"
-fi
-rm -rf /data/.backup-staging
+# backup.sh stages under a per-run name (.backup-staging-<stamp>-<pid>) so overlapping
+# runs cannot delete the snapshot another run staged; promote whichever member this archive carries.
+for _snap in /data/.backup-staging*/agentforge.sqlite; do
+  if [ -f "$_snap" ]; then
+    rm -f /data/agentforge.sqlite-wal /data/agentforge.sqlite-shm
+    mv -f "$_snap" /data/agentforge.sqlite
+    echo "promoted the consistent snapshot"
+  fi
+done
+rm -rf /data/.backup-staging*
 chown -R node:node /data
 '
 
@@ -239,12 +243,16 @@ cat "$PLAIN" | dc run --rm --no-deps -T --user root \
 set -e
 rm -rf /data/..?* /data/.[!.]* /data/* 2>/dev/null || true
 tar -xzf - -C /data
-if [ -f /data/.backup-staging/agentforge.sqlite ]; then
-  rm -f /data/agentforge.sqlite-wal /data/agentforge.sqlite-shm
-  mv -f /data/.backup-staging/agentforge.sqlite /data/agentforge.sqlite
-  echo "promoted the consistent snapshot"
-fi
-rm -rf /data/.backup-staging
+# backup.sh stages under a per-run name (.backup-staging-<stamp>-<pid>) so overlapping
+# runs cannot delete the snapshot another run staged; promote whichever member this archive carries.
+for _snap in /data/.backup-staging*/agentforge.sqlite; do
+  if [ -f "$_snap" ]; then
+    rm -f /data/agentforge.sqlite-wal /data/agentforge.sqlite-shm
+    mv -f "$_snap" /data/agentforge.sqlite
+    echo "promoted the consistent snapshot"
+  fi
+done
+rm -rf /data/.backup-staging*
 chown -R node:node /data
 '
 
