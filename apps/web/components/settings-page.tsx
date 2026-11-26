@@ -26,6 +26,7 @@ import { availabilityFrom, SettingsModelsCard, type ModelAvailabilityWire } from
 import { SettingsResetCard } from "./settings-reset-card";
 // Phase 8: renders only where there is a ceiling to show (hosted); null on a desk.
 import { SettingsStorageCard } from "./settings-storage-card";
+import { SettingsApiKeysCard } from "./settings-api-keys";
 import { UsagePanel, type AccountUsage } from "./usage-panel";
 
 type Probe = {
@@ -624,6 +625,7 @@ export function SettingsPage() {
           <div className="mt-2 space-y-4">
             <SettingsModelsCard availability={modelAvailability} onRefreshed={setModelAvailability} hasKey={hasOpenai} />
             <SettingsStorageCard />
+            <SettingsApiKeysCard />
           </div>
         </details>
         <SettingsResetCard resetPending={resetPending} />

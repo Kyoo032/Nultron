@@ -145,6 +145,12 @@ const FOLDER_PROPOSAL_WHY =
   "pending after approve and reject were both called with its id.";
 
 const BY_ID_ROUTES: readonly ByIdRoute[] = [
+  // --- api keys (F5a) --------------------------------------------------------------------
+  // `id` is `unseeded`: a foreign call and a ghost call must answer identically either way, and
+  // seeding a real key here would leak nothing extra — the handler scopes `WHERE tenant_id` to B,
+  // so both ids are 404 `not_found` to B.
+  { method: "POST", path: "/api/v1/api-keys/:id/revoke", params: { id: "unseeded" }, body: {} },
+  { method: "POST", path: "/api/v1/api-keys/:id/rotate", params: { id: "unseeded" }, body: {} },
   // --- edit ---------------------------------------------------------------------------------
   { method: "GET", path: "/api/v1/edit/projects/:projectId", params: { projectId: "projectId" } },
   {

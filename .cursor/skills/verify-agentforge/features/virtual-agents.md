@@ -88,3 +88,7 @@ Steps. "Driven" means a record from 2026-10-09 or 2026-10-12 shows it; "Not driv
 - A let-go agent keeps its row and threads. Hiring it again shows the old threads.
 - Hire and let go call `router.refresh()` and fire the agents-changed event. A rail that does not update until reload is a failure of that event, not of the host.
 - Playwright is not run on the Windows desk. `apps/web/tests/e2e/foundation.spec.ts` follows this layout: the tier picker in the header, `agent-<mode>` tiles, the Conversations popover, `composer-send` by its name, and the Virtual agents page (hire and let go, no `create-new-workspace`). The empty-Chat headline is read from `locales/en/chat.json`. `edit.spec.ts` looks for `agent-edit` on the rail.
+
+## Public API routes (F5a, DFIND-174)
+
+`packages/host/src/router.ts` mounts `GET/POST /api/v1/api-keys` and `POST /api/v1/api-keys/:id/revoke|rotate` (administer-gated), and `dispatch` sends `/api/public/v1/*` plus `/v1/chat/completions` to `packages/host/src/public-api/routes.ts` **before** the session gate — bearer `nk_live_` keys resolve to a service identity (`apikey-<id>`), never a session. Every public call is audited as `api_key.request`.

@@ -7271,6 +7271,18 @@ Gate: none for week one (voice is Rizky's only); before customer voice or any al
 - **Model allowlist.** `model_allowlist` travels in the `POST /auth/token` body (`apps/portal/src/flows/token.ts`, from `tenant_config.model_allowlist`); the host holds it per tenant in memory (`packages/host/src/model-allowance.ts`) — no host migration. A `null` body field never clears a list an older token carried. Off-portal, the desk's `modelAllowlist` setting is the fallback (`mergeSecrets`). Empty or absent keeps allow-everything.
 - **Residual.** The gate resolves the tenant through `getTenant` per request; a session whose membership cannot resolve skips the check and the handler answers with its own tenancy error (the pre-gate behaviour, kept so unprovisioned test identities behave as before).
 
+
+### SR-215 {#sr-215}
+
+**Desk public API keys (F5a, DFIND-174) — built 2026-11-26, branch `devin/1795703635-f5a-versioned-api`; in the tree, not deployed.** Control entry.
+
+- **Hash-only at rest.** `createApiKey` (`packages/host/src/public-api/keys.ts`) mints `nk_live_<48 hex>`; the row keeps `sha256(raw)` as BLOB(32) UNIQUE, the `key_prefix` and `last4` for display (`packages/db/drizzle/0029_agent_api_keys.sql`). The raw value exists only in the create/rotate response — no route re-derives it (`handlers/api-keys.ts`).
+- **Constant-time verify, one 401.** `resolveApiKey` looks the row up by prefix and compares hashes with `timingSafeEqual`; malformed, unknown, revoked and expired keys are the same `401 invalid_api_key`. An out-of-scope agent is `403 forbidden` (`allowsAgent`), over `rate_limit_rpm` is `429` + `Retry-After` (`checkApiKeyRate` in `rate-limit.ts`).
+- **Two audiences, disjoint.** `dispatch` routes `/api/public/v1/*` and `/v1/chat/completions` to the public table before `gate()` (`router.ts`); a bearer key never meets `requireSessionFor`, and `session-routes-refuse-keys.test.ts` walks `routeRegistrations()` so a public path can never land in the session table.
+- **Service identity.** A key resolves to `userId: apikey-<id>`, role `member` (`public-api/auth.ts`) — never an owner, so key-started runs cannot approve F3 actions; every call lands in `audit_events` as `api_key.request` with key id, target and outcome, no content.
+- **Sealed results.** `api_jobs.result_sealed` is AES-256-GCM under the desk vault key (`public-api/jobs.ts`); a job is readable only by the key that created it (`getApiJob` scopes `tenant_id` + `key_id`).
+- **Residual.** A leaked key is usable until revoked; `expires_at` is optional and unlimited keys have no rotation schedule (F9 owns richer policy). The per-key bucket is per-process, like every limiter on this single-process deployment.
+
 ## Must be true before the Tencent Cloud deploy
 
 Each line names the row that owns it. A line that cannot be ticked is a reason not to hand out the

@@ -12,6 +12,7 @@ export const AUDIT_EVENTS = [
   "role.change",
   "delegation.change",
   "api_key.create",
+  "api_key.request",
   "api_key.revoke",
   "data_source.add",
   "data_source.change",

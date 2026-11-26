@@ -52,6 +52,13 @@ import {
   handleGetArtifacts,
 } from "./handlers/artifacts";
 import { DESK_FILE_ROUTES } from "./desk-files/routes";
+import {
+  handleGetApiKeys,
+  handlePostApiKeyRevoke,
+  handlePostApiKeyRotate,
+  handlePostApiKeys,
+} from "./handlers/api-keys";
+import { dispatchPublicApi, isPublicApiPath } from "./public-api/routes";
 import { FOLDER_ROUTES } from "./folder-root";
 import {
   handleDeleteConversation,
@@ -345,6 +352,11 @@ const routes: Route[] = [
   compile("POST", "/api/v1/edit/projects/:projectId/parity", handlePostEditParity),
   compile("GET", "/api/v1/settings", handleGetSettings),
   compile("POST", "/api/v1/settings", handlePostSettings),
+  // F5a: desk API-key management. Owner/Admin only — see role-policy.ts ADMINISTER_ROUTES.
+  compile("GET", "/api/v1/api-keys", handleGetApiKeys),
+  compile("POST", "/api/v1/api-keys", handlePostApiKeys),
+  compile("POST", "/api/v1/api-keys/:id/revoke", handlePostApiKeyRevoke),
+  compile("POST", "/api/v1/api-keys/:id/rotate", handlePostApiKeyRotate),
   compile("POST", "/api/v1/settings/apply-locale", handleApplyLocale),
   compile("POST", "/api/v1/settings/gateway/check", handleGatewayCheck),
   compile("POST", "/api/v1/settings/guide", handlePostGuide),
@@ -639,6 +651,12 @@ export async function dispatch(request: HostRequest, options: DispatchOptions = 
   // Read per request, never once at module load: a process that is told it is a server after this
   // module was imported (and every test that stubs the variable) still gets the gate.
   const serverMode = options.serverMode ?? isServerMode();
+  // F5a: `/api/public/v1/*` and `/v1/chat/completions` are bearer-key paths, resolved by
+  // their own table BEFORE the session gate — a key never meets `requireSessionFor`, and
+  // the gate never sees a service identity. Every other path keeps the gate's behaviour.
+  if (isPublicApiPath(path)) {
+    return dispatchPublicApi(request);
+  }
   let session: HostSession | undefined;
   if (serverMode) {
     const verdict = await gate(request, method, path, options);

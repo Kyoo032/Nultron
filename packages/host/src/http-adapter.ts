@@ -254,9 +254,7 @@ async function readBody(
     total += piece.byteLength;
     if (total > cap) {
       req.destroy();
-      throw new BodyTooLarge(
-        isWebhook ? "Request body exceeds the 1 MB cap" : "Request body exceeds the 26 MB cap",
-      );
+      throw new BodyTooLarge(isWebhook ? "Request body exceeds the 1 MB cap" : "Request body exceeds the 26 MB cap");
     }
     chunks.push(piece);
   }
@@ -353,6 +351,9 @@ export async function writeHostResult(
     res.statusCode = result.status;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("X-Content-Type-Options", "nosniff");
+    for (const [name, value] of Object.entries(result.headers ?? {})) {
+      res.setHeader(name, value);
+    }
     res.end(JSON.stringify(result.body));
     return;
   }

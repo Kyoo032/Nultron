@@ -250,3 +250,38 @@ export function checkRequestRate(input: RateCheckInput): RateDecision {
   }
   return RATE_ALLOWED;
 }
+
+/**
+ * F5a — the public API key bucket (`public-api/routes.ts` calls this per request).
+ *
+ * Each key's own `rate_limit_rpm` (migration `0029_agent_api_keys.sql`) is the bucket's
+ * refill; a key with no row limit gets the session bucket's rpm so "unset" means
+ * "sensible default", never "unlimited". The burst is the rpm itself, so a steady
+ * caller never sees a refusal and a spike is capped.
+ *
+ * Buckets are kept per (key id, rpm) and rebuilt when the row's rpm changes, so a rotate
+ * or edit does not leave a stale allowance behind. F9 is where the full per-key policy
+ * lands; this is the single-counter floor.
+ */
+let apiKeyLimiter: RateLimiter | null = null;
+let apiKeyLimiterRpm = -1;
+
+export const DEFAULT_API_KEY_RPM = 60;
+
+export function checkApiKeyRate(
+  key: { readonly id: string; readonly rate_limit_rpm: number | null },
+  now = Date.now(),
+): { allowed: boolean; retryAfterSeconds: number } {
+  const rpm = key.rate_limit_rpm ?? DEFAULT_API_KEY_RPM;
+  if (!apiKeyLimiter || apiKeyLimiterRpm !== rpm) {
+    apiKeyLimiterRpm = rpm;
+    apiKeyLimiter = createRateLimiter({ rpm, burst: Math.max(1, Math.min(rpm, 60)) });
+  }
+  return apiKeyLimiter.take(`apikey:${key.id}`, now);
+}
+
+/** Test hook: drops the per-key bucket together with the others. */
+export function resetApiKeyRateLimiter(): void {
+  apiKeyLimiter = null;
+  apiKeyLimiterRpm = -1;
+}

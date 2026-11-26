@@ -2,6 +2,8 @@
 
 Product: both Â· Instance: main :3000
 
+Last verified: 2026-11-26 on `devin/1795703635-f5a-versioned-api` (F5a, DFIND-174): `router.ts` registers the F5a session routes `GET/POST /api/v1/api-keys` and `POST /api/v1/api-keys/:id/revoke|rotate` (handlers/api-keys.ts) under `ADMINISTER_ROUTES` (owner/admin, `role-policy.ts`), and `dispatch` routes `/api/public/v1/*` and `/v1/chat/completions` to `public-api/routes.ts` before `gate()` — the bearer-key table with its own auth, per-key rate bucket and `api_key.request` audit event (`core/src/audit/events.ts`).
+
 Last verified: 2026-11-26 on `devin/1795694018-audit-log` (F2, branch head `5fd2adfe`): `App.tsx` adds the `/settings/activity` route inside `SettingsShell` rendering `ActivityLogPage`; `packages/core/src/index.ts` re-exports the audit vocabulary (`AUDIT_EVENTS`, `AUDIT_ACTOR_KINDS`, `AUDIT_OUTCOMES`, `auditEventInput`, `reportAuditEvent`, `installAuditWriter`) so `packages/host` and `packages/core/src/runtime/invoke-guarded.ts` share one event surface; `router.ts` mounts `/api/v1/audit/events|verify|export` behind the `role-policy.ts` `canAudit` gate (`AUDIT_ROUTES`, owner + auditor).
 
 Last verified: 2026-11-26 on `devin/1795686920-opc-auditor-allowlist` (F8a): `App.tsx` adds the `/users` route inside `SettingsShell`, `SessionRole` includes `auditor` (`apps/web/lib/session.tsx`), and `dispatch` (`packages/host/src/router.ts`) applies the `role-policy.ts` route gate before the handler on every non-exempt `/api/v1/*` route.
