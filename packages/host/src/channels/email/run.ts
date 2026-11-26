@@ -55,7 +55,28 @@ const EMAIL_TIMEOUT_MS = 120_000;
 const EMAIL_PROMPT_PREFIX =
   "The following turn arrived as an e-mail to this agent's address. Answer it as the reply to that e-mail — plain text, no markup the mail client would not render.\n\n";
 
-export async function runEmailReply(input: {
+// Replies on one chat thread run one at a time: two mails a single batch delivers into the
+// same conversation must never see each other's turn inside their own prompt.
+const threadReplyQueues = new Map<string, Promise<EmailRunResult>>();
+
+export function runEmailReply(input: {
+  tenant: TenantContext;
+  threadId: string;
+  /** The sender's mail body, already size-capped by the webhook. */
+  body: string;
+  locale?: "en" | "id";
+}): Promise<EmailRunResult> {
+  const previous =
+    threadReplyQueues.get(input.threadId) ?? Promise.resolve({ kind: "refused", reason: "failed" } as EmailRunResult);
+  const next = previous.then(() => runEmailReplyInner(input));
+  threadReplyQueues.set(
+    input.threadId,
+    next.catch(() => ({ kind: "refused", reason: "failed" }) as EmailRunResult),
+  );
+  return next;
+}
+
+async function runEmailReplyInner(input: {
   tenant: TenantContext;
   threadId: string;
   /** The sender's mail body, already size-capped by the webhook. */
