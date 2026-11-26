@@ -49,6 +49,18 @@ fi
 # The desk id travels in the archive name (nultron-data-<desk>-<stamp>.tar.gz.enc); an explicit
 # --desk wins. A name with no desk id falls back to this folder's compose project, the old
 # single-desk behaviour.
+# The desk the run is pinned to - COMPOSE_PROJECT_NAME, or `-p <name>`/`--project-name` in
+# DC_ARGS the way the local rehearsal (pilot-local.mjs) sets it. When set, a restore may only
+# target that desk: an archive's embedded desk id or its name never widens the scope.
+PINNED_PROJECT="${COMPOSE_PROJECT_NAME:-}"
+_prev=""
+# shellcheck disable=SC2086
+for _arg in ${DC_ARGS:-}; do
+	case "$_prev" in -p | --project-name) PINNED_PROJECT="$_arg" ;; esac
+	case "$_arg" in --project-name=*) PINNED_PROJECT="${_arg#--project-name=}" ;; esac
+	_prev="$_arg"
+done
+
 if [ -z "$DESK" ]; then
 	case "${TARBALL##*/}" in
 	nultron-data-*-*.tar.gz.enc)
@@ -137,6 +149,12 @@ if [ -n "$META_DESK" ]; then
 	fi
 fi
 
+if [ -n "$PINNED_PROJECT" ] && [ "$DESK" != "$PINNED_PROJECT" ]; then
+	echo "error: this run is pinned to desk '$PINNED_PROJECT' (COMPOSE_PROJECT_NAME/-p)," >&2
+	echo "       and the archive resolves to '$DESK' - refusing to restore outside the pin." >&2
+	exit 1
+fi
+
 if [ "$CONFIRM" != "--yes" ]; then
 	if [ -n "$DESK" ]; then
 		echo "This REPLACES everything in the $DESK desk's data volume with $TARBALL."
@@ -171,6 +189,13 @@ if [ -n "$DESK" ]; then
 	echo "==> stopping the '$DESK' desk"
 	# shellcheck disable=SC2086
 	docker stop $PROJECT_CIDS >/dev/null 2>&1 || true
+	# Refuse to wipe a live volume: if the stop failed (or half-failed), the app keeps
+	# writing to its SQLite file while restore replaces it underneath.
+	if [ -n "$(docker ps -q --filter "label=com.docker.compose.project=$DESK")" ]; then
+		echo "error: the '$DESK' desk is still running after docker stop - refusing" >&2
+		echo "       to overwrite a live volume. Stop it by hand and run again." >&2
+		exit 1
+	fi
 
 	echo "==> emptying and unpacking $DESK's /data"
 	# cap_drop: ALL takes CHOWN away even from root, and both tar -x and the chown below

@@ -196,9 +196,14 @@ INNER
 			--exclude=./.master-key .
 		echo "tar_exit=$?" >&2
 	' 2>"$_tarlog" | node "$AEAD_CRYPT" encrypt --out "$_out" ||
-		! grep -q 'tar_exit=0' "$_tarlog"; then
+		! grep -Eq 'tar_exit=[01]' "$_tarlog"; then
 		rm -f "$_out" "$_tarlog"
 		fail_desk "$_desk" "$_cid" "the archive or encryption step failed"; return
+	fi
+	# GNU tar exits 1 on "file changed as we read it" (a live WAL is expected); the database
+	# in the archive is the consistent sqlite snapshot staged above, so 1 is a warn, not a fail.
+	if grep -q 'tar_exit=1' "$_tarlog"; then
+		echo "warn[$_desk]: tar reported files changed mid-archive; the consistent sqlite snapshot stands" >&2
 	fi
 	rm -f "$_tarlog"
 
