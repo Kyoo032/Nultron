@@ -5,6 +5,7 @@ export const universityLabels: Record<MembershipRole, string> = {
   admin: "Faculty admin",
   builder: "Builder",
   member: "Student",
+  auditor: "Auditor",
 };
 
 export const universityPack = {
