@@ -50,6 +50,12 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Images/Videos Enhance uses a chat model, 2026-11-27 (branch `devin/1795755899-media-enhance-model` from `main`; focused tests run, not driven live)
+
+Lanes: enterprise, tester
+
+- Images and Videos no longer pass the selected media-generation model into `POST /api/v1/prompts/enhance`. That endpoint resolves only chat models, so a picker id such as `gpt-image-2-count` made the enhancement fail with `400 unknown_model`; with no `model` field the host uses the desk's default chat model. `EnhancePromptButton`'s props now reject a `model` on the two media surfaces at compile time, and `apps/web/lib/enhance-prompt-button.test.tsx` pins the studio wiring. Other Enhance surfaces already pass text/chat models. Proof: `npx tsc -p apps/web/tsconfig.json --noEmit`, Biome on touched files, `apps/web` Vitest `lib/enhance-prompt-button.test.tsx` (7/7). Driven on stub webdev with Playwright request capture: both Posts carried `text` and `surface` but no `model`, and the stub rewrite applied. Not driven against a keyed gateway.
+
 ## Retire leftover Personal/Electron desktop tree, bridge, skills, and docs (DFIND-139), 2026-11-24 (branch `chore/dfind-139-retire-desktop` from `main` at `bce117d7`; Biome, tsc, vitest, script tests, lane-guard passed)
 
 Lanes: enterprise

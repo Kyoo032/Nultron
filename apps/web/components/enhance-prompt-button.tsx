@@ -7,15 +7,22 @@ import { t } from "@/lib/i18n";
 
 type Props = {
   text: string;
-  surface: EnhanceSurface;
-  model?: string;
   disabled?: boolean;
   testId?: string;
   onApply: (next: string) => void;
   onBusyChange?: (busy: boolean) => void;
   /** Chat's toolbar is a row of pills. Other desks keep the tighter control. */
   pill?: boolean;
-};
+} & (
+  | {
+      surface: Exclude<EnhanceSurface, "images" | "videos">;
+      model?: string;
+    }
+  | {
+      surface: "images" | "videos";
+      model?: never;
+    }
+);
 
 /** The sentence for a failed enhance: the host's reason when it gave one, otherwise the catalog's. */
 export function enhanceFailureMessage(data: unknown): string {

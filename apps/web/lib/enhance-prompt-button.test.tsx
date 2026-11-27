@@ -46,10 +46,15 @@ describe("the Enhance button's live region", () => {
 });
 
 describe("the Enhance button wiring", () => {
-  const source = readFileSync(
-    resolve(dirname(fileURLToPath(import.meta.url)), "../components/enhance-prompt-button.tsx"),
-    "utf8",
-  ).replace(/\r\n/g, "\n");
+  const root = dirname(fileURLToPath(import.meta.url));
+  const source = readFileSync(resolve(root, "../components/enhance-prompt-button.tsx"), "utf8").replace(/\r\n/g, "\n");
+
+  it.each(["images", "videos"])("uses no media generation model on the %s studio", (studio) => {
+    const studioSource = readFileSync(resolve(root, `../components/${studio}-studio.tsx`), "utf8").replace(/\r\n/g, "\n");
+    const button = studioSource.match(/<EnhancePromptButton[\s\S]*?\/>/)?.[0] ?? "";
+    expect(button).toContain(`surface="${studio}"`);
+    expect(button).not.toContain("model=");
+  });
 
   it("reports a failed request and a thrown one, and still ignores a cancel", () => {
     expect(source).toContain("setFailure({ text, message: enhanceFailureMessage(data) });");

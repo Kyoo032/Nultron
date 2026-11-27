@@ -319,7 +319,6 @@ export function VideosStudio() {
           <EnhancePromptButton
             text={prompt}
             surface="videos"
-            model={model}
             disabled={generating}
             testId="videos-enhance"
             onApply={setPrompt}
