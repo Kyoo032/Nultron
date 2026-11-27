@@ -15,6 +15,24 @@ import { db, getTenantById, organizations, workspaces } from "@agentforge/db";
 import { eq } from "drizzle-orm";
 import { resolveApiKey, touchApiKey, type ApiKeyRow } from "./keys";
 
+type WorkspaceRow = typeof workspaces.$inferSelect;
+
+/**
+ * Where a key resolves. `null` `workspace_id` means a key minted before desks were recorded,
+ * which still lands on the home desk of the tenant's first org. A recorded desk that no longer
+ * resolves is `refuse` — never a silent hop to the first org's home desk, which under a
+ * multi-org partner can be another company's desk with its own private agents.
+ */
+export function deskForKey(
+  key: Pick<ApiKeyRow, "workspace_id">,
+  mintedDesk: WorkspaceRow | null | undefined,
+): { kind: "refuse" } | { kind: "desk"; desk: WorkspaceRow } | { kind: "home" } {
+  if (key.workspace_id === null) {
+    return { kind: "home" };
+  }
+  return mintedDesk ? { kind: "desk", desk: mintedDesk } : { kind: "refuse" };
+}
+
 export const PUBLIC_API_PREFIX = "/api/public/v1";
 /** The OpenAI-compatible facade is one endpoint group; it is also reachable at the bare path. */
 export const OPENAI_FACADE_PATH = "/v1/chat/completions";
@@ -61,8 +79,7 @@ export async function authenticatePublic(request: {
     throw new ApiError("tenant_inactive", "Your provider's account is not active. Contact support.", 403);
   }
   // The desk is read first: it decides the org, so a key minted in one company never resolves
-  // into a sibling company under the same partner. `null` means a key minted before desks were
-  // recorded, which still lands on the home desk of the tenant's first org.
+  // into a sibling company under the same partner.
   const mintedDesk =
     key.workspace_id === null
       ? null
@@ -72,16 +89,30 @@ export async function authenticatePublic(request: {
           .where(eq(workspaces.id, key.workspace_id))
           .limit(1)
           .then((r) => r[0]);
+  const resolution = deskForKey(key, mintedDesk);
+  if (resolution.kind === "refuse") {
+    throw new ApiError("workspace_not_found", "The desk this key belongs to no longer exists.", 403);
+  }
   const [org] = await db
     .select()
     .from(organizations)
-    .where(mintedDesk ? eq(organizations.id, mintedDesk.organizationId) : eq(organizations.tenantId, tenant.id))
+    .where(
+      resolution.kind === "desk"
+        ? eq(organizations.id, resolution.desk.organizationId)
+        : eq(organizations.tenantId, tenant.id),
+    )
     .limit(1);
   if (!org) {
     throw new ApiError("org_inactive", "Your organisation is not active.", 403);
   }
-  const desks = await db.select().from(workspaces).where(eq(workspaces.organizationId, org.id));
-  const desk = mintedDesk ?? desks.find((desk) => desk.slug === "home") ?? desks[0];
+  const desk =
+    resolution.kind === "desk"
+      ? resolution.desk
+      : (await db
+          .select()
+          .from(workspaces)
+          .where(eq(workspaces.organizationId, org.id))
+          .then((rows) => rows.find((row) => row.slug === "home") ?? rows[0]));
   if (!desk) {
     throw new ApiError("workspace_not_found", "The desk this key belongs to no longer exists.", 403);
   }

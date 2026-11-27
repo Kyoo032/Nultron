@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { ensureSchema } from "@agentforge/db";
 import { describe, expect, it } from "vitest";
 import { createApiKey, resolveApiKey, allowsAgent, revokeApiKey } from "./keys";
-import { isPublicApiPath, publicApiEnabled } from "./auth";
+import { deskForKey, isPublicApiPath, publicApiEnabled } from "./auth";
 
 /**
  * The 401/403 matrix (AC-5a.2): every credential shape that is not an active key is a 401,
@@ -33,6 +33,15 @@ describe("public API auth (F5a)", () => {
     const row = resolveApiKey(key, Date.now(), db);
     expect(allowsAgent(row, "agent-a")).toBe(true);
     expect(allowsAgent(row, "agent-b")).toBe(false);
+  });
+
+  it("a key whose recorded desk is gone refuses — it never hops to another desk", () => {
+    // Under a multi-org partner the home desk of the first org can belong to another company,
+    // so a deleted recorded desk must refuse rather than resolve there.
+    const desk = { id: "w-b", organizationId: "o-b" } as Parameters<typeof deskForKey>[1];
+    expect(deskForKey({ workspace_id: "w-deleted" }, null)).toEqual({ kind: "refuse" });
+    expect(deskForKey({ workspace_id: "w-b" }, desk)).toEqual({ kind: "desk", desk });
+    expect(deskForKey({ workspace_id: null }, null)).toEqual({ kind: "home" });
   });
 
   it("recognises only the public prefixes, and defaults off", () => {
