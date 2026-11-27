@@ -245,7 +245,6 @@ export function ImagesStudio() {
           <EnhancePromptButton
             text={prompt}
             surface="images"
-            model={model}
             disabled={generating}
             testId="images-enhance"
             onApply={setPrompt}
