@@ -61,12 +61,14 @@ describe("chat completions facade (F5a)", () => {
   });
 
   it("requires a model and a non-empty last message", async () => {
-    await expect(chatCompletionsHandler(request({ messages: [{ role: "user", content: "hi" }] }), identity())).rejects
-      .toBeInstanceOf(ApiError);
+    await expect(
+      chatCompletionsHandler(request({ messages: [{ role: "user", content: "hi" }] }), identity()),
+    ).rejects.toBeInstanceOf(ApiError);
     // Existence is checked before the prompt parses, matching `requireAgent` on the
     // sibling routes, so an unknown agent with empty messages is still a 404.
-    await expect(
-      chatCompletionsHandler(request({ model: "a", messages: [] }), identity()),
-    ).rejects.toMatchObject({ code: "not_found", status: 404 });
+    await expect(chatCompletionsHandler(request({ model: "a", messages: [] }), identity())).rejects.toMatchObject({
+      code: "not_found",
+      status: 404,
+    });
   });
 });

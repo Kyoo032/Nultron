@@ -23,7 +23,7 @@ describe("public API auth (F5a)", () => {
       expect(() => resolveApiKey(value, Date.now(), db)).toThrowError(/Invalid API key/);
     }
     resolveApiKey(key, Date.now(), db);
-    revokeApiKey("t1", apiKey.id, Date.now(), db);
+    revokeApiKey("t1", apiKey.id, "o1", Date.now(), db);
     expect(() => resolveApiKey(key, Date.now(), db)).toThrowError(/Invalid API key/);
   });
 

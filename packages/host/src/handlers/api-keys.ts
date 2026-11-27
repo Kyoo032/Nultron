@@ -31,7 +31,7 @@ function apiKeyAudit(tenantId: string, event: "api_key.create" | "api_key.revoke
 export async function handleGetApiKeys(request: HostRequest): Promise<HostResult> {
   try {
     const tenant = await getTenant(request);
-    return jsonOk({ apiKeys: listApiKeys(tenant.tenantId) });
+    return jsonOk({ apiKeys: listApiKeys(tenant.tenantId, tenant.organizationId) });
   } catch (error) {
     return jsonError(error);
   }
@@ -86,7 +86,7 @@ export async function handlePostApiKeys(request: HostRequest): Promise<HostResul
 export async function handlePostApiKeyRevoke(request: HostRequest): Promise<HostResult> {
   try {
     const tenant = await getTenant(request);
-    revokeApiKey(tenant.tenantId, request.params.id);
+    revokeApiKey(tenant.tenantId, request.params.id, tenant.organizationId);
     apiKeyAudit(tenant.tenantId, "api_key.revoke", tenant.userId, request.params.id);
     return jsonOk({ ok: true });
   } catch (error) {
@@ -97,7 +97,10 @@ export async function handlePostApiKeyRevoke(request: HostRequest): Promise<Host
 export async function handlePostApiKeyRotate(request: HostRequest): Promise<HostResult> {
   try {
     const tenant = await getTenant(request);
-    const { key, apiKey } = rotateApiKey(tenant.tenantId, request.params.id, { createdBy: tenant.userId });
+    const { key, apiKey } = rotateApiKey(tenant.tenantId, request.params.id, {
+      createdBy: tenant.userId,
+      organizationId: tenant.organizationId,
+    });
     apiKeyAudit(tenant.tenantId, "api_key.revoke", tenant.userId, request.params.id);
     apiKeyAudit(tenant.tenantId, "api_key.create", tenant.userId, apiKey.id);
     return jsonOk({ key, apiKey });

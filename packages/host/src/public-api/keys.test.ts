@@ -47,7 +47,7 @@ describe("desk API keys (F5a)", () => {
   it("refuses revoked and expired keys", () => {
     const sqlite = db();
     const { key, apiKey } = createApiKey(input, sqlite);
-    revokeApiKey("t1", apiKey.id, Date.now(), sqlite);
+    revokeApiKey("t1", apiKey.id, "o1", Date.now(), sqlite);
     expect(() => resolveApiKey(key, Date.now(), sqlite)).toThrowError(/invalid/i);
     const soon = Date.now() + 60_000;
     const expired = createApiKey({ ...input, name: "old", expiresAt: soon }, sqlite);
@@ -57,12 +57,12 @@ describe("desk API keys (F5a)", () => {
   it("rotates: the old key 401s immediately, the new one resolves", () => {
     const sqlite = db();
     const { key, apiKey } = createApiKey(input, sqlite);
-    const rotated = rotateApiKey("t1", apiKey.id, {}, sqlite);
+    const rotated = rotateApiKey("t1", apiKey.id, { organizationId: "o1" }, sqlite);
     expect(rotated.key).not.toBe(key);
     expect(() => resolveApiKey(key, Date.now(), sqlite)).toThrowError(/invalid/i);
     expect(resolveApiKey(rotated.key, Date.now(), sqlite).id).toBe(rotated.apiKey.id);
     // Old row is revoked, not deleted — the audit trail keeps it.
-    const rows = listApiKeys("t1", sqlite);
+    const rows = listApiKeys("t1", "o1", sqlite);
     expect(rows.find((r) => r.id === apiKey.id)?.status).toBe("revoked");
   });
 
@@ -77,15 +77,39 @@ describe("desk API keys (F5a)", () => {
       )
       .run(apiKey.id);
     sqlite
-      .prepare("INSERT INTO threads (id, organization_id, workspace_id, user_id, agent_id, title, created_at) VALUES ('th1', 'o1', 'w1', ?, 'agent-a', 't', 0)")
+      .prepare(
+        "INSERT INTO threads (id, organization_id, workspace_id, user_id, agent_id, title, created_at) VALUES ('th1', 'o1', 'w1', ?, 'agent-a', 't', 0)",
+      )
       .run(`apikey-${apiKey.id}`);
-    const rotated = rotateApiKey("t1", apiKey.id, {}, sqlite);
-    expect(
-      sqlite.prepare("SELECT key_id FROM api_jobs WHERE id = 'j1'").get(),
-    ).toEqual({ key_id: rotated.apiKey.id });
+    const rotated = rotateApiKey("t1", apiKey.id, { organizationId: "o1" }, sqlite);
+    expect(sqlite.prepare("SELECT key_id FROM api_jobs WHERE id = 'j1'").get()).toEqual({ key_id: rotated.apiKey.id });
     expect(sqlite.prepare("SELECT user_id FROM threads WHERE id = 'th1'").get()).toEqual({
       user_id: `apikey-${rotated.apiKey.id}`,
     });
+  });
+
+  it("refuses a caller from another org under the same partner (list, revoke, rotate)", () => {
+    const sqlite = db();
+    sqlite.pragma("foreign_keys = OFF");
+    // Partner t1 hosts two companies; the key's desk lives in the second.
+    sqlite
+      .prepare(
+        "INSERT INTO organizations (id, tenant_id, name, slug, industry_pack, created_at) VALUES ('o-a', 't1', 'A', 'a', 'generic', 1), ('o-b', 't1', 'B', 'b', 'generic', 1)",
+      )
+      .run();
+    sqlite
+      .prepare(
+        "INSERT INTO workspaces (id, organization_id, name, slug, created_at) VALUES ('w-b', 'o-b', 'B desk', 'home', 1)",
+      )
+      .run();
+    const { apiKey } = createApiKey({ ...input, workspaceId: "w-b" }, sqlite);
+    expect(listApiKeys("t1", "o-a", sqlite)).toHaveLength(0);
+    expect(() => revokeApiKey("t1", apiKey.id, "o-a", Date.now(), sqlite)).toThrowError(/not found/i);
+    expect(() => rotateApiKey("t1", apiKey.id, { organizationId: "o-a" }, sqlite)).toThrowError(/not found/i);
+    // The owning org is untouched and still administers it.
+    expect(listApiKeys("t1", "o-b", sqlite)).toHaveLength(1);
+    revokeApiKey("t1", apiKey.id, "o-b", Date.now(), sqlite);
+    expect(listApiKeys("t1", "o-b", sqlite)[0].status).toBe("revoked");
   });
 
   it("enforces the agent allow-list", async () => {

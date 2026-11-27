@@ -210,20 +210,36 @@ export function touchApiKey(id: string, now = Date.now(), sqlite: typeof sql = s
   sqlite.prepare("UPDATE agent_api_keys SET last_used_at = ? WHERE id = ?").run(now, id);
 }
 
-export function listApiKeys(tenantId: string, sqlite: typeof sql = sql): ApiKeySummary[] {
+/**
+ * `tenant_id` is the partner, not the company: two organisations under one partner share it.
+ * Every administrative read/mutation therefore also requires the key's desk to belong to the
+ * caller's organisation — otherwise an admin in one company could list, revoke or rotate the
+ * neighbouring company's keys (and rotation would hand over the jobs/threads lineage).
+ * A NULL `workspace_id` predates desk recording and stays tenant-scoped (local mode has one org).
+ */
+const ORG_SCOPE_SQL = `(workspace_id IS NULL OR workspace_id IN
+  (SELECT id FROM workspaces WHERE organization_id = ?))`;
+
+export function listApiKeys(tenantId: string, organizationId: string, sqlite: typeof sql = sql): ApiKeySummary[] {
   const rows = sqlite
-    .prepare("SELECT * FROM agent_api_keys WHERE tenant_id = ? ORDER BY created_at DESC")
-    .all(tenantId) as ApiKeyRow[];
+    .prepare(`SELECT * FROM agent_api_keys WHERE tenant_id = ? AND ${ORG_SCOPE_SQL} ORDER BY created_at DESC`)
+    .all(tenantId, organizationId) as ApiKeyRow[];
   return rows.map(summary);
 }
 
-export function revokeApiKey(tenantId: string, id: string, now = Date.now(), sqlite: typeof sql = sql): void {
+export function revokeApiKey(
+  tenantId: string,
+  id: string,
+  organizationId: string,
+  now = Date.now(),
+  sqlite: typeof sql = sql,
+): void {
   const result = sqlite
     .prepare(
       `UPDATE agent_api_keys SET status = 'revoked', revoked_at = ?
-        WHERE tenant_id = ? AND id = ? AND status = 'active'`,
+        WHERE tenant_id = ? AND id = ? AND status = 'active' AND ${ORG_SCOPE_SQL}`,
     )
-    .run(now, tenantId, id);
+    .run(now, tenantId, id, organizationId);
   if (!result || result.changes === 0) {
     throw new ApiError("not_found", "API key not found", 404);
   }
@@ -236,12 +252,12 @@ export function revokeApiKey(tenantId: string, id: string, now = Date.now(), sql
 export function rotateApiKey(
   tenantId: string,
   id: string,
-  input: { createdBy?: string | null; now?: number } = {},
+  input: { createdBy?: string | null; now?: number; organizationId: string },
   sqlite: typeof sql = sql,
 ): { key: string; apiKey: ApiKeySummary } {
-  const row = sqlite.prepare("SELECT * FROM agent_api_keys WHERE tenant_id = ? AND id = ?").get(tenantId, id) as
-    | ApiKeyRow
-    | undefined;
+  const row = sqlite
+    .prepare(`SELECT * FROM agent_api_keys WHERE tenant_id = ? AND id = ? AND ${ORG_SCOPE_SQL}`)
+    .get(tenantId, id, input.organizationId) as ApiKeyRow | undefined;
   if (row?.status !== "active") {
     throw new ApiError("not_found", "API key not found", 404);
   }

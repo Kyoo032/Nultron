@@ -12,7 +12,7 @@
  */
 import { ApiError, type TenantContext } from "@agentforge/core";
 import { db, getTenantById, organizations, workspaces } from "@agentforge/db";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { resolveApiKey, touchApiKey, type ApiKeyRow } from "./keys";
 
 export const PUBLIC_API_PREFIX = "/api/public/v1";
@@ -47,9 +47,10 @@ function bearerToken(request: { headers: Record<string, string | undefined> }): 
 }
 
 /**
- * Bearer → `{ key, tenant }`. The tenant is resolved straight from the key's `tenant_id`
- * (its org and home desk), NOT through `getTenant`'s session path: there is no session on
- * a public call and there must not be a synthetic one.
+ * Bearer → `{ key, tenant }`. The tenant is resolved straight from the key's `tenant_id`,
+ * and the org from the key's desk (`workspace_id`), NOT through `getTenant`'s session path:
+ * there is no session on a public call and there must not be a synthetic one. A partner can
+ * host several organisations, so "first org of the tenant" is not the key's org.
  */
 export async function authenticatePublic(request: {
   headers: Record<string, string | undefined>;
@@ -59,26 +60,28 @@ export async function authenticatePublic(request: {
   if (tenant?.status !== "active") {
     throw new ApiError("tenant_inactive", "Your provider's account is not active. Contact support.", 403);
   }
+  // The desk is read first: it decides the org, so a key minted in one company never resolves
+  // into a sibling company under the same partner. `null` means a key minted before desks were
+  // recorded, which still lands on the home desk of the tenant's first org.
+  const mintedDesk =
+    key.workspace_id === null
+      ? null
+      : await db
+          .select()
+          .from(workspaces)
+          .where(eq(workspaces.id, key.workspace_id))
+          .limit(1)
+          .then((r) => r[0]);
   const [org] = await db
     .select()
     .from(organizations)
-    .where(and(eq(organizations.tenantId, tenant.id)))
+    .where(mintedDesk ? eq(organizations.id, mintedDesk.organizationId) : eq(organizations.tenantId, tenant.id))
     .limit(1);
   if (!org) {
     throw new ApiError("org_inactive", "Your organisation is not active.", 403);
   }
   const desks = await db.select().from(workspaces).where(eq(workspaces.organizationId, org.id));
-  if (desks.length === 0) {
-    throw new ApiError("workspace_not_found", "Workspace not found", 404);
-  }
-  // The desk the key was minted on. `null` means a key minted before desks were recorded,
-  // which still lands on the home desk; a recorded desk that no longer resolves is a
-  // refusal — a key must never silently hop to another desk (possibly another company's
-  // under the same partner) and inherit its private agents.
-  const desk =
-    key.workspace_id === null
-      ? (desks.find((desk) => desk.slug === "home") ?? desks[0])
-      : desks.find((desk) => desk.id === key.workspace_id);
+  const desk = mintedDesk ?? desks.find((desk) => desk.slug === "home") ?? desks[0];
   if (!desk) {
     throw new ApiError("workspace_not_found", "The desk this key belongs to no longer exists.", 403);
   }
