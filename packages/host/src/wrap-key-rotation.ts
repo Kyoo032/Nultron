@@ -172,6 +172,7 @@ export type EncryptedStoreRotationCounts = {
   deskFiles: number;
   knowledgeSources: number;
   knowledgeGraphNodes: number;
+  apiJobs: number;
 };
 
 export type RotateWrapKeyResult = {
@@ -320,6 +321,7 @@ const SINGLE_COLUMN_TABLES: readonly SingleColumnTableSpec[] = [
   { table: "knowledge_sources", column: "name", countKey: "knowledgeSources", where: "origin_kind = 'thread'" },
   { table: "knowledge_graph_nodes", column: "label", countKey: "knowledgeGraphNodes" },
   { table: "customer_messages", column: "text", countKey: "customerMessages" },
+  { table: "api_jobs", column: "result_sealed", countKey: "apiJobs" },
 ];
 
 type MultiColumnTableSpec = {
@@ -426,6 +428,7 @@ export function rotateWrapKey(input: RotateWrapKeyInput): RotateWrapKeyResult {
       deskFiles: 0,
       knowledgeSources: 0,
       knowledgeGraphNodes: 0,
+      apiJobs: 0,
     };
 
     if (sql) {

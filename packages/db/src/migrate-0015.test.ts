@@ -209,9 +209,13 @@ describe("0015_tenants on a fresh database", () => {
     // per organization. tenant_reset_audit is Phase 8 (0020): it records that a tenant erased its
     // own content, so it has to hang off the thing that survives that act — the tenant — and never
     // off the organization the reset deletes. audit_events is F2: the desk's trail is the tenant's,
-    // and it has to outlive a workspace or an org the way the reset audit does. Nothing else is
+    // and it has to outlive a workspace or an org the way the reset audit does. agent_api_keys and
+    // api_jobs are F5a (0029): a desk's public-API credentials and their async jobs belong to the
+    // tenant and die with it, they are not reached through one organization. Nothing else is
     // allowed to carry a second tenant_id.
     expect(carriers.sort()).toEqual([
+      "agent_api_keys",
+      "api_jobs",
       "audit_events",
       "auth_sessions",
       "billing_events",

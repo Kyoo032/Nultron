@@ -52,8 +52,13 @@ export function jsonError(error: unknown): HostJsonResult {
   };
 }
 
-export function jsonOk(body: unknown, status = 200, cookies?: HostJsonResult["cookies"]): HostJsonResult {
-  return { type: "json", status, body, cookies };
+export function jsonOk(
+  body: unknown,
+  status = 200,
+  cookies?: HostJsonResult["cookies"],
+  headers?: HostJsonResult["headers"],
+): HostJsonResult {
+  return { type: "json", status, body, cookies, headers };
 }
 
 export function isApiError(error: unknown): error is ApiError {

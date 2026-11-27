@@ -427,7 +427,7 @@ describe("rotating the session refresh tokens sealed on auth_sessions", () => {
     try {
       putSession(S1, "refresh-one", OLD_KEY);
       const result = rotateWrapKey({ from: OLD_KEY, to: NEW_KEY });
-    expect(result.sessionTokens).toBe(1);
+      expect(result.sessionTokens).toBe(1);
       expect(openRefresh(S1, storedFor(S1) as string, wrap(NEW_KEY))).not.toBeNull();
     } finally {
       delete process.env.AGENTFORGE_SERVER;
@@ -459,7 +459,10 @@ describe("rotating every encrypted database store and desk file object", () => {
     return decryptJson<T>(JSON.parse(raw), wrappingKeyFromSecret(secret));
   }
 
-  function seedAllStores(keySecret: string, options: { corruptTable?: "artifacts" | "desk_files" } = {}): {
+  function seedAllStores(
+    keySecret: string,
+    options: { corruptTable?: "artifacts" | "desk_files" } = {},
+  ): {
     deskObjectKey: string;
     deskObjectPath: string;
   } {
@@ -471,7 +474,9 @@ describe("rotating every encrypted database store and desk file object", () => {
       .prepare("INSERT INTO tenant_state (tenant_id, key, value, updated_at) VALUES (?, 'settings', ?, ?)")
       .run(A, sealed(payloadFor("desk-a", "sk-alpha-key-0000"), keySecret), now);
     sqlite
-      .prepare("INSERT INTO organizations (id, tenant_id, name, slug, industry_pack, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .prepare(
+        "INSERT INTO organizations (id, tenant_id, name, slug, industry_pack, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      )
       .run("org-1", A, "Org 1", "org-1", "general", now);
     sqlite
       .prepare("INSERT INTO workspaces (id, organization_id, name, slug, created_at) VALUES (?, ?, ?, ?, ?)")
@@ -528,7 +533,9 @@ describe("rotating every encrypted database store and desk file object", () => {
       )
       .run("thread-legacy", "ws-1", "Legacy plaintext graph label", now);
     sqlite
-      .prepare("INSERT INTO messages (id, organization_id, thread_id, role, content, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .prepare(
+        "INSERT INTO messages (id, organization_id, thread_id, role, content, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      )
       .run("msg-1", "org-1", "thread-1", "user", sealStr([{ type: "text", text: "secret message" }], keySecret), now);
     sqlite
       .prepare(
@@ -536,7 +543,9 @@ describe("rotating every encrypted database store and desk file object", () => {
       )
       .run("run-1", "org-1", "thread-1", "ver-1", "text", "completed", now);
     sqlite
-      .prepare("INSERT INTO tool_invocations (id, organization_id, run_id, tool_key, input, output, status) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .prepare(
+        "INSERT INTO tool_invocations (id, organization_id, run_id, tool_key, input, output, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      )
       .run(
         "tool-1",
         "org-1",
@@ -625,7 +634,9 @@ describe("rotating every encrypted database store and desk file object", () => {
     mkdirSync(path.dirname(deskObjectPath), { recursive: true });
     writeFileSync(
       deskObjectPath,
-      options.corruptTable === "desk_files" ? sealStr("wrong", NEW_KEY) : sealStr("Secret desk file content", keySecret),
+      options.corruptTable === "desk_files"
+        ? sealStr("wrong", NEW_KEY)
+        : sealStr("Secret desk file content", keySecret),
       "utf8",
     );
     return { deskObjectKey, deskObjectPath };
@@ -647,6 +658,7 @@ describe("rotating every encrypted database store and desk file object", () => {
         deskFiles: 1,
         knowledgeSources: 1,
         knowledgeGraphNodes: 1,
+        apiJobs: 0,
       });
 
       const msg = sqlite.prepare("SELECT content FROM messages WHERE id = 'msg-1'").get() as { content: string };
@@ -684,7 +696,9 @@ describe("rotating every encrypted database store and desk file object", () => {
       };
       expect(openStr(source.name, NEW_KEY)).toBe("Encrypted chat work card");
       expect(() => openStr(source.name, OLD_KEY)).toThrow();
-      const sourceLegacy = sqlite.prepare("SELECT name FROM knowledge_sources WHERE id = 'source-thread-legacy'").get() as {
+      const sourceLegacy = sqlite
+        .prepare("SELECT name FROM knowledge_sources WHERE id = 'source-thread-legacy'")
+        .get() as {
         name: string;
       };
       expect(sourceLegacy.name).toBe("Legacy plaintext work card");
@@ -694,7 +708,9 @@ describe("rotating every encrypted database store and desk file object", () => {
       };
       expect(openStr(graphNode.label, NEW_KEY)).toBe("Encrypted graph thread label");
       expect(() => openStr(graphNode.label, OLD_KEY)).toThrow();
-      const graphLegacy = sqlite.prepare("SELECT label FROM knowledge_graph_nodes WHERE id = 'thread-legacy'").get() as {
+      const graphLegacy = sqlite
+        .prepare("SELECT label FROM knowledge_graph_nodes WHERE id = 'thread-legacy'")
+        .get() as {
         label: string;
       };
       expect(graphLegacy.label).toBe("Legacy plaintext graph label");
@@ -723,9 +739,9 @@ describe("rotating every encrypted database store and desk file object", () => {
         .content;
       const deskBefore = readFileSync(deskObjectPath, "utf8");
 
-      expect(() =>
-        rotateWrapKey({ from: OLD_KEY, to: NEW_KEY, backend: stateStore.dbTenantStateBackend }),
-      ).toThrow(WrapKeyRotationError);
+      expect(() => rotateWrapKey({ from: OLD_KEY, to: NEW_KEY, backend: stateStore.dbTenantStateBackend })).toThrow(
+        WrapKeyRotationError,
+      );
 
       const msgAfter = (sqlite.prepare("SELECT content FROM messages WHERE id = 'msg-1'").get() as { content: string })
         .content;
@@ -745,9 +761,9 @@ describe("rotating every encrypted database store and desk file object", () => {
     try {
       const msgBefore = (sqlite.prepare("SELECT content FROM messages WHERE id = 'msg-1'").get() as { content: string })
         .content;
-      expect(() =>
-        rotateWrapKey({ from: OLD_KEY, to: NEW_KEY, backend: stateStore.dbTenantStateBackend }),
-      ).toThrow(WrapKeyRotationError);
+      expect(() => rotateWrapKey({ from: OLD_KEY, to: NEW_KEY, backend: stateStore.dbTenantStateBackend })).toThrow(
+        WrapKeyRotationError,
+      );
       const msgAfter = (sqlite.prepare("SELECT content FROM messages WHERE id = 'msg-1'").get() as { content: string })
         .content;
       expect(msgAfter).toBe(msgBefore);
@@ -773,9 +789,9 @@ describe("rotating every encrypted database store and desk file object", () => {
       expect(result.dryRun).toBe(true);
       expect(result.encryptedStores.messages).toBe(1);
       expect(result.encryptedStores.deskFiles).toBe(1);
-      expect((sqlite.prepare("SELECT content FROM messages WHERE id = 'msg-1'").get() as { content: string }).content).toBe(
-        msgBefore,
-      );
+      expect(
+        (sqlite.prepare("SELECT content FROM messages WHERE id = 'msg-1'").get() as { content: string }).content,
+      ).toBe(msgBefore);
       expect(readFileSync(deskObjectPath, "utf8")).toBe(deskBefore);
     } finally {
       rmSync(deskMediaRoot, { recursive: true, force: true });
@@ -784,7 +800,9 @@ describe("rotating every encrypted database store and desk file object", () => {
 
   it("reads a rotated Chat work-card name through Knowledge under the new key", async () => {
     const { sql: knowledgeSql } = await import("@agentforge/db");
-    stateStore.registerTenantStateSql(knowledgeSql as unknown as Parameters<typeof stateStore.registerTenantStateSql>[0]);
+    stateStore.registerTenantStateSql(
+      knowledgeSql as unknown as Parameters<typeof stateStore.registerTenantStateSql>[0],
+    );
     const workspaceId = "ws-rotate-read";
     const threadId = "thread-rotate-read";
     const title = "Rotation-sensitive chat work card 7701";

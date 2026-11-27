@@ -65,6 +65,12 @@ export const ADMINISTER_ROUTES: ReadonlySet<string> = new Set([
   // because the route is a mutation — `agents`.
   // Billing and components.
   "POST /api/v1/billing/top-up",
+  // F5a desk API keys: mint/revoke/rotate is administer (Owner, or Admin when delegated).
+  // The list is administer too — it reveals another member's key metadata.
+  "GET /api/v1/api-keys",
+  "POST /api/v1/api-keys",
+  "POST /api/v1/api-keys/:id/revoke",
+  "POST /api/v1/api-keys/:id/rotate",
   "POST /api/v1/components/install/stream",
   // Desks and the agents on them. Selecting a desk is the person's own preference, not administer.
   "POST /api/v1/workspaces",

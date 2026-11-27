@@ -126,6 +126,10 @@ export const TENANT_SCOPED_TABLES = [
   // The byte counter (Phase 6). It has to reach zero in the same transaction the rows do, or the
   // tenant is billed storage for objects that no longer exist until somebody runs a recompute.
   "tenant_storage",
+  // F5a desk API keys and their async jobs (migration 0029): a purged tenant's credentials and
+  // sealed job results go with it — leaving `key_hash` rows behind would keep dead keys verifiable.
+  "agent_api_keys",
+  "api_jobs",
   // Every browser session of the tenant, and with each row the portal refresh token sealed on it
   // (`refresh_sealed`, migration 0021). Owner decision 2026-10-01, SR-65: when the company account is
   // erased every person in it is deleted, so nobody stays signed in. It goes in the same transaction

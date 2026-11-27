@@ -32,6 +32,7 @@ import {
 import { RATE_LIMITED_CODE, RATE_LIMITED_MESSAGE, checkRequestRate, clientIp, sessionRateKey } from "./rate-limit";
 import { applySecurityHeaders } from "./security-headers";
 import type { HostCookie, HostFile, HostRequest, HostResult } from "./types";
+import { isPublicApiPath } from "./public-api/auth";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 /** Only paths under this prefix are answered here; everything else falls through to the web server. */
@@ -254,9 +255,7 @@ async function readBody(
     total += piece.byteLength;
     if (total > cap) {
       req.destroy();
-      throw new BodyTooLarge(
-        isWebhook ? "Request body exceeds the 1 MB cap" : "Request body exceeds the 26 MB cap",
-      );
+      throw new BodyTooLarge(isWebhook ? "Request body exceeds the 1 MB cap" : "Request body exceeds the 26 MB cap");
     }
     chunks.push(piece);
   }
@@ -353,6 +352,9 @@ export async function writeHostResult(
     res.statusCode = result.status;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("X-Content-Type-Options", "nosniff");
+    for (const [name, value] of Object.entries(result.headers ?? {})) {
+      res.setHeader(name, value);
+    }
     res.end(JSON.stringify(result.body));
     return;
   }
@@ -550,7 +552,14 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
   // The "is this ours to answer" test stays on the raw path: normalising only removes slashes, so it
   // can never turn a non-/api path into an /api one, and the set of requests this adapter DISPATCHES
   // is unchanged. The transport rules below are deliberately not gated on it.
-  const isApiPath = rawPath?.startsWith(API_PREFIX) ?? false;
+  // The public API table (`/api/public/v1/*`, already inside API_PREFIX, and the bare
+  // `/v1/chat/completions` facade) is dispatched by this adapter too: its callers are
+  // bearer-key integrations, never the page server.
+  // The public test runs on the NORMALISED path: `/v1/chat/completions/` and a doubled slash
+  // inside `/api/public/v1/*` spell the same public route and must get the same bearer-key rules
+  // as their canonical form, not the browser checks below.
+  const isPublic = rawPath !== null && isPublicApiPath(normaliseApiPath(rawPath));
+  const isApiPath = (rawPath?.startsWith(API_PREFIX) ?? false) || isPublic;
   // One switch decides which rule this process runs: the hosted web rule or the local loopback rule.
   const serverMode = isServerMode();
   /*
@@ -658,13 +667,15 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
     const { handleBootEditJobs } = await import("./handlers/edit");
     void handleBootEditJobs();
   }
-  if (!CSRF_EXEMPT_PATHS.has(path)) {
+  // The Origin and CSRF rules are about a call the renderer makes; a bearer-key public
+  // request answers `invalid_api_key` or its route, never a session check, so it skips both.
+  if (!isPublic && !CSRF_EXEMPT_PATHS.has(path)) {
     const rejection = hostRejection(header(req, "host"), serverMode);
     if (rejection) {
       return respondRejection(res, { status: 403, ...rejection }, context);
     }
   }
-  if (!SAFE_METHODS.has(method) && !CSRF_EXEMPT_PATHS.has(path)) {
+  if (!SAFE_METHODS.has(method) && !isPublic && !CSRF_EXEMPT_PATHS.has(path)) {
     const rejection = mutatingRejection(req, path, cookies, csrfMode, presentedSessionId);
     if (rejection) {
       return respondRejection(res, { status: 403, ...rejection }, context);
@@ -708,6 +719,9 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
     query,
     params: {},
     headers: {
+      // Forwarded only on the public API paths, where `authenticatePublic` reads it;
+      // session routes never see an Authorization header from this adapter.
+      ...(isPublic ? { authorization: header(req, "authorization"), accept: header(req, "accept") } : {}),
       origin: header(req, "origin"),
       referer: header(req, "referer"),
       cookie: header(req, "cookie"),

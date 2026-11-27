@@ -68,6 +68,8 @@ export type HostJsonResult = {
   status: number;
   body: unknown;
   cookies?: HostCookie[];
+  /** Extra response headers, e.g. `Retry-After` on a 429. */
+  headers?: Record<string, string>;
 };
 
 export type HostStreamResult = {
